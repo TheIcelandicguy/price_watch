@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Price Watch</title>
+  <!-- Light mode logo: dark navy outer disc, white inner disc, currency symbols in the ring -->
+  <circle cx="128" cy="128" r="124" fill="#1e293b"/>
+  <circle cx="128" cy="128" r="60" fill="white"/>
+  <text x="128" y="148" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="48" font-weight="600" fill="#1e293b" text-anchor="middle">PW</text>
+  <!-- Currency symbols in the outer ring -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="600" fill="white" text-anchor="middle">
+    <text x="128" y="36">$</text>
+    <text x="193" y="65">€</text>
+    <text x="220" y="135">£</text>
+    <text x="193" y="206">¥</text>
+    <text x="128" y="234">kr</text>
+    <text x="63" y="206">₹</text>
+    <text x="36" y="135">฿</text>
+    <text x="63" y="65">₽</text>
+  </g>
+</svg>

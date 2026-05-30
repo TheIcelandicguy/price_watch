@@ -1,0 +1,366 @@
+"""Sensor platform for Price Watch.
+
+Phase 2.3: per-listing sensors. Each product has N listings; each listing
+gets its own price/lowest/highest/target_diff/stock_count sensors. The
+primary listing keeps legacy unique_ids ({entry}_{key}) for back-compat
+with existing entity registry entries and the panel; secondary listings
+use extended unique_ids ({entry}_{listing}_{key}) which the panel's
+key-splitting logic gracefully ignores (so secondary listings are
+invisible in the current panel — Phase 4 will extend the panel UI).
+
+price_local is only created for the primary listing — FX conversion is
+product-level in Phase 2 (see coordinator._update_price_local).
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .config_flow import ENTRY_TYPE_PRODUCT
+from .const import (
+    ATTR_ALTERNATIVES,
+    ATTR_ALTERNATIVES_ERROR,
+    ATTR_ALTERNATIVES_FETCHED_AT,
+    ATTR_CURRENCY,
+    ATTR_IMAGE_URL,
+    ATTR_LAST_CHECK,
+    ATTR_PRICE_HISTORY,
+    ATTR_PRODUCT_URL,
+    ATTR_RETAILER,
+    ATTR_SKU,
+    ATTR_STOCK_COUNT,
+    ATTR_TITLE,
+    DOMAIN,
+)
+from .coordinator import PriceWatchCoordinator
+
+# Monetary sensors all behave the same (price/lowest/highest/target_diff/price_local)
+MONETARY_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="price",
+        translation_key="price",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:tag",
+    ),
+    SensorEntityDescription(
+        key="lowest",
+        translation_key="lowest",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:arrow-down-bold",
+    ),
+    SensorEntityDescription(
+        key="highest",
+        translation_key="highest",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:arrow-up-bold",
+    ),
+    SensorEntityDescription(
+        key="target_diff",
+        translation_key="target_diff",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:bullseye-arrow",
+    ),
+    SensorEntityDescription(
+        key="price_local",
+        translation_key="price_local",
+        device_class=SensorDeviceClass.MONETARY,
+        suggested_display_precision=2,
+        icon="mdi:cash-multiple",
+    ),
+)
+
+STOCK_COUNT_DESCRIPTION = SensorEntityDescription(
+    key="stock_count",
+    translation_key="stock_count",
+    icon="mdi:numeric",
+    native_unit_of_measurement="units",
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up sensors for a product entry.
+
+    Phase 2.3: iterates over coordinator.listing_ids. For the primary
+    listing, creates the full set (5 monetary + 1 stock count) with
+    legacy unique_ids. For secondary listings, creates 4 monetary
+    (no price_local) + 1 stock count with listing-prefixed unique_ids.
+    """
+    if entry.data.get("entry_type") != ENTRY_TYPE_PRODUCT:
+        return
+
+    coordinator: PriceWatchCoordinator = hass.data[DOMAIN][entry.entry_id]
+
+    entities: list[SensorEntity] = []
+    primary_id = coordinator.primary_listing_id
+
+    for listing_id in coordinator.listing_ids:
+        is_primary = listing_id == primary_id
+        for description in MONETARY_DESCRIPTIONS:
+            # price_local only makes sense for the primary listing in
+            # Phase 2 (FX conversion is product-level, see coordinator
+            # ._update_price_local). Skip on secondary listings to
+            # avoid creating sensors that always report None.
+            if description.key == "price_local" and not is_primary:
+                continue
+            entities.append(
+                PriceWatchMonetarySensor(coordinator, description, listing_id)
+            )
+        entities.append(
+            PriceWatchStockCountSensor(coordinator, STOCK_COUNT_DESCRIPTION, listing_id)
+        )
+
+    async_add_entities(entities)
+
+
+class _BasePriceWatchSensor(CoordinatorEntity[PriceWatchCoordinator], SensorEntity):
+    """Common base for Price Watch sensors.
+
+    Each sensor is bound to a specific listing_id. For the primary
+    listing, unique_id retains the legacy {entry_id}_{key} format so
+    existing entity registry entries match. For secondary listings,
+    unique_id is {entry_id}_{listing_id}_{key}.
+    """
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: PriceWatchCoordinator,
+        description: SensorEntityDescription,
+        listing_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._listing_id = listing_id
+
+        entry_id = coordinator.entry.entry_id
+        if listing_id == coordinator.primary_listing_id:
+            # Legacy form — matches existing entity registry entries
+            self._attr_unique_id = f"{entry_id}_{description.key}"
+        else:
+            # Per-listing form for secondary listings (no existing
+            # entities to preserve)
+            self._attr_unique_id = (
+                f"{entry_id}_{listing_id}_{description.key}"
+            )
+            # Prefix the entity name with the retailer for clarity
+            # in the entity list. e.g. "Newegg Price" alongside the
+            # primary listing's plain "Price". Only set when we can
+            # resolve a retailer name; otherwise fall back to the
+            # translation_key default.
+            config = coordinator.get_listing_config(listing_id) or {}
+            retailer = config.get("retailer")
+            if retailer:
+                # Use translation_key-style name with the retailer
+                # appended. The translation_key handles the base
+                # ("Price", "Lowest", etc.); we just prepend retailer.
+                self._attr_name = f"{retailer} {self._description_label(description.key)}"
+
+    @staticmethod
+    def _description_label(key: str) -> str:
+        """Human-readable label for a description key.
+
+        Used to construct entity names for secondary listings without
+        going through the translation_key machinery (which would
+        require translation files for any per-listing variant). The
+        labels mirror what the translation files would produce.
+        """
+        return {
+            "price": "Price",
+            "lowest": "Lowest seen",
+            "highest": "Highest seen",
+            "target_diff": "Target diff",
+            "price_local": "Price (local)",
+            "stock_count": "Stock count",
+        }.get(key, key.replace("_", " ").title())
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        return self.coordinator.device_info
+
+    # Convenience accessors — sensors below use these instead of
+    # talking to the coordinator's primary-listing-fronted properties.
+    @property
+    def _result(self):
+        """Latest ExtractionResult for THIS sensor's listing (or None)."""
+        return self.coordinator.get_listing_result(self._listing_id)
+
+    @property
+    def _listing_state(self) -> dict[str, Any]:
+        """Runtime state dict for THIS sensor's listing (or empty dict)."""
+        return self.coordinator.get_listing_state(self._listing_id) or {}
+
+
+class PriceWatchMonetarySensor(_BasePriceWatchSensor):
+    """Sensor for any monetary value (price, lowest, highest, target_diff, price_local)."""
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Currency for this sensor.
+
+        For price_local: the user's home currency (set in settings).
+        For everything else: the listing's source currency.
+        """
+        result = self._result
+        if result is None:
+            return None
+        if self.entity_description.key == "price_local":
+            return self.coordinator.home_currency or None
+        return result.currency or None
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the value for this sensor."""
+        result = self._result
+        state = self._listing_state
+        key = self.entity_description.key
+
+        if key == "price":
+            if result is None:
+                return None
+            # For a discontinued listing, the live page returns 0 — but
+            # the user's expectation is "show me what it cost when it
+            # was still sold." Surface the LKG price for THIS listing;
+            # the discontinued binary sensor and attributes tell the
+            # rest of the story.
+            if result.discontinued:
+                return state.get("lkg_price")
+            return result.price
+        if key == "lowest":
+            return state.get("lowest")
+        if key == "highest":
+            return state.get("highest")
+        if key == "target_diff":
+            target = self.coordinator.target_price
+            if result is None or target is None:
+                return None
+            # Don't compute target_diff against a discontinued listing.
+            if result.discontinued:
+                return None
+            return round(result.price - target, 2)
+        if key == "price_local":
+            # price_local sensor only exists on the primary listing;
+            # the value is product-level (computed once per tick from
+            # the primary listing's result).
+            return self.coordinator.price_local
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Hide price_local until we have a value (avoids "unavailable" noise)."""
+        if self.entity_description.key == "price_local":
+            return (
+                super().available
+                and self._result is not None
+                and self.coordinator.price_local is not None
+            )
+        return super().available
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Expose full product context on the price sensor.
+
+        Per-listing attributes (title, URL, retailer, history) come
+        from THIS listing's result and state. Product-level fields
+        (alternatives) appear only on the primary listing's price
+        sensor — they're shared across the product and showing them
+        on every listing would be duplicative.
+        """
+        if self.entity_description.key != "price":
+            return None
+        result = self._result
+        if result is None:
+            return None
+        state = self._listing_state
+        config = self.coordinator.get_listing_config(self._listing_id) or {}
+        # Listing URL: prefer the listing config's URL; fall back to
+        # the coordinator's product-level URL (primary listing).
+        product_url = config.get("url") or self.coordinator.url
+
+        attrs: dict[str, Any] = {
+            ATTR_TITLE: result.title,
+            ATTR_PRODUCT_URL: product_url,
+            ATTR_IMAGE_URL: result.image_url,
+            ATTR_RETAILER: result.retailer,
+            ATTR_CURRENCY: result.currency,
+            ATTR_SKU: result.sku,
+            ATTR_STOCK_COUNT: result.stock_count,
+            ATTR_LAST_CHECK: state.get("last_check") or self._last_check_iso(),
+            ATTR_PRICE_HISTORY: state.get("history") or [],
+            "extraction_method": result.method,
+            "lifetime_cost_usd": round(
+                float(state.get("lifetime_cost_usd") or 0.0), 4
+            ),
+            "listing_id": self._listing_id,
+        }
+
+        # Alternatives are product-level — only attach to the primary
+        # listing's price sensor. Showing them on every listing's price
+        # sensor would be redundant.
+        if self._listing_id == self.coordinator.primary_listing_id:
+            attrs[ATTR_ALTERNATIVES] = self.coordinator.alternatives
+            attrs[ATTR_ALTERNATIVES_FETCHED_AT] = (
+                self.coordinator.alternatives_fetched_at
+            )
+            attrs[ATTR_ALTERNATIVES_ERROR] = self.coordinator.alternatives_error
+
+        # Discontinued context for THIS listing (per-listing — secondary
+        # listings can be discontinued independently)
+        if result.discontinued:
+            attrs.update(
+                {
+                    "discontinued": True,
+                    "discontinued_reason": result.discontinued_reason,
+                    "discontinued_at": state.get("discontinued_at"),
+                    "last_known_price": state.get("lkg_price"),
+                    "last_known_currency": state.get("lkg_currency"),
+                    "last_known_observed_at": state.get("lkg_observed_at"),
+                }
+            )
+        return attrs
+
+    def _last_check_iso(self) -> str | None:
+        """Fallback last_check derived from coordinator-level success time.
+
+        Used when a listing hasn't yet stored its own last_check (e.g.
+        very first tick before _async_save runs). Mirrors the legacy
+        behavior — last_update_success_time is when _async_update_data
+        completed, which IS when this listing was last refreshed for
+        single-listing products.
+        """
+        ts = getattr(self.coordinator, "last_update_success_time", None)
+        if ts is None:
+            return None
+        try:
+            return ts.isoformat()
+        except Exception:  # noqa: BLE001
+            return None
+
+
+class PriceWatchStockCountSensor(_BasePriceWatchSensor):
+    """Numeric stock-count sensor. Stays unknown when count isn't available."""
+
+    @property
+    def native_value(self) -> int | None:
+        result = self._result
+        if result is None:
+            return None
+        return result.stock_count

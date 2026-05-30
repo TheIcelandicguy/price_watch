@@ -1,0 +1,234 @@
+{
+  "config": {
+    "step": {
+      "settings": {
+        "title": "Price Watch — first-time setup",
+        "description": "Price Watch can extract product info two ways:\n\n1. **Free, no API needed** — works on any site with Schema.org Product markup (most major retailers), or via a custom parser you define per-site.\n\n2. **AI extraction** — works on any site. Pick a provider below:\n\n• **Anthropic (Claude)** — paste an `sk-ant-…` key. Typical cost: $0.50–$2/month for ~10 products. See {docs_url}.\n• **OpenAI-compatible** — point at any service speaking OpenAI's chat-completions API: OpenAI itself, Ollama (free, local), Groq, OpenRouter, LM Studio, Together, Fireworks, etc. Fill in `base_url` (e.g. `https://api.openai.com/v1` or `http://localhost:11434/v1`) and `model`. Leave the API key blank for local servers.\n\nLeave both API keys blank to start in free mode. You can change provider/keys later in the integration's options.\n\nSet a home currency (3-letter code like ISK, EUR, USD) to enable the price-in-local-currency sensor. Supported: AUD BGN BRL CAD CHF CNY CZK DKK EUR GBP HKD HUF IDR ILS INR ISK JPY KRW MXN MYR NOK NZD PHP PLN RON SEK SGD THB TRY USD ZAR.",
+        "data": {
+          "ai_provider": "AI provider",
+          "api_key": "API key (Anthropic: sk-ant-… / OpenAI: sk-… / local: leave blank)",
+          "model_anthropic": "Anthropic model (only matters when provider = Anthropic)",
+          "base_url": "OpenAI-compat base URL (e.g. https://api.openai.com/v1 or http://localhost:11434/v1)",
+          "model_openai": "OpenAI-compat model name (e.g. gpt-4o-mini, llama3.3, qwen-coder)",
+          "input_cost_per_mtok": "Input cost per million tokens (USD, 0 = free/unknown)",
+          "output_cost_per_mtok": "Output cost per million tokens (USD, 0 = free/unknown)",
+          "max_html_chars": "Max HTML chars sent to model (smaller for tiny local models)",
+          "force_json_mode": "Force JSON mode instead of tool calls (older Ollama, some local models)",
+          "extra_headers": "Extra HTTP headers (optional JSON object, e.g. for OpenRouter analytics)",
+          "home_currency": "Home currency (3-letter ISO code, optional)",
+          "daily_budget_usd": "Daily budget cap (USD)",
+          "monthly_budget_usd": "Monthly budget cap (USD)"
+        }
+      },
+      "product": {
+        "title": "Add a product to track",
+        "description": "Paste the product URL. Price Watch will fetch the page and extract the product details.\n\n**Cookies (optional)** — only needed for sites with hostile bot detection (Amazon, etc.). Open the product page in your browser, then DevTools (F12) → Network tab → reload → click the document request → Headers → copy the `Cookie:` value and paste it below.",
+        "data": {
+          "url": "Product URL",
+          "cookies": "Cookies (optional — for sites that need them)"
+        }
+      },
+      "confirm": {
+        "title": "Confirm tracked product",
+        "description": "Found:\n\n**{title}**\nRetailer: {retailer}\nPrice: {price}\nMethod: {method} (cost: {cost_usd})\n\nSet a target price to be notified when it drops below.",
+        "data": {
+          "name": "Display name",
+          "target_price": "Target price (leave empty for none)",
+          "scan_interval": "Check interval (minutes)"
+        }
+      },
+      "user": {
+        "title": "Add a tracked product",
+        "description": "How do you want to add this product?",
+        "menu_options": {
+          "product": "Add by URL (paste a product link, integration fetches details)",
+          "shell": "Add by name (create empty entry, add retailer URLs later)"
+        }
+      },
+      "shell": {
+        "title": "Add product (shell mode)",
+        "description": "Create an empty tracked product — just the name, no URL yet.\n\nAfter creation, add retailer URLs using the **price_watch.add_listing** service. Each listing gets its own price/lowest/highest sensors and polls independently. This is useful when you want to track the same product across multiple retailers.",
+        "data": {
+          "name": "Product name"
+        }
+      }
+    },
+    "error": {
+      "extraction_failed": "Could not extract product info from this URL. The page may be JS-rendered or protected. Try defining a custom parser in advanced options.",
+      "needs_api_or_parser": "This page has no Schema.org Product data, so it can't be tracked in free mode. Either add an Anthropic API key in the integration options, or define a custom parser for this site (see docs).",
+      "invalid_key_format": "API keys start with 'sk-ant-'.",
+      "invalid_key": "API key is invalid.",
+      "validation_error": "Could not validate the API key. Check your network connection.",
+      "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
+      "model_required": "Model name is required for OpenAI-compatible providers.",
+      "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
+      "extra_headers_invalid_json": "Extra headers must be valid JSON (e.g. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_not_object": "Extra headers must be a JSON object (key/value pairs), not an array or string.",
+      "custom_parser_invalid_json": "Custom parser must be valid JSON (e.g. {\"type\": \"regex\", \"price\": \"\\\\$([\\\\d.,]+)\"}).",
+      "custom_parser_not_object": "Custom parser must be a JSON object (key/value pairs), not an array or string.",
+      "unknown": "Unexpected error. See HA logs for details.",
+      "name_required": "Product name is required."
+    },
+    "abort": {
+      "already_configured": "This URL is already being tracked."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Price Watch options",
+        "description": "Choose what to configure. Each section has its own page so you only see what's relevant. Click **Save and exit** when you're done.",
+        "menu_options": {
+          "basic": "Basic — target price, check interval, pause",
+          "parser": "Parser — cookies and custom parser config",
+          "provider": "AI provider override (advanced)",
+          "maintenance": "Maintenance — force discontinued, reset history",
+          "save_exit": "Save and exit"
+        },
+        "data": {
+          "ai_provider": "AI provider",
+          "api_key": "API key (Anthropic: sk-ant-… / OpenAI: sk-… / local: leave blank)",
+          "model_anthropic": "Anthropic model",
+          "base_url": "OpenAI-compat base URL",
+          "model_openai": "OpenAI-compat model name",
+          "input_cost_per_mtok": "Input cost per million tokens (USD)",
+          "output_cost_per_mtok": "Output cost per million tokens (USD)",
+          "max_html_chars": "Max HTML chars sent to model",
+          "force_json_mode": "Force JSON mode (older Ollama / some local models)",
+          "extra_headers": "Extra HTTP headers (optional JSON object)",
+          "home_currency": "Home currency (3-letter ISO code)",
+          "daily_budget_usd": "Daily budget cap (USD)",
+          "monthly_budget_usd": "Monthly budget cap (USD)"
+        }
+      },
+      "basic": {
+        "title": "Basic options",
+        "description": "Target price, how often to check, and whether to pause polling.",
+        "data": {
+          "target_price": "Target price (leave empty for none)",
+          "scan_interval": "Check interval (minutes)",
+          "paused": "Pause polling for this product",
+          "daily_alternatives": "Refresh alternatives daily (find competing listings)",
+          "back_to_menu": "← Back to menu (discard changes on this page)"
+        }
+      },
+      "parser": {
+        "title": "Parser options",
+        "description": "Cookies and custom parser config. Cookies are stored inside the parser config; leave the parser field alone unless you know what you're doing.\n\n**Cookies** — paste a Cookie header value to send with every request (DevTools → Network tab → reload → click document → Headers → copy `Cookie:` value).\n\n**Custom parser** — raw JSON, e.g. `{\"type\": \"regex\", \"price\": \"\\\\$([\\\\d.,]+)\", \"request_cookies\": \"...\"}`. Leave blank to use the auto-detected preset.",
+        "data": {
+          "cookies": "Cookies (one-line header value)",
+          "custom_parser": "Custom parser (JSON, advanced)",
+          "back_to_menu": "← Back to menu (discard changes on this page)"
+        }
+      },
+      "provider": {
+        "title": "AI provider override",
+        "description": "Override the shared AI provider for this product only. Default is **Inherit from settings** — leave it there unless you have a specific reason to use a different provider/model for this URL.\n\nFields not relevant to the chosen provider are ignored.",
+        "data": {
+          "ai_provider": "Provider override",
+          "api_key": "API key",
+          "model_anthropic": "Anthropic model",
+          "base_url": "OpenAI-compat base URL",
+          "model_openai": "OpenAI-compat model name",
+          "input_cost_per_mtok": "Input cost per million tokens (USD)",
+          "output_cost_per_mtok": "Output cost per million tokens (USD)",
+          "max_html_chars": "Max HTML chars sent to model",
+          "force_json_mode": "Force JSON mode",
+          "extra_headers": "Extra HTTP headers",
+          "back_to_menu": "← Back to menu (discard changes on this page)"
+        }
+      },
+      "maintenance": {
+        "title": "Maintenance",
+        "description": "Manual overrides. Use sparingly.\n\n**Force discontinued** — manually mark this product as discontinued. Polling stops and the sensor shows the last known price. Untick to resume polling.\n\n**Reset history** — wipe the price history (lowest/highest/sparkline). Useful after fixing a parser that was producing bad prices. The current price is kept. This is a one-shot action; the checkbox doesn't persist.",
+        "data": {
+          "force_discontinued": "Force discontinued",
+          "reset_history": "Reset price history now",
+          "back_to_menu": "← Back to menu (discard changes on this page)"
+        }
+      }
+    },
+    "error": {
+      "invalid_key_format": "API keys start with 'sk-ant-'.",
+      "invalid_key": "API key is invalid.",
+      "validation_error": "Could not validate the API key. Check your network connection.",
+      "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
+      "model_required": "Model name is required for OpenAI-compatible providers.",
+      "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
+      "extra_headers_invalid_json": "Extra headers must be valid JSON (e.g. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_not_object": "Extra headers must be a JSON object (key/value pairs), not an array or string.",
+      "custom_parser_invalid_json": "Custom parser must be valid JSON.",
+      "custom_parser_not_object": "Custom parser must be a JSON object (key/value pairs)."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "price": {
+        "name": "Price"
+      },
+      "lowest": {
+        "name": "Lowest seen"
+      },
+      "highest": {
+        "name": "Highest seen"
+      },
+      "target_diff": {
+        "name": "Target diff"
+      },
+      "stock_count": {
+        "name": "Stock count"
+      },
+      "price_local": {
+        "name": "Price (local)"
+      }
+    },
+    "binary_sensor": {
+      "in_stock": {
+        "name": "In stock",
+        "state": {
+          "off": "No",
+          "on": "Yes"
+        }
+      },
+      "discontinued": {
+        "name": "Discontinued",
+        "state": {
+          "off": "No",
+          "on": "Yes"
+        }
+      }
+    }
+  },
+  "services": {
+    "refresh_now": {
+      "name": "Refresh now",
+      "description": "Force an immediate price check."
+    },
+    "set_target": {
+      "name": "Set target price",
+      "description": "Update the target price for a tracked product."
+    },
+    "reset_history": {
+      "name": "Reset history",
+      "description": "Wipe the price history."
+    },
+    "find_alternatives": {
+      "name": "Find alternatives",
+      "description": "Search the web for alternative retailer listings of a tracked product.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "Search only for this product (optional)."
+        },
+        "device_id": {
+          "name": "Device",
+          "description": "Search only for this product, by HA device."
+        },
+        "max_results": {
+          "name": "Max results",
+          "description": "How many alternatives to return at most (1-20)."
+        }
+      }
+    }
+  }
+}

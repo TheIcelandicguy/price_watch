@@ -1,0 +1,17 @@
+{
+  "domain": "price_watch",
+  "name": "Price Watch",
+  "version": "0.1.0",
+  "documentation": "https://github.com/davidh/price_watch",
+  "issue_tracker": "https://github.com/davidh/price_watch/issues",
+  "codeowners": ["@davidh"],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "integration_type": "service",
+  "requirements": [
+    "anthropic>=0.40.0",
+    "openai>=1.40.0",
+    "beautifulsoup4>=4.12.0",
+    "curl_cffi>=0.15.0"
+  ]
+}

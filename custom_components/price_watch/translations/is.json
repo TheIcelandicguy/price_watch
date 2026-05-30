@@ -1,0 +1,234 @@
+{
+  "config": {
+    "step": {
+      "settings": {
+        "title": "Price Watch — fyrsta uppsetning",
+        "description": "Price Watch getur lesið vöruupplýsingar á tvo vegu:\n\n1. **Ókeypis, án API** — virkar á hvaða síðu sem er með Schema.org Product merkingu (flestar stærri verslanir), eða í gegnum eigin þáttara sem þú skilgreinir.\n\n2. **AI lestur** — virkar á hvaða síðu sem er. Veldu þjónustu:\n\n• **Anthropic (Claude)** — settu inn `sk-ant-…` lykil. Dæmigerður kostnaður: $0.50–$2 á mánuði fyrir ~10 vörur. Sjá {docs_url}.\n• **OpenAI-samhæft** — bendir á hvaða þjónustu sem talar OpenAI chat-completions API: OpenAI sjálft, Ollama (ókeypis, staðbundið), Groq, OpenRouter, LM Studio o.fl. Fylltu `base_url` (t.d. `https://api.openai.com/v1` eða `http://localhost:11434/v1`) og `model`. Skildu API lykil eftir auðan fyrir staðbundna þjóna.\n\nSkildu báða API lykla eftir auða til að byrja í ókeypis ham.\n\nStilltu heimagjaldmiðil (3-stafa kóði eins og ISK, EUR, USD). Stuðningur við: AUD BGN BRL CAD CHF CNY CZK DKK EUR GBP HKD HUF IDR ILS INR ISK JPY KRW MXN MYR NOK NZD PHP PLN RON SEK SGD THB TRY USD ZAR.",
+        "data": {
+          "ai_provider": "AI þjónusta",
+          "api_key": "API lykill (Anthropic: sk-ant-… / OpenAI: sk-… / staðbundið: skildu autt)",
+          "model_anthropic": "Anthropic líkan (skiptir aðeins máli ef Anthropic er valið)",
+          "base_url": "OpenAI-samhæft base URL (t.d. https://api.openai.com/v1 eða http://localhost:11434/v1)",
+          "model_openai": "OpenAI-samhæft líkan (t.d. gpt-4o-mini, llama3.3, qwen-coder)",
+          "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
+          "output_cost_per_mtok": "Úttakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
+          "max_html_chars": "Hámark HTML stafa sent á líkanið (minna fyrir lítil staðbundin líkön)",
+          "force_json_mode": "Þvinga JSON ham í stað tool calls (eldri Ollama, sum staðbundin líkön)",
+          "extra_headers": "Aukahöfuð (valfrjáls JSON hlutur, t.d. fyrir OpenRouter)",
+          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði, valfrjálst)",
+          "daily_budget_usd": "Dagleg þak (USD)",
+          "monthly_budget_usd": "Mánaðarlegt þak (USD)"
+        }
+      },
+      "product": {
+        "title": "Bæta við vöru",
+        "description": "Settu inn vefslóð á vöruna. Price Watch sækir síðuna og les út upplýsingarnar.\n\n**Vafrakökur (valfrjálst)** — aðeins þörf fyrir síður sem hindra sjálfvirkar fyrirspurnir (Amazon o.fl.). Opnaðu vörusíðuna í vafranum, ýttu á F12 → Network → endurhlaða → smelltu á document beiðnina → Headers → afritaðu `Cookie:` gildið og límdu hér að neðan.",
+        "data": {
+          "url": "Vefslóð vöru",
+          "cookies": "Vafrakökur (valfrjálst — fyrir síður sem þurfa þær)"
+        }
+      },
+      "confirm": {
+        "title": "Staðfesta vöru",
+        "description": "Fann:\n\n**{title}**\nVerslun: {retailer}\nVerð: {price}\nAðferð: {method} (kostnaður: {cost_usd})\n\nStilltu markverð til að fá tilkynningu þegar verðið fer þangað eða lægra.",
+        "data": {
+          "name": "Heiti",
+          "target_price": "Markverð (skildu eftir autt ef ekkert)",
+          "scan_interval": "Athugunartíðni (mínútur)"
+        }
+      },
+      "user": {
+        "title": "Bæta við vöru til að fylgjast með",
+        "description": "Hvernig viltu bæta þessari vöru við?",
+        "menu_options": {
+          "product": "Bæta við með slóð (límdu vöruslóð, samþættingin sækir upplýsingar)",
+          "shell": "Bæta við með nafni (búa til tóma færslu, bæta við slóðum síðar)"
+        }
+      },
+      "shell": {
+        "title": "Bæta við vöru (tóm færsla)",
+        "description": "Búa til tóma færslu fyrir vöru — bara nafnið, engin slóð ennþá.\n\nEftir að færslan er búin til, bættu við slóðum með **price_watch.add_listing** þjónustunni. Hver söluaðili fær sína eigin verð-/lægstu-/hæstu-skynjara og er sóttur sjálfstætt. Gagnlegt þegar þú vilt fylgjast með sömu vöru hjá mörgum söluaðilum.",
+        "data": {
+          "name": "Vöruheiti"
+        }
+      }
+    },
+    "error": {
+      "extraction_failed": "Gat ekki lesið vöruupplýsingar úr þessari vefslóð. Síðan er kannski JS-byggð eða varin. Prófaðu að setja upp eigin þáttara í valkostum.",
+      "needs_api_or_parser": "Þessi síða er ekki með Schema.org Product gögn, svo ekki er hægt að fylgjast með henni í ókeypis ham. Annaðhvort bættu Anthropic API lykli við í valkostum, eða skilgreindu eigin þáttara fyrir þessa síðu (sjá docs).",
+      "invalid_key_format": "API lyklar byrja á 'sk-ant-'.",
+      "invalid_key": "API lykill er ógildur.",
+      "validation_error": "Gat ekki staðfest API lykil. Athugaðu netnotkun.",
+      "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur (t.d. https://api.openai.com/v1).",
+      "model_required": "Líkansheiti er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
+      "openai_compat_unreachable": "Gat ekki náð í OpenAI-samhæfða þjónustu. Athugaðu URL, net, og að þjónninn sé í gangi. Ef þjónninn styður ekki tool calls, prófaðu 'Force JSON mode'.",
+      "extra_headers_invalid_json": "Aukahöfuð verða að vera gilt JSON (t.d. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_not_object": "Aukahöfuð verða að vera JSON hlutur (lykill/gildi), ekki listi eða strengur.",
+      "custom_parser_invalid_json": "Eigin þáttari verður að vera gilt JSON.",
+      "custom_parser_not_object": "Eigin þáttari verður að vera JSON hlutur (lykill/gildi), ekki listi eða strengur.",
+      "unknown": "Óvænt villa. Sjá HA log.",
+      "name_required": "Vöruheiti er nauðsynlegt."
+    },
+    "abort": {
+      "already_configured": "Þessi vefslóð er þegar í eftirliti."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Price Watch valkostir",
+        "description": "Veldu hvað á að breyta. Hver hluti er á sinni síðu. Smelltu á **Vista og loka** þegar þú ert búinn.",
+        "menu_options": {
+          "basic": "Grunnstillingar — markverð, tíðni, pása",
+          "parser": "Þáttari — vafrakökur og þáttari",
+          "provider": "AI þjónusta (sérstillt fyrir þessa vöru)",
+          "maintenance": "Viðhald — þvinga útgöngu, núllstilla sögu",
+          "save_exit": "Vista og loka"
+        },
+        "data": {
+          "ai_provider": "AI þjónusta",
+          "api_key": "API lykill (Anthropic: sk-ant-… / OpenAI: sk-… / staðbundið: skildu autt)",
+          "model_anthropic": "Anthropic líkan",
+          "base_url": "OpenAI-samhæft base URL",
+          "model_openai": "OpenAI-samhæft líkan",
+          "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD)",
+          "output_cost_per_mtok": "Úttakskostnaður á milljón tókena (USD)",
+          "max_html_chars": "Hámark HTML stafa send á líkan",
+          "force_json_mode": "Þvinga JSON ham",
+          "extra_headers": "Aukahöfuð (JSON hlutur, valfrjálst)",
+          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði)",
+          "daily_budget_usd": "Dagleg þak (USD)",
+          "monthly_budget_usd": "Mánaðarlegt þak (USD)"
+        }
+      },
+      "basic": {
+        "title": "Grunnstillingar",
+        "description": "Markverð, hversu oft á að athuga, og hvort á að gera hlé á athugunum.",
+        "data": {
+          "target_price": "Markverð (skildu autt ef ekkert)",
+          "scan_interval": "Athugunartíðni (mínútur)",
+          "paused": "Setja vöru í pásu (engar athuganir)",
+          "daily_alternatives": "Endurnýja samkeppnislistun daglega",
+          "back_to_menu": "← Til baka í valmynd (kasta breytingum á þessari síðu)"
+        }
+      },
+      "parser": {
+        "title": "Þáttari",
+        "description": "Vafrakökur eru geymdar inni í þáttarastillingum; ekki snerta þáttara sjálfan nema þú vitir hvað þú ert að gera.\n\n**Vafrakökur** — settu Cookie höfuð gildi (DevTools → Network → endurhlaða → document → Headers → afritaðu `Cookie:` gildið).\n\n**Eigin þáttari** — JSON, t.d. `{\"type\": \"regex\", \"price\": \"\\\\$([\\\\d.,]+)\", \"request_cookies\": \"...\"}`. Skildu autt til að nota sjálfvirkan preset.",
+        "data": {
+          "cookies": "Vafrakökur (einnar línu höfuðgildi)",
+          "custom_parser": "Eigin þáttari (JSON, fyrir lengra komna)",
+          "back_to_menu": "← Til baka í valmynd (kasta breytingum á þessari síðu)"
+        }
+      },
+      "provider": {
+        "title": "AI þjónusta (sérstillt)",
+        "description": "Yfirskrifa sameiginlegu AI þjónustuna fyrir þessa vöru eingöngu. Sjálfgildi er **Erfa frá stillingum** — láttu það vera nema þú hafir sérstaka ástæðu fyrir öðru líkani fyrir þessa vefslóð.\n\nReitir sem ekki eiga við valda þjónustu eru hunsaðir.",
+        "data": {
+          "ai_provider": "Yfirskrifa þjónustu",
+          "api_key": "API lykill",
+          "model_anthropic": "Anthropic líkan",
+          "base_url": "OpenAI-samhæft base URL",
+          "model_openai": "OpenAI-samhæft líkan",
+          "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD)",
+          "output_cost_per_mtok": "Úttakskostnaður á milljón tókena (USD)",
+          "max_html_chars": "Hámark HTML stafa send á líkan",
+          "force_json_mode": "Þvinga JSON ham",
+          "extra_headers": "Aukahöfuð",
+          "back_to_menu": "← Til baka í valmynd (kasta breytingum á þessari síðu)"
+        }
+      },
+      "maintenance": {
+        "title": "Viðhald",
+        "description": "Handvirk yfirskrift. Notist sparlega.\n\n**Þvinga útgöngu** — merkja vöruna sem hætta í sölu handvirkt. Athuganir hætta og skynjarinn sýnir síðasta þekkta verðið. Affmerktu til að halda áfram.\n\n**Núllstilla sögu** — eyða verðsögu (lægsta/hæsta/sparkline). Gagnlegt eftir að þú lagar þáttara sem var að skila vitlausum verðum. Núverandi verð helst. Þessi gátreitur er einnota og er ekki vistaður.",
+        "data": {
+          "force_discontinued": "Þvinga útgöngu",
+          "reset_history": "Núllstilla verðsögu núna",
+          "back_to_menu": "← Til baka í valmynd (kasta breytingum á þessari síðu)"
+        }
+      }
+    },
+    "error": {
+      "invalid_key_format": "API lyklar byrja á 'sk-ant-'.",
+      "invalid_key": "API lykill er ógildur.",
+      "validation_error": "Gat ekki staðfest API lykil. Athugaðu netnotkun.",
+      "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur (t.d. https://api.openai.com/v1).",
+      "model_required": "Líkansheiti er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
+      "openai_compat_unreachable": "Gat ekki náð í OpenAI-samhæfða þjónustu. Athugaðu URL, net, og að þjónninn sé í gangi. Ef þjónninn styður ekki tool calls, prófaðu 'Force JSON mode'.",
+      "extra_headers_invalid_json": "Aukahöfuð verða að vera gilt JSON (t.d. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_not_object": "Aukahöfuð verða að vera JSON hlutur (lykill/gildi), ekki listi eða strengur.",
+      "custom_parser_invalid_json": "Eigin þáttari verður að vera gilt JSON.",
+      "custom_parser_not_object": "Eigin þáttari verður að vera JSON hlutur (lykill/gildi)."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "price": {
+        "name": "Verð"
+      },
+      "lowest": {
+        "name": "Lægsta"
+      },
+      "highest": {
+        "name": "Hæsta"
+      },
+      "target_diff": {
+        "name": "Markverðsmunur"
+      },
+      "stock_count": {
+        "name": "Á lager"
+      },
+      "price_local": {
+        "name": "Verð (heima)"
+      }
+    },
+    "binary_sensor": {
+      "in_stock": {
+        "name": "Til á lager",
+        "state": {
+          "off": "Nei",
+          "on": "Já"
+        }
+      },
+      "discontinued": {
+        "name": "Hætt í sölu",
+        "state": {
+          "off": "Nei",
+          "on": "Já"
+        }
+      }
+    }
+  },
+  "services": {
+    "refresh_now": {
+      "name": "Endurnýja núna",
+      "description": "Þvinga verðsathugun strax."
+    },
+    "set_target": {
+      "name": "Stilla markverð",
+      "description": "Uppfæra markverð fyrir vöktaða vöru."
+    },
+    "reset_history": {
+      "name": "Núllstilla sögu",
+      "description": "Eyða verðsögu fyrir vöru."
+    },
+    "find_alternatives": {
+      "name": "Finna samkeppnislistun",
+      "description": "Leita á vefnum að öðrum söluaðilum sem selja sömu vöru.",
+      "fields": {
+        "entry_id": {
+          "name": "Vöru-ID",
+          "description": "Leita aðeins að þessari vöru (valfrjálst)."
+        },
+        "device_id": {
+          "name": "Tæki",
+          "description": "Leita aðeins að þessari vöru, eftir HA tæki."
+        },
+        "max_results": {
+          "name": "Hámarksfjöldi niðurstaðna",
+          "description": "Hve margar samkeppnislistun (1-20)."
+        }
+      }
+    }
+  }
+}
