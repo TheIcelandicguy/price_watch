@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from .config_flow import ENTRY_TYPE_PRODUCT, ENTRY_TYPE_SETTINGS
@@ -456,6 +457,33 @@ async def _register_services(hass: HomeAssistant) -> None:
                     "remove_listing: failed to save after dropping %s",
                     listing_id,
                 )
+
+        # Remove the listing's entities from the registry. Reloading the
+        # entry stops the platforms from RE-creating these sensors, but HA
+        # does NOT auto-delete the now-unproduced entities — they linger as
+        # orphaned "unavailable" registry entries. The panel builds its
+        # listing rows from the entity registry, so an orphaned price
+        # sensor renders as a ghost "Unknown / never / —" row that can't
+        # be dismissed. Delete them explicitly here.
+        #
+        # Secondary-listing sensors use unique_id `{entry_id}_{listing_id}_{key}`
+        # (see sensor._BasePriceWatchSensor / binary_sensor). The primary
+        # listing uses the legacy `{entry_id}_{key}` form with no listing_id
+        # segment, so this prefix never matches primary entities.
+        ent_reg = er.async_get(hass)
+        prefix = f"{entry.entry_id}_{listing_id}_"
+        removed_entities = [
+            ent.entity_id
+            for ent in er.async_entries_for_config_entry(ent_reg, entry.entry_id)
+            if ent.unique_id and ent.unique_id.startswith(prefix)
+        ]
+        for entity_id in removed_entities:
+            ent_reg.async_remove(entity_id)
+        if removed_entities:
+            _LOGGER.debug(
+                "remove_listing: removed %d orphaned entities for %s: %s",
+                len(removed_entities), listing_id, removed_entities,
+            )
 
         _LOGGER.info(
             "remove_listing: removed %s from entry %s; reloading",
