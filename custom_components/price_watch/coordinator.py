@@ -76,66 +76,25 @@ from .search import (
     SearchQuery,
 )
 from .migration import migrate_storage_v1_to_v2
+from .coordinator_alternatives import AlternativesMixin
+from .provider_config import build_ai_provider
+from .store import PriceWatchStore, derive_listing_id, empty_listing_state
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _derive_listing_id(entry: ConfigEntry) -> str:
-    """Deterministic listing-id derivation from entry_id.
+class PriceWatchCoordinator(
+    AlternativesMixin,
+    TimestampDataUpdateCoordinator[ExtractionResult],
+):
+    """Coordinator for a single tracked product.
 
-    Must produce the same id as async_migrate_entry's derivation —
-    that's the contract that ties migrated entry options to migrated
-    storage data. ULID suffix gives plenty of entropy.
+    Alternatives-discovery behavior (find/maybe-refresh, search-provider
+    selection, alternatives* properties) lives in AlternativesMixin
+    (coordinator_alternatives.py). AI-provider resolution lives in
+    provider_config.py; the Store subclass + listing-id/empty-state
+    helpers live in store.py.
     """
-    return f"l_{entry.entry_id[-12:].lower()}"
-
-
-class _PriceWatchStore(Store[dict[str, Any]]):
-    """Per-product Store with built-in v1 → v2 migration.
-
-    HA calls _async_migrate_func when the on-disk version is older
-    than the requested STORAGE_VERSION. We use the listing-id captured
-    at construction time to nest v1's flat history under the right
-    listings[id] key in v2.
-    """
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        key: str,
-        *,
-        listing_id: str,
-    ) -> None:
-        super().__init__(hass, STORAGE_VERSION, key)
-        self._listing_id = listing_id
-
-    async def _async_migrate_func(
-        self,
-        old_major_version: int,
-        old_minor_version: int,
-        old_data: Any,
-    ) -> dict[str, Any]:
-        """Migrate v1 storage to v2 shape.
-
-        Called by HA's Store load path when the persisted version is
-        below STORAGE_VERSION. Returns the new shape, which HA then
-        persists (so future loads bypass migration).
-        """
-        if old_major_version < 2:
-            _LOGGER.info(
-                "Storage migration v%s → v2 for listing %s",
-                old_major_version, self._listing_id,
-            )
-            return migrate_storage_v1_to_v2(
-                old_data or {}, listing_id=self._listing_id,
-            )
-        # Future version we don't know about — return as-is. HA will
-        # log a warning.
-        return old_data
-
-
-class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
-    """Coordinator for a single tracked product."""
 
     config_entry: ConfigEntry
 
@@ -148,7 +107,7 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
         # (neither on this entry nor on the shared settings entry),
         # we operate in no-AI mode: JSON-LD-only or custom-parser-only.
         # extract_product accepts None for ai_provider.
-        self._ai_provider: AIProvider | None = self._build_ai_provider(hass, entry)
+        self._ai_provider: AIProvider | None = build_ai_provider(hass, entry)
 
         # custom_parser is stored as a JSON string in entry.options (so the
         # value can survive HA's config_entry serialization). Parse it once
@@ -175,10 +134,10 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
         # v2: the deterministic listing-id ties this coordinator to its
         # one listing in the v2 entry-options and storage shapes. Same
         # derivation that async_migrate_entry used.
-        self._listing_id: str = _derive_listing_id(entry)
+        self._listing_id: str = derive_listing_id(entry)
 
         # Per-product persistent state with built-in v1 → v2 migration.
-        self._store: _PriceWatchStore = _PriceWatchStore(
+        self._store: PriceWatchStore = PriceWatchStore(
             hass,
             f"{DOMAIN}.{entry.entry_id}",
             listing_id=self._listing_id,
@@ -206,7 +165,7 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
         # code that does self._state[X] = Y propagates to
         # self._listings[primary_id][X] = Y (same dict reference). Set
         # by _ensure_primary_listing() after load.
-        self._state: dict[str, Any] = self._empty_listing_state()
+        self._state: dict[str, Any] = empty_listing_state()
         # Per-listing ExtractionResult cache. Populated by
         # _async_update_one_listing on each successful extraction.
         # Read as the "previous" result for event firing and UNCHANGED
@@ -239,194 +198,6 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
         self._listing_image_bytes: dict[str, bytes] = {}
         self._listing_image_content_type: dict[str, str] = {}
         self._listing_cached_image_url: dict[str, str | None] = {}
-
-    @staticmethod
-    def _build_ai_provider(
-        hass: HomeAssistant, entry: ConfigEntry
-    ) -> AIProvider | None:
-        """Build the AIProvider for this entry, or None if not configured.
-
-        Reads CONF_AI_PROVIDER to select between Anthropic and the
-        OpenAI-compatible class. Falls back to Anthropic when unset so
-        existing config entries (which predate the provider abstraction)
-        keep working.
-
-        Credential resolution:
-        1. The product entry's own data/options (snapshotted at creation
-           time by the config flow).
-        2. The shared settings entry. This is a fallback for product
-           entries that don't carry their own snapshot. Reading the
-           settings entry live also means subsequent key/provider
-           changes propagate automatically.
-        """
-        # Settings come from the product entry first, then fall back to
-        # the shared settings entry.
-        provider_type, config = PriceWatchCoordinator._resolve_provider_config(
-            hass, entry
-        )
-        if provider_type is None:
-            return None
-
-        try:
-            return get_provider(provider_type, **config)
-        except Exception as err:  # noqa: BLE001
-            # A failed provider build should NOT brick the coordinator —
-            # JSON-LD extraction still works without AI. Log and continue.
-            _LOGGER.warning(
-                "Failed to build AI provider %s for %s: %s",
-                provider_type, entry.entry_id, err,
-            )
-            return None
-
-    @staticmethod
-    def _resolve_provider_config(
-        hass: HomeAssistant, entry: ConfigEntry
-    ) -> tuple[str | None, dict[str, Any]]:
-        """Pick the provider type and assemble its constructor kwargs.
-
-        Returns (provider_type, config_kwargs). provider_type is None
-        when no credentials are available anywhere (i.e. the
-        integration should operate in JSON-LD-only mode for this entry).
-
-        The merge is "product entry overrides settings entry, options
-        override data" — same precedence the rest of the integration
-        uses. Empty-string and None are treated the same.
-        """
-        # Look up settings entry once, used as fallback throughout.
-        settings_entry: ConfigEntry | None = None
-        for other in hass.config_entries.async_entries(entry.domain):
-            if other.data.get("entry_type") == ENTRY_TYPE_SETTINGS:
-                settings_entry = other
-                break
-
-        # AI-config keys are read differently than product-specific keys
-        # (url, target_price, custom_parser, cookies, etc.). For AI config,
-        # we have to handle the case where the user changed the global
-        # provider (settings entry) AFTER products were added. Each
-        # product carries a frozen `data` snapshot from when it was
-        # created — that snapshot's keys (especially `model`) become
-        # stale when the settings entry switches provider.
-        #
-        # Rule: if the product entry has NO explicit AI override
-        # (options.ai_provider not set), AI config is read from the
-        # settings entry ONLY. The product's data snapshot is ignored
-        # for AI keys. This way "no override" really means "inherit
-        # whatever settings has now," not "inherit my creation-time
-        # snapshot."
-        #
-        # If the product DOES have an explicit override (it set
-        # options.ai_provider), we use product-first precedence so
-        # the override can be fully self-contained.
-        AI_CONFIG_KEYS = frozenset({
-            CONF_AI_PROVIDER, CONF_API_KEY, CONF_MODEL, CONF_BASE_URL,
-            CONF_INPUT_COST_PER_MTOK, CONF_OUTPUT_COST_PER_MTOK,
-            CONF_MAX_HTML_CHARS, CONF_FORCE_JSON_MODE, CONF_EXTRA_HEADERS,
-        })
-        # A product is treated as having an explicit AI override if it
-        # has SET ai_provider in its options, OR if it set any
-        # significant AI config field. "Significant" excludes data-only
-        # fields like cost-per-mtok (which exist on every entry by
-        # default) and includes the bits that actually change provider
-        # behavior. Without this, a user who set model+base_url in the
-        # options flow but didn't set ai_provider would have their
-        # work silently ignored.
-        product_has_override = (
-            entry.options.get(CONF_AI_PROVIDER) not in ("", None)
-            or entry.options.get(CONF_MODEL) not in ("", None)
-            or entry.options.get(CONF_BASE_URL) not in ("", None)
-            or entry.options.get(CONF_API_KEY) not in ("", None)
-        )
-
-        def read(key: str, default: Any = None) -> Any:
-            """Read a config value with appropriate precedence.
-
-            Non-AI keys (url, cookies, custom_parser, target_price,
-            scan_interval, etc.) always use product-first precedence:
-              product.options > product.data > settings.options >
-              settings.data > default
-
-            AI-config keys behave one of two ways depending on
-            whether the product has its own AI override:
-            - With override (options.ai_provider set on product):
-              same product-first precedence as above. Lets the
-              override be fully self-contained.
-            - Without override: settings entry only, ignoring the
-              product's data snapshot. Keeps inheritance fresh when
-              the global provider gets switched mid-life.
-            """
-            if key in AI_CONFIG_KEYS and not product_has_override:
-                # Inheritance-only path. Skip product entry entirely
-                # so its stale data snapshot can't shadow a current
-                # settings value.
-                if settings_entry is not None:
-                    if (
-                        key in settings_entry.options
-                        and settings_entry.options[key] not in ("", None)
-                    ):
-                        return settings_entry.options[key]
-                    if (
-                        key in settings_entry.data
-                        and settings_entry.data[key] not in ("", None)
-                    ):
-                        return settings_entry.data[key]
-                return default
-
-            # Normal product-first precedence.
-            if key in entry.options and entry.options[key] not in ("", None):
-                return entry.options[key]
-            if key in entry.data and entry.data[key] not in ("", None):
-                return entry.data[key]
-            if settings_entry is not None:
-                if key in settings_entry.options and settings_entry.options[key] not in ("", None):
-                    return settings_entry.options[key]
-                if key in settings_entry.data and settings_entry.data[key] not in ("", None):
-                    return settings_entry.data[key]
-            return default
-
-        provider_type = read(CONF_AI_PROVIDER, PROVIDER_ANTHROPIC)
-
-        if provider_type == PROVIDER_ANTHROPIC:
-            api_key = read(CONF_API_KEY)
-            if not api_key:
-                _LOGGER.debug(
-                    "No Anthropic key for %s; AI extraction unavailable",
-                    entry.entry_id,
-                )
-                return None, {}
-            return PROVIDER_ANTHROPIC, {
-                "api_key": api_key,
-                "model": read(CONF_MODEL, DEFAULT_MODEL),
-            }
-
-        if provider_type == PROVIDER_OPENAI_COMPATIBLE:
-            # OpenAI-compatible needs base_url + model at minimum. api_key
-            # is optional (local Ollama / LM Studio).
-            base_url = read(CONF_BASE_URL)
-            model = read(CONF_MODEL)
-            if not base_url or not model:
-                _LOGGER.warning(
-                    "OpenAI-compat provider needs base_url and model "
-                    "(have base_url=%r, model=%r); AI extraction "
-                    "unavailable for %s",
-                    base_url, model, entry.entry_id,
-                )
-                return None, {}
-            return PROVIDER_OPENAI_COMPATIBLE, {
-                "api_key": read(CONF_API_KEY),
-                "model": model,
-                "base_url": base_url,
-                "input_cost_per_mtok": float(read(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0),
-                "output_cost_per_mtok": float(read(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0),
-                "max_html_chars": int(read(CONF_MAX_HTML_CHARS, 100_000) or 100_000),
-                "force_json_mode": bool(read(CONF_FORCE_JSON_MODE, False)),
-                "extra_headers": read(CONF_EXTRA_HEADERS),
-            }
-
-        _LOGGER.warning(
-            "Unknown AI provider type %r for %s; AI extraction unavailable",
-            provider_type, entry.entry_id,
-        )
-        return None, {}
 
     @staticmethod
     def _parse_custom_parser(raw: Any) -> dict[str, Any] | None:
@@ -516,32 +287,6 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
             "alternatives_error": product.get("alternatives_error"),
         }
 
-    @staticmethod
-    def _empty_listing_state() -> dict[str, Any]:
-        """Default runtime-state dict for a fresh listing.
-
-        Used to initialize new listings and as the fallback when the
-        primary listing is missing from storage (defensive — shouldn't
-        happen). Keys here match what _async_update_one_listing
-        reads/writes.
-        """
-        return {
-            "history": [],
-            "lowest": None,
-            "highest": None,
-            "last_hash": None,
-            "last_result": None,
-            "last_check": None,
-            "lifetime_cost_usd": 0.0,
-            "discontinued": False,
-            "discontinued_at": None,
-            "discontinued_reason": None,
-            "discontinued_title": None,
-            "lkg_price": None,
-            "lkg_currency": None,
-            "lkg_observed_at": None,
-        }
-
     def _ensure_primary_listing(self) -> None:
         """Sync self._listings with entry.options.listings and alias self._state.
 
@@ -615,7 +360,7 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
                     "from storage; initializing empty runtime state",
                     self.entry.entry_id, lid,
                 )
-                self._listings[lid] = self._empty_listing_state()
+                self._listings[lid] = empty_listing_state()
 
         # Prune orphans — listings in storage but not declared in options
         orphan_ids = set(self._listings.keys()) - declared_ids
@@ -650,7 +395,7 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
             # reads self._state[X] gets defaults; writes don't persist
             # (there's no real listing to persist to). _async_update_data
             # short-circuits before any per-listing work in this state.
-            self._state = self._empty_listing_state()
+            self._state = empty_listing_state()
 
         # Mirror product-level alternatives onto self._state
         self._state["alternatives"] = self._product_state.get("alternatives", [])
@@ -931,55 +676,10 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
         )
         await self.async_request_refresh()
 
-    # --- Alternatives discovery ----------------------------------------------
-    #
-    # The alternatives feature finds other retailer listings of the same
-    # product so the user can compare prices. Two implementations live in
-    # the search/ subpackage:
-    #
-    # - AnthropicNativeSearchProvider: uses Claude's web_search tool.
-    #   One round-trip, high quality, costs a few cents per call.
-    # - AISynthesizerSearchProvider: free DuckDuckGo HTML search +
-    #   AI synthesis (Ollama / OpenAI-compat). Lower quality because
-    #   the AI works from snippets, but no Anthropic credit required.
-    #
-    # The coordinator picks between them based on which AI provider it
-    # built in __init__. The choice is implicit (no separate config
-    # option for "search provider"), with the contract: "use whatever
-    # is configured for AI extraction, in the most capable mode that
-    # provider supports."
-
-    @property
-    def alternatives(self) -> list[dict[str, Any]]:
-        """List of alternative product dicts. Empty if none fetched."""
-        return list(self._state.get("alternatives") or [])
-
-    @property
-    def alternatives_fetched_at(self) -> str | None:
-        """ISO timestamp of the last alternatives refresh. None if never."""
-        return self._state.get("alternatives_fetched_at")
-
-    @property
-    def alternatives_error(self) -> str | None:
-        """Short user-facing error from the last fetch, if any."""
-        return self._state.get("alternatives_error")
-
-    @property
-    def daily_alternatives(self) -> bool:
-        """Auto-refresh alternatives once per day (TTL gated)."""
-        return bool(self.entry.options.get(CONF_DAILY_ALTERNATIVES, False))
-
-    @property
-    def max_alternatives(self) -> int:
-        """Per-product max alternatives to fetch."""
-        raw = self.entry.options.get(
-            CONF_MAX_ALTERNATIVES, DEFAULT_MAX_ALTERNATIVES
-        )
-        try:
-            value = int(raw)
-        except (TypeError, ValueError):
-            return DEFAULT_MAX_ALTERNATIVES
-        return max(1, min(20, value))
+    # Alternatives discovery (alternatives* properties, max_alternatives,
+    # alternatives_region, _build_search_provider, async_find_alternatives,
+    # async_maybe_refresh_alternatives) lives in AlternativesMixin —
+    # see coordinator_alternatives.py.
 
     @property
     def user_region(self) -> str:
@@ -1017,221 +717,6 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
             if mapped:
                 return mapped
         return ""
-
-    @property
-    def alternatives_region(self) -> str:
-        """Regional preference for alternatives search.
-
-        Currently a free-form string ('worldwide', 'nordic', 'eu',
-        'us'). The Anthropic-native and AI-synthesis providers
-        interpret it best-effort. We default to 'worldwide' so the
-        user filters manually unless they've set an explicit option.
-        """
-        value = self.entry.options.get(CONF_ALTERNATIVES_REGION) or "worldwide"
-        return str(value)
-
-    def _build_search_provider(self) -> SearchProvider | None:
-        """Pick a SearchProvider strategy based on the AI provider.
-
-        Returns None if no AI provider is configured at all (then the
-        feature is unavailable — the caller surfaces a clear error).
-
-        Strategy:
-        - If AI provider is Anthropic with a working key, use the
-          native web_search tool (one round-trip, highest quality).
-        - Otherwise, use the AI synthesizer (DDG + whatever AI we
-          have). Works for Ollama, OpenAI-compat, even Anthropic-
-          without-web-search if we ever disable it.
-
-        Re-uses self._ai_provider rather than building a separate one
-        — saves credentials lookups and ensures the search uses the
-        same model the user picked for extraction.
-        """
-        if self._search_provider is not None:
-            return self._search_provider
-
-        ai_provider = self._ai_provider
-        if ai_provider is None:
-            return None
-
-        # Detect Anthropic by class name (avoids importing the class
-        # here and creating a circular import). The class is always
-        # named AnthropicProvider in ai/anthropic_provider.py.
-        provider_class_name = type(ai_provider).__name__
-
-        if provider_class_name == "AnthropicProvider":
-            # Use Anthropic's native web_search. Build a parallel
-            # AnthropicNativeSearchProvider — they share the same key
-            # and model but have different message/tool shapes, so a
-            # separate client is cleaner than method-bombing the
-            # extraction provider.
-            api_key = getattr(ai_provider, "_api_key", None)
-            model = getattr(ai_provider, "model", DEFAULT_MODEL)
-            if not api_key:
-                _LOGGER.warning(
-                    "%s: AnthropicProvider has no api_key; cannot "
-                    "build native search provider",
-                    self.entry.entry_id,
-                )
-                return None
-            self._search_provider = AnthropicNativeSearchProvider(
-                api_key=api_key, model=model
-            )
-            _LOGGER.debug(
-                "%s: using AnthropicNativeSearchProvider for alternatives",
-                self.entry.entry_id,
-            )
-            return self._search_provider
-
-        # Default: AI synthesizer over DuckDuckGo. Works for any
-        # AIProvider that implements call_with_tool (OpenAI-compat
-        # does; we added it as part of this feature).
-        session = async_get_clientsession(self.hass)
-        try:
-            self._search_provider = AISynthesizerSearchProvider(
-                ai_provider=ai_provider,
-                session=session,
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning(
-                "%s: could not build AISynthesizerSearchProvider: %s",
-                self.entry.entry_id, err,
-            )
-            return None
-        _LOGGER.debug(
-            "%s: using AISynthesizerSearchProvider (AI=%s) for alternatives",
-            self.entry.entry_id, provider_class_name,
-        )
-        return self._search_provider
-
-    async def async_find_alternatives(
-        self, max_results: int | None = None
-    ) -> list[dict[str, Any]]:
-        """Run a fresh alternatives search and persist the result.
-
-        Returns the list of Alternative dicts (the same list now stored
-        on self._state). On failure, returns an empty list and stores
-        the error message in alternatives_error.
-
-        Always updates alternatives_fetched_at on completion, success
-        or failure. That way the daily-refresh TTL is respected even
-        when the call fails (we don't want to hammer the search
-        provider every coordinator tick after a failure).
-        """
-        await self.async_load()
-
-        provider = self._build_search_provider()
-        if provider is None:
-            error = (
-                "No AI provider configured for this product. Set one in "
-                "Settings → Devices & Services → Price Watch → Configure."
-            )
-            self._state["alternatives_error"] = error
-            self._state["alternatives_fetched_at"] = dt_util.utcnow().isoformat()
-            await self._async_save()
-            self.async_update_listeners()
-            return []
-
-        result_data = self.data
-        # Build the search query from current product state. If we have
-        # no current data (e.g. paused, never refreshed), use the entry
-        # title as a fallback so the user can still try a search.
-        if result_data is not None:
-            title = result_data.title
-            current_price = result_data.price if result_data.price else None
-            currency = result_data.currency
-            retailer = result_data.retailer or ""
-        else:
-            title = self.entry.title or "Unknown product"
-            current_price = None
-            currency = ""
-            retailer = ""
-
-        query = SearchQuery(
-            title=title,
-            current_price=current_price,
-            currency=currency,
-            retailer=retailer,
-            max_results=(
-                max_results
-                if max_results is not None
-                else self.max_alternatives
-            ),
-            region=self.alternatives_region,
-            user_region=self.user_region,
-        )
-
-        _LOGGER.info(
-            "%s: fetching alternatives via %s (max=%d, region=%s)",
-            self.entry.entry_id,
-            type(provider).__name__,
-            query.max_results,
-            query.region,
-        )
-
-        alternatives: list[Alternative] = []
-        error: str | None = None
-        try:
-            alternatives = await provider.find_alternatives(query)
-        except SearchProviderError as err:
-            error = str(err)
-            _LOGGER.warning(
-                "%s: alternatives search failed: %s",
-                self.entry.entry_id, err,
-            )
-        except Exception as err:  # noqa: BLE001
-            error = f"Unexpected error: {type(err).__name__}: {err}"
-            _LOGGER.exception(
-                "%s: unexpected error in alternatives search",
-                self.entry.entry_id,
-            )
-
-        # Persist
-        self._state["alternatives"] = [a.to_dict() for a in alternatives]
-        self._state["alternatives_fetched_at"] = dt_util.utcnow().isoformat()
-        self._state["alternatives_error"] = error
-        await self._async_save()
-        self.async_update_listeners()
-
-        _LOGGER.info(
-            "%s: alternatives search done — %d results, error=%r",
-            self.entry.entry_id, len(alternatives), error,
-        )
-        return self._state["alternatives"]
-
-    async def async_maybe_refresh_alternatives(self) -> None:
-        """If daily_alternatives is enabled and TTL has expired, run a refresh.
-
-        Called from _async_update_data after a successful price tick.
-        We deliberately fire-and-forget (no await on the result) so a
-        slow search doesn't block the coordinator's update cycle —
-        the next tick is more important than waiting for alternatives.
-
-        TTL: ALTERNATIVES_REFRESH_HOURS (24h by default). On failure
-        the fetched_at timestamp is updated anyway, so we don't retry
-        until the next TTL period. User can force a manual refresh
-        via the service.
-        """
-        if not self.daily_alternatives:
-            return
-
-        last = self._state.get("alternatives_fetched_at")
-        if last:
-            try:
-                last_dt = dt_util.parse_datetime(last)
-            except (ValueError, TypeError):
-                last_dt = None
-            if last_dt is not None:
-                age = dt_util.utcnow() - last_dt
-                if age.total_seconds() < ALTERNATIVES_REFRESH_HOURS * 3600:
-                    return  # TTL not yet expired
-
-        _LOGGER.debug(
-            "%s: daily alternatives TTL expired, scheduling refresh",
-            self.entry.entry_id,
-        )
-        # Fire-and-forget — don't block the update tick.
-        self.hass.async_create_task(self.async_find_alternatives())
 
     async def _async_update_one_listing(
         self,

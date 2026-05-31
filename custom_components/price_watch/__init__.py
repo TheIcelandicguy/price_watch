@@ -188,9 +188,10 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     Settings entries have no per-entry store, so they're a no-op.
     Storage key shape matches what the coordinator constructs in its
-    _PriceWatchStore (f"{DOMAIN}.{entry.entry_id}"), so async_remove
-    targets the right file. A plain Store is used here instead of
-    _PriceWatchStore — we don't need migration logic to delete a file.
+    PriceWatchStore (f"{DOMAIN}.{entry.entry_id}", from store.py), so
+    async_remove targets the right file. A plain Store is used here
+    instead of PriceWatchStore — we don't need migration logic to
+    delete a file.
     """
     if entry.data.get("entry_type") == ENTRY_TYPE_SETTINGS:
         return
