@@ -132,6 +132,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Settings entry has nothing to set up - just stores API key
     if entry.data.get("entry_type") == ENTRY_TYPE_SETTINGS:
         hass.data[DOMAIN]["settings"] = entry.entry_id
+        # Register the WS API and sidebar panel here too. The settings
+        # entry always exists, so this guarantees "Search & add" and the
+        # panel work even with ZERO product entries (start-from-scratch).
+        # Previously both registered only on the first product entry — a
+        # chicken-and-egg that left a fresh install with no panel route
+        # (/price-watch → 404) and no price_watch/search command, so you
+        # couldn't add your first product from the panel. Both calls are
+        # idempotent (HA replaces same-typed WS handlers; async_register_panel
+        # early-returns if already registered).
+        async_register_websocket_api(hass)
+        await async_register_panel(hass)
+        # Services too (esp. track_product, which CREATES the first product
+        # from the panel's "Search & add"). Same chicken-and-egg as above:
+        # without this, a from-scratch install has no track_product service.
+        # Guard keeps it idempotent with the product-entry path below.
+        if not hass.services.has_service(DOMAIN, "refresh_now"):
+            await _register_services(hass)
         return True
 
     # Product entry
