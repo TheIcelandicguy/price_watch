@@ -296,8 +296,31 @@ function buildListing(
     lastCheck:
       typeof attrs.last_check === "string" ? attrs.last_check : null,
     history: readHistory(attrs.price_history),
+    // Filled in below from this listing's photo image entity, if present.
+    imageProxyUrl: null,
+    imageBroken: false,
     entityIds: { price: priceEntity },
   };
+
+  // Photo image entity — same bytes-mode proxy approach as the
+  // product-level image. The "photo" key lands in this listing's keyMap
+  // because the image entity's unique_id is {entry}_photo (primary) or
+  // {entry}_{listing}_photo (secondary), which parseUniqueId routes to
+  // the matching listing bucket.
+  const photoEntity = keyMap.get("photo");
+  if (photoEntity) {
+    const s = hass.states[photoEntity];
+    if (s) {
+      if (s.state === "unavailable" || s.state === "unknown") {
+        listing.imageBroken = true;
+      } else {
+        const ep = s.attributes.entity_picture;
+        if (typeof ep === "string" && ep.length > 0) {
+          listing.imageProxyUrl = ep;
+        }
+      }
+    }
+  }
 
   // in_stock binary sensor — authoritative over the attribute mirror.
   const inStockEntity = keyMap.get("in_stock");

@@ -445,7 +445,24 @@ export class PriceWatchCard extends LitElement {
         ? html`<span class="listings__chip listings__chip--ok">in stock</span>`
         : nothing;
 
+    // Per-listing thumbnail. Prefer the proxied image bytes; show a
+    // neutral placeholder when the listing has no photo or the entity is
+    // unavailable (a broken-image icon would be uglier and the raw URL is
+    // usually blocked anyway — that's why the byte fetch failed).
+    const thumb = listing.imageProxyUrl
+      ? html`<img
+          class="listings__thumb"
+          src=${listing.imageProxyUrl}
+          alt=""
+          loading="lazy"
+        />`
+      : html`<span
+          class="listings__thumb listings__thumb--placeholder"
+          aria-hidden="true"
+        ></span>`;
+
     const body = html`
+      ${thumb}
       <div class="listings__info">
         <span class="listings__row-retailer">
           ${listing.retailer ?? "Unknown"}
@@ -1018,6 +1035,19 @@ export class PriceWatchCard extends LitElement {
     }
     .listings__link--noUrl:hover {
       background: transparent;
+    }
+    .listings__thumb {
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      border-radius: 5px;
+      object-fit: cover;
+      background: var(--secondary-background-color, #f0f0f0);
+    }
+    .listings__thumb--placeholder {
+      display: inline-block;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      box-sizing: border-box;
     }
     .listings__info {
       flex: 1 1 auto;

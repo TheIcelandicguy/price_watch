@@ -118,6 +118,16 @@ export interface Listing {
   stockCount: number | null;
   lastCheck: string | null;
   history: PriceHistoryPoint[];
+  // Same-origin proxy URL for this listing's image entity
+  // (image.<...>_photo for primary, image.<...>_<listing>_photo for
+  // secondaries). When present, the listing row shows a thumbnail. HA
+  // serves the bytes server-side, sidestepping CDN hotlink/TLS blocking.
+  // null when the listing has no photo entity or no bytes cached yet.
+  imageProxyUrl: string | null;
+  // True if the photo entity exists but is currently unavailable
+  // (coordinator couldn't fetch bytes — usually a 404 on the source).
+  // The row shows a placeholder rather than a broken-image icon.
+  imageBroken: boolean;
   // Entity IDs for this listing's sensors. Used for service-call
   // targeting and cross-references. Always populated with the price
   // entity (the listing wouldn't exist without it); others optional.

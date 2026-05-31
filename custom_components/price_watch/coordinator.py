@@ -229,11 +229,16 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
         self._fx = FxRates(hass, async_get_clientsession(hass))
         self._price_local: float | None = None
 
-        # Image bytes cache (in-memory only; not persisted to HA Store)
-        # Keyed by URL so we only refetch when the URL changes.
-        self._image_bytes: bytes | None = None
-        self._image_content_type: str | None = None
-        self._cached_image_url: str | None = None
+        # Image bytes cache (in-memory only; not persisted to HA Store).
+        # Phase 3c: one entry per listing_id so every listing has its own
+        # thumbnail. Keyed first by listing_id, then internally by URL so
+        # we only refetch a listing's image when its source URL changes.
+        # The primary listing's bytes are also surfaced via the legacy
+        # image_bytes / image_content_type properties (used by the
+        # ProductImage entity and the panel's product-level image).
+        self._listing_image_bytes: dict[str, bytes] = {}
+        self._listing_image_content_type: dict[str, str] = {}
+        self._listing_cached_image_url: dict[str, str | None] = {}
 
     @staticmethod
     def _build_ai_provider(
@@ -1387,7 +1392,9 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
             if is_primary:
                 self.update_interval = None
                 await self._update_price_local(result)
-                await self._update_image_bytes(result)
+            # Keep each listing's thumbnail current even when discontinued
+            # (the panel still shows the row with its last-known image).
+            await self._update_image_bytes(listing_id, result)
 
             self._listing_results[listing_id] = result
             return result
@@ -1441,12 +1448,13 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
         ):
             self._fire_target_hit(result, previous)
 
-        # Per-listing FX + image — Phase 2: only primary listing.
-        # Phase 3+ may extend per-listing if multi-currency cards are
-        # added to the panel; for now the panel only shows the primary.
+        # Per-listing image — Phase 3c: fetch every listing's own photo
+        # so the panel can show a thumbnail per listing row. FX stays
+        # primary-only (conversion is product-level in Phase 2; the panel
+        # only shows price_local for the headline/primary listing).
         if is_primary:
             await self._update_price_local(result)
-            await self._update_image_bytes(result)
+        await self._update_image_bytes(listing_id, result)
 
         self._listing_results[listing_id] = result
         return result
@@ -1543,21 +1551,27 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
 
         return primary_result
 
-    async def _update_image_bytes(self, result: ExtractionResult) -> None:
-        """Fetch and cache product image bytes.
+    async def _update_image_bytes(
+        self, listing_id: str, result: ExtractionResult
+    ) -> None:
+        """Fetch and cache one listing's image bytes.
 
-        Only refetches when the source URL changes, so most updates are
-        no-ops. Stored in memory only - never persisted to HA Store
-        (image bytes are too large and don't survive restarts well via
-        that path).
+        Only refetches when that listing's source URL changes, so most
+        updates are no-ops. Stored in memory only - never persisted to HA
+        Store (image bytes are too large and don't survive restarts well
+        via that path). Keyed by listing_id so each listing keeps its own
+        thumbnail independently (Phase 3c).
         """
         url = result.image_url if result else None
         if not url:
-            self._image_bytes = None
-            self._image_content_type = None
-            self._cached_image_url = None
+            self._listing_image_bytes.pop(listing_id, None)
+            self._listing_image_content_type.pop(listing_id, None)
+            self._listing_cached_image_url[listing_id] = None
             return
-        if url == self._cached_image_url and self._image_bytes is not None:
+        if (
+            url == self._listing_cached_image_url.get(listing_id)
+            and self._listing_image_bytes.get(listing_id) is not None
+        ):
             # Same URL, cache hit - skip the fetch
             return
         try:
@@ -1567,17 +1581,23 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
                 url, async_get_clientsession(self.hass)
             )
         except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Image fetch raised: %s", err)
+            _LOGGER.debug("Image fetch raised (%s): %s", listing_id, err)
             fetched = None
 
         if fetched is None:
-            _LOGGER.warning("Could not fetch product image: %s", url)
+            _LOGGER.warning(
+                "Could not fetch listing image (%s): %s", listing_id, url
+            )
             return  # Keep stale bytes if we have any - better than nothing
 
-        self._image_bytes, self._image_content_type = fetched
-        self._cached_image_url = url
+        self._listing_image_bytes[listing_id] = fetched[0]
+        self._listing_image_content_type[listing_id] = fetched[1]
+        self._listing_cached_image_url[listing_id] = url
         _LOGGER.debug(
-            "Image fetched: %d bytes, %s", len(self._image_bytes), self._image_content_type
+            "Image fetched for %s: %d bytes, %s",
+            listing_id,
+            len(fetched[0]),
+            fetched[1],
         )
 
     async def _update_price_local(self, result: ExtractionResult) -> None:
@@ -1760,13 +1780,26 @@ class PriceWatchCoordinator(TimestampDataUpdateCoordinator[ExtractionResult]):
 
     @property
     def image_bytes(self) -> bytes | None:
-        """Raw bytes of the product photo (None if fetch failed or no URL)."""
-        return self._image_bytes
+        """Primary listing's photo bytes (None if fetch failed or no URL).
+
+        Back-compat accessor for the product-level image (ProductImage
+        entity + panel product image). Per-listing bytes are available
+        via image_bytes_for().
+        """
+        return self._listing_image_bytes.get(self.primary_listing_id)
 
     @property
     def image_content_type(self) -> str | None:
-        """MIME type of the cached image bytes."""
-        return self._image_content_type
+        """MIME type of the primary listing's cached image bytes."""
+        return self._listing_image_content_type.get(self.primary_listing_id)
+
+    def image_bytes_for(self, listing_id: str) -> bytes | None:
+        """Raw bytes of a specific listing's photo (None if none cached)."""
+        return self._listing_image_bytes.get(listing_id)
+
+    def image_content_type_for(self, listing_id: str) -> str | None:
+        """MIME type of a specific listing's cached image bytes."""
+        return self._listing_image_content_type.get(listing_id)
 
     @property
     def device_info(self) -> dict[str, Any]:
