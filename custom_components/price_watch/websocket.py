@@ -60,7 +60,11 @@ from .const import (
     DOMAIN,
     ENTRY_TYPE_SETTINGS,
 )
-from .coordinator_alternatives import _host_excluded, _normalize_domain
+from .coordinator_alternatives import (
+    _host_excluded,
+    _is_non_shop_domain,
+    _normalize_domain,
+)
 from .search.ai_synthesizer import AISynthesizerSearchProvider
 from .search.anthropic_native import AnthropicNativeSearchProvider
 from .search.base import (
@@ -252,15 +256,23 @@ async def ws_search(
     try:
         if engine == "duckduckgo":
             hits = await provider.search(query_text, max_results=max_results)
-            results = [
-                Alternative(
+            results = []
+            for hit in hits:
+                if not hit.url:
+                    continue
+                row = Alternative(
                     title=hit.title,
                     url=hit.url,
                     notes=(hit.snippet or "")[:_DDG_SNIPPET_CHARS],
                 ).to_dict()
-                for hit in hits
-                if hit.url
-            ][:max_results]
+                # Free mode has no AI to name the retailer or read a price,
+                # so surface the bare domain as the retailer and flag the
+                # obvious non-shops (GitHub/YouTube/wiki/docs) — that's the
+                # only "is this a seller?" signal we can give without AI.
+                row["retailer"] = _normalize_domain(hit.url)
+                row["likely_non_shop"] = _is_non_shop_domain(hit.url)
+                results.append(row)
+            results = results[:max_results]
         else:
             alternatives = await provider.find_alternatives(query)
             results = [alt.to_dict() for alt in alternatives]

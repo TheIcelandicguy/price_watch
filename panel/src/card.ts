@@ -7,12 +7,11 @@
  */
 
 import { LitElement, html, css, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 
 import type { Alternative, Listing, TrackedProduct } from "./types.js";
 import { filterOutliers, formatPrice, formatRelative, sparklinePath } from "./utils.js";
 
-@customElement("price-watch-card")
 export class PriceWatchCard extends LitElement {
   @property({ attribute: false }) product!: TrackedProduct;
   // Optional callback for clicks on the card body. Used by the panel
@@ -1536,6 +1535,16 @@ export class PriceWatchCard extends LitElement {
       outline-offset: 1px;
     }
   `;
+}
+
+// Guarded registration instead of the @customElement decorator: HA may
+// re-import this bundle (navigate away and back to the panel, or a soft
+// reload), and a second unconditional customElements.define throws
+// "the name 'price-watch-card' has already been used with this registry",
+// which aborts the whole module and blanks the panel. The guard makes a
+// re-import a harmless no-op.
+if (!customElements.get("price-watch-card")) {
+  customElements.define("price-watch-card", PriceWatchCard);
 }
 
 declare global {

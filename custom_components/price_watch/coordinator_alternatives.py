@@ -126,6 +126,67 @@ def _host_excluded(url: str, excluded: set[str]) -> bool:
     return any(host == ex or host.endswith("." + ex) for ex in excluded)
 
 
+# Domains that are clearly NOT shops — code hosts, video, social, forums,
+# Q&A, encyclopedias, docs/tutorial blogs. Used by Free-mode "Search & add"
+# to flag raw web hits that can't be a seller. Conservative on purpose: we
+# only mark the obvious non-commerce sites, so a real store never gets a
+# false "not a store" badge (the inverse — an unflagged non-shop — is the
+# safe failure: the user just judges it themselves, same as before).
+_NON_SHOP_DOMAINS: frozenset[str] = frozenset(
+    {
+        "github.com",
+        "gitlab.com",
+        "bitbucket.org",
+        "githubusercontent.com",
+        "youtube.com",
+        "youtu.be",
+        "vimeo.com",
+        "reddit.com",
+        "quora.com",
+        "stackoverflow.com",
+        "stackexchange.com",
+        "superuser.com",
+        "serverfault.com",
+        "wikipedia.org",
+        "wikimedia.org",
+        "fandom.com",
+        "medium.com",
+        "facebook.com",
+        "twitter.com",
+        "x.com",
+        "instagram.com",
+        "pinterest.com",
+        "tiktok.com",
+        "linkedin.com",
+        "readthedocs.io",
+        "readthedocs.org",
+        "instructables.com",
+        "hackster.io",
+        "hackaday.com",
+        "hackaday.io",
+        "dronebotworkshop.com",
+        "randomnerdtutorials.com",
+        "home-assistant.io",
+    }
+)
+
+
+def _is_non_shop_domain(url: str) -> bool:
+    """True if the URL's host is a known non-commerce site (heuristic).
+
+    Suffix match so subdomains (gist.github.com, m.youtube.com,
+    en.wikipedia.org) are caught too. Only ever returns True for the
+    curated denylist above — an unrecognized host returns False (treated
+    as a possible shop), which is the conservative default.
+    """
+    host = _normalize_domain(url)
+    if not host:
+        return False
+    return any(
+        host == nd or host.endswith("." + nd) for nd in _NON_SHOP_DOMAINS
+    )
+
+
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant

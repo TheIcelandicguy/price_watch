@@ -20,7 +20,7 @@
  */
 
 import { LitElement, html, css } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { state } from "lit/decorators.js";
 
 import "./card.js";
 import type {
@@ -72,6 +72,11 @@ interface SearchResult {
   confidence: number;
   notes: string;
   ships_to_user_region: boolean | null;
+  // Free mode (no AI) only: the backend sets `retailer` to the bare domain
+  // and flags hits on known non-commerce sites (GitHub/YouTube/wiki/docs)
+  // so the user can tell a seller from a guide/video/repo. Absent/false in
+  // AI modes (those already return curated retailer listings).
+  likely_non_shop?: boolean;
 }
 
 // Reply envelope from price_watch/search.
@@ -242,7 +247,6 @@ interface StateChangedEvent {
   };
 }
 
-@customElement("price-watch-panel")
 export class PriceWatchPanel extends LitElement {
   @state() private _products: TrackedProduct[] = [];
   @state() private _registry: EntityRegistryIndex | null = null;
@@ -284,6 +288,11 @@ export class PriceWatchPanel extends LitElement {
   @state() private _searchRan = false;
   // User-facing error from the last search (WS error message), or null.
   @state() private _searchError: string | null = null;
+  // When true, Free-mode results flagged as non-stores (GitHub, YouTube,
+  // wiki, docs/forums) are hidden from the list. Persisted to localStorage.
+  // Only affects rows with likely_non_shop===true (Free mode only); AI
+  // modes never set the flag, so the toggle is a no-op there.
+  @state() private _hideNonShops = false;
   // The result the user is confirming in the "Track this" dialog, or
   // null when the results list is showing. When set, the modal swaps to
   // the confirm form pre-filled from this result.
@@ -377,6 +386,7 @@ export class PriceWatchPanel extends LitElement {
   private static readonly SORT_KEY = "price-watch:sort";
   private static readonly HIDE_DISCONTINUED_KEY =
     "price-watch:hide-discontinued";
+  private static readonly HIDE_NONSHOPS_KEY = "price-watch:hide-non-shops";
 
   constructor() {
     super();
@@ -387,6 +397,8 @@ export class PriceWatchPanel extends LitElement {
         localStorage.getItem(PriceWatchPanel.HIDE_NONSHIP_KEY) === "1";
       this._hideDiscontinued =
         localStorage.getItem(PriceWatchPanel.HIDE_DISCONTINUED_KEY) === "1";
+      this._hideNonShops =
+        localStorage.getItem(PriceWatchPanel.HIDE_NONSHOPS_KEY) === "1";
       const savedSort = localStorage.getItem(PriceWatchPanel.SORT_KEY);
       if (savedSort && SORT_KEYS.includes(savedSort as SortKey)) {
         this._sort = savedSort as SortKey;
@@ -1452,13 +1464,53 @@ export class PriceWatchPanel extends LitElement {
         </div>
       `;
     }
+    // Count how many rows the heuristic flagged as non-stores, so the
+    // toggle can show "(N)" and we only render it when it'd do something.
+    const nonShopCount = this._searchResults.filter(
+      (r) => r.likely_non_shop
+    ).length;
+    const visible = this._hideNonShops
+      ? this._searchResults.filter((r) => !r.likely_non_shop)
+      : this._searchResults;
     return html`
-      <div class="modal__engine">${ENGINE_LABELS[this._searchEngine]}</div>
-      <ul class="results">
-        ${this._searchResults.map((r) => this._renderResultRow(r))}
-      </ul>
+      <div class="results-bar">
+        <div class="modal__engine">${ENGINE_LABELS[this._searchEngine]}</div>
+        ${nonShopCount > 0
+          ? html`<label
+              class="results-bar__toggle"
+              title="Hide GitHub, YouTube, wikis, forums and other non-store results"
+            >
+              <input
+                type="checkbox"
+                .checked=${this._hideNonShops}
+                @change=${this._handleHideNonShopsToggle}
+              />
+              Hide non-stores (${nonShopCount})
+            </label>`
+          : null}
+      </div>
+      ${visible.length === 0
+        ? html`<div class="modal__status">
+            All ${this._searchResults.length} results were non-stores and are
+            hidden. Untick "Hide non-stores" to see them.
+          </div>`
+        : html`<ul class="results">
+            ${visible.map((r) => this._renderResultRow(r))}
+          </ul>`}
     `;
   }
+
+  private _handleHideNonShopsToggle = (e: Event) => {
+    this._hideNonShops = (e.target as HTMLInputElement).checked;
+    try {
+      localStorage.setItem(
+        PriceWatchPanel.HIDE_NONSHOPS_KEY,
+        this._hideNonShops ? "1" : "0"
+      );
+    } catch {
+      // Ignore — preference just won't persist in locked-down contexts.
+    }
+  };
 
   private _renderResultRow(r: SearchResult) {
     const price =
@@ -1471,8 +1523,15 @@ export class PriceWatchPanel extends LitElement {
         : r.ships_to_user_region === false
         ? html`<span class="results__ship results__ship--no">Doesn't ship</span>`
         : null;
+    // Free-mode hint: flag obvious non-shops (repo/video/wiki/docs) so the
+    // user doesn't try to track a guide as if it were a seller.
+    const notAShop = r.likely_non_shop
+      ? html`<span class="results__kind results__kind--info"
+          >not a store?</span
+        >`
+      : null;
     return html`
-      <li class="results__row">
+      <li class="results__row ${r.likely_non_shop ? "results__row--muted" : ""}">
         <div class="results__thumb">
           ${r.image_url
             ? html`<img src=${r.image_url} alt="" loading="lazy" />`
@@ -1485,6 +1544,7 @@ export class PriceWatchPanel extends LitElement {
             ${r.retailer
               ? html`<span class="results__retailer">${r.retailer}</span>`
               : null}
+            ${notAShop}
             ${ships}
           </div>
           ${r.notes
@@ -2391,6 +2451,28 @@ export class PriceWatchPanel extends LitElement {
       letter-spacing: 0.05em;
       color: var(--secondary-text-color, #9e9e9e);
     }
+    .results-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .results-bar .modal__engine {
+      padding-bottom: 0;
+    }
+    .results-bar__toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 20px 8px;
+      font-size: 0.78rem;
+      color: var(--secondary-text-color, #757575);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .results-bar__toggle input {
+      cursor: pointer;
+    }
     .results {
       list-style: none;
       margin: 0;
@@ -2463,6 +2545,20 @@ export class PriceWatchPanel extends LitElement {
     .results__ship--no {
       background: rgba(158, 158, 158, 0.18);
       color: var(--secondary-text-color, #9e9e9e);
+    }
+    .results__kind {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 999px;
+    }
+    .results__kind--info {
+      background: rgba(255, 152, 0, 0.16);
+      color: var(--warning-color, #ff9800);
+    }
+    /* De-emphasize rows that are clearly not a store. */
+    .results__row--muted .results__thumb,
+    .results__row--muted .results__title {
+      opacity: 0.6;
     }
     .results__notes {
       font-size: 0.76rem;
@@ -2847,6 +2943,13 @@ export class PriceWatchPanel extends LitElement {
       margin: 0;
     }
   `;
+}
+
+// Guarded registration instead of @customElement — see card.ts for the
+// rationale. A re-import of this bundle must not throw on a duplicate
+// customElements.define, or the whole panel module aborts and renders blank.
+if (!customElements.get("price-watch-panel")) {
+  customElements.define("price-watch-panel", PriceWatchPanel);
 }
 
 declare global {
