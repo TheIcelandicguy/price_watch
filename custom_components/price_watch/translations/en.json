@@ -2,20 +2,48 @@
   "config": {
     "step": {
       "settings": {
-        "title": "Price Watch — first-time setup",
-        "description": "Price Watch can extract product info two ways:\n\n1. **Free, no API needed** — works on any site with Schema.org Product markup (most major retailers), or via a custom parser you define per-site.\n\n2. **AI extraction** — works on any site. Pick a provider below:\n\n• **Anthropic (Claude)** — paste an `sk-ant-…` key. Typical cost: $0.50–$2/month for ~10 products. See {docs_url}.\n• **OpenAI-compatible** — point at any service speaking OpenAI's chat-completions API: OpenAI itself, Ollama (free, local), Groq, OpenRouter, LM Studio, Together, Fireworks, etc. Fill in `base_url` (e.g. `https://api.openai.com/v1` or `http://localhost:11434/v1`) and `model`. Leave the API key blank for local servers.\n\nLeave both API keys blank to start in free mode. You can change provider/keys later in the integration's options.\n\nSet a home currency (3-letter code like ISK, EUR, USD) to enable the price-in-local-currency sensor. Supported: AUD BGN BRL CAD CHF CNY CZK DKK EUR GBP HKD HUF IDR ILS INR ISK JPY KRW MXN MYR NOK NZD PHP PLN RON SEK SGD THB TRY USD ZAR.",
+        "title": "Price Watch — choose how prices are read",
+        "description": "Price Watch extracts product info from web pages. Pick how:\n\n• **Free** — no AI, no key. Works on any site with Schema.org Product markup (most major retailers) or a custom parser you define per-site.\n\n• **Anthropic (Claude)** — paste an `sk-ant-…` key. AI extraction on any site. Typical cost: $0.50–$2/month for ~10 products.\n\n• **OpenAI-compatible** — OpenAI, Ollama (free/local), Groq, OpenRouter, LM Studio, etc. AI extraction via any chat-completions endpoint.\n\nYou can change this anytime in the integration's options.",
         "data": {
-          "ai_provider": "AI provider",
-          "api_key": "API key (Anthropic: sk-ant-… / OpenAI: sk-… / local: leave blank)",
-          "model_anthropic": "Anthropic model (only matters when provider = Anthropic)",
-          "base_url": "OpenAI-compat base URL (e.g. https://api.openai.com/v1 or http://localhost:11434/v1)",
-          "model_openai": "OpenAI-compat model name (e.g. gpt-4o-mini, llama3.3, qwen-coder)",
+          "ai_provider": "How should prices be read?"
+        }
+      },
+      "settings_free": {
+        "title": "Free mode — no AI",
+        "description": "No API key needed. Prices are read from Schema.org Product markup or a per-site custom parser.\n\nSet a home currency (3-letter code like ISK, EUR, USD) to enable the price-in-local-currency sensor. Supported: AUD BGN BRL CAD CHF CNY CZK DKK EUR GBP HKD HUF IDR ILS INR ISK JPY KRW MXN MYR NOK NZD PHP PLN RON SEK SGD THB TRY USD ZAR.",
+        "data": {
+          "home_currency": "Home currency (3-letter ISO code, optional)",
+          "user_region": "Your country code (2-letter, e.g. IS, US — used for 'ships to me')",
+          "daily_budget_usd": "Daily budget cap (USD — unused in free mode)",
+          "monthly_budget_usd": "Monthly budget cap (USD — unused in free mode)"
+        }
+      },
+      "settings_anthropic": {
+        "title": "Anthropic (Claude)",
+        "description": "Paste your `sk-ant-…` key. Leave it blank to start in free mode (you can add it later). Pricing: {docs_url}.",
+        "data": {
+          "api_key": "Anthropic API key (sk-ant-… — leave blank for free mode)",
+          "model_anthropic": "Anthropic model",
+          "home_currency": "Home currency (3-letter ISO code, optional)",
+          "user_region": "Your country code (2-letter, e.g. IS, US — used for 'ships to me')",
+          "daily_budget_usd": "Daily budget cap (USD)",
+          "monthly_budget_usd": "Monthly budget cap (USD)"
+        }
+      },
+      "settings_openai": {
+        "title": "OpenAI-compatible provider",
+        "description": "Point at any service speaking OpenAI's chat-completions API: OpenAI, Ollama (free/local), Groq, OpenRouter, LM Studio, Together, Fireworks, etc.\n\nFill in the base URL (e.g. `https://api.openai.com/v1` or `http://localhost:11434/v1`) and model. Leave the API key blank for local servers.",
+        "data": {
+          "base_url": "Base URL (e.g. https://api.openai.com/v1 or http://localhost:11434/v1)",
+          "model_openai": "Model name (e.g. gpt-4o-mini, llama3.3, qwen-coder)",
+          "api_key": "API key (sk-… — leave blank for local servers)",
           "input_cost_per_mtok": "Input cost per million tokens (USD, 0 = free/unknown)",
           "output_cost_per_mtok": "Output cost per million tokens (USD, 0 = free/unknown)",
           "max_html_chars": "Max HTML chars sent to model (smaller for tiny local models)",
           "force_json_mode": "Force JSON mode instead of tool calls (older Ollama, some local models)",
           "extra_headers": "Extra HTTP headers (optional JSON object, e.g. for OpenRouter analytics)",
           "home_currency": "Home currency (3-letter ISO code, optional)",
+          "user_region": "Your country code (2-letter, e.g. IS, US — used for 'ships to me')",
           "daily_budget_usd": "Daily budget cap (USD)",
           "monthly_budget_usd": "Monthly budget cap (USD)"
         }
@@ -59,6 +87,7 @@
       "invalid_key_format": "API keys start with 'sk-ant-'.",
       "invalid_key": "API key is invalid.",
       "validation_error": "Could not validate the API key. Check your network connection.",
+      "invalid_region_code": "Country code must be 2 letters (e.g. IS, US, GB).",
       "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
       "model_required": "Model name is required for OpenAI-compatible providers.",
       "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
@@ -70,7 +99,8 @@
       "name_required": "Product name is required."
     },
     "abort": {
-      "already_configured": "This URL is already being tracked."
+      "already_configured": "This URL is already being tracked.",
+      "no_url": "No URL was provided to track."
     }
   },
   "options": {
@@ -86,17 +116,45 @@
           "save_exit": "Save and exit"
         },
         "data": {
-          "ai_provider": "AI provider",
-          "api_key": "API key (Anthropic: sk-ant-… / OpenAI: sk-… / local: leave blank)",
+          "ai_provider": "How should prices be read?"
+        }
+      },
+      "settings_opt_free": {
+        "title": "Free mode — no AI",
+        "description": "No API key needed. Prices are read from Schema.org Product markup or a per-site custom parser.\n\nSet a home currency (3-letter code like ISK, EUR, USD) to enable the price-in-local-currency sensor.",
+        "data": {
+          "home_currency": "Home currency (3-letter ISO code, optional)",
+          "user_region": "Your country code (2-letter, e.g. IS, US — used for 'ships to me')",
+          "daily_budget_usd": "Daily budget cap (USD — unused in free mode)",
+          "monthly_budget_usd": "Monthly budget cap (USD — unused in free mode)"
+        }
+      },
+      "settings_opt_anthropic": {
+        "title": "Anthropic (Claude)",
+        "description": "Paste your `sk-ant-…` key. Leave it blank for free mode. Pricing: {docs_url}.",
+        "data": {
+          "api_key": "Anthropic API key (sk-ant-… — leave blank for free mode)",
           "model_anthropic": "Anthropic model",
-          "base_url": "OpenAI-compat base URL",
-          "model_openai": "OpenAI-compat model name",
-          "input_cost_per_mtok": "Input cost per million tokens (USD)",
-          "output_cost_per_mtok": "Output cost per million tokens (USD)",
-          "max_html_chars": "Max HTML chars sent to model",
-          "force_json_mode": "Force JSON mode (older Ollama / some local models)",
+          "home_currency": "Home currency (3-letter ISO code, optional)",
+          "user_region": "Your country code (2-letter, e.g. IS, US — used for 'ships to me')",
+          "daily_budget_usd": "Daily budget cap (USD)",
+          "monthly_budget_usd": "Monthly budget cap (USD)"
+        }
+      },
+      "settings_opt_openai": {
+        "title": "OpenAI-compatible provider",
+        "description": "Point at any service speaking OpenAI's chat-completions API: OpenAI, Ollama (free/local), Groq, OpenRouter, LM Studio, etc. Leave the API key blank for local servers.",
+        "data": {
+          "base_url": "Base URL (e.g. https://api.openai.com/v1 or http://localhost:11434/v1)",
+          "model_openai": "Model name (e.g. gpt-4o-mini, llama3.3, qwen-coder)",
+          "api_key": "API key (sk-… — leave blank for local servers)",
+          "input_cost_per_mtok": "Input cost per million tokens (USD, 0 = free/unknown)",
+          "output_cost_per_mtok": "Output cost per million tokens (USD, 0 = free/unknown)",
+          "max_html_chars": "Max HTML chars sent to model (smaller for tiny local models)",
+          "force_json_mode": "Force JSON mode instead of tool calls (older Ollama, some local models)",
           "extra_headers": "Extra HTTP headers (optional JSON object)",
-          "home_currency": "Home currency (3-letter ISO code)",
+          "home_currency": "Home currency (3-letter ISO code, optional)",
+          "user_region": "Your country code (2-letter, e.g. IS, US — used for 'ships to me')",
           "daily_budget_usd": "Daily budget cap (USD)",
           "monthly_budget_usd": "Monthly budget cap (USD)"
         }
@@ -152,6 +210,7 @@
       "invalid_key_format": "API keys start with 'sk-ant-'.",
       "invalid_key": "API key is invalid.",
       "validation_error": "Could not validate the API key. Check your network connection.",
+      "invalid_region_code": "Country code must be 2 letters (e.g. IS, US, GB).",
       "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
       "model_required": "Model name is required for OpenAI-compatible providers.",
       "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
@@ -211,6 +270,24 @@
     "reset_history": {
       "name": "Reset history",
       "description": "Wipe the price history."
+    },
+    "set_paused": {
+      "name": "Pause / resume",
+      "description": "Pause or resume price polling for a tracked product.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "Target only this product (optional)."
+        },
+        "device_id": {
+          "name": "Device",
+          "description": "Target only this product, by HA device."
+        },
+        "paused": {
+          "name": "Paused",
+          "description": "True to pause polling, false to resume."
+        }
+      }
     },
     "find_alternatives": {
       "name": "Find alternatives",

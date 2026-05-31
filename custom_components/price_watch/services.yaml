@@ -54,6 +54,30 @@ reset_history:
         device:
           integration: price_watch
 
+set_paused:
+  name: Pause / resume
+  description: >
+    Pause or resume price polling for a tracked product. Paused products
+    keep their last-known price and stop checking until resumed.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Target only this product (optional).
+      selector:
+        text:
+    device_id:
+      name: Device
+      description: Target only this product, by HA device.
+      selector:
+        device:
+          integration: price_watch
+    paused:
+      name: Paused
+      description: True to pause polling, false to resume.
+      default: true
+      selector:
+        boolean:
+
 find_alternatives:
   name: Find alternatives
   description: >
@@ -159,3 +183,82 @@ remove_listing:
       example: l_newegg_test
       selector:
         text:
+
+edit_listing:
+  name: Edit listing
+  description: >
+    Update an existing listing's custom parser or metadata in place. Use
+    this to attach a hand-tuned CSS price selector (e.g. captured via the
+    panel's Advanced editor / bookmarklet) to a listing the default
+    extractor can't read. Reloads the product so the next poll uses it.
+    Unlike remove_listing, this is allowed on the primary listing.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: The product entry the listing belongs to (required).
+      example: 01KSBSNNAYACAF7FB34KX8BWNP
+      selector:
+        text:
+    listing_id:
+      name: Listing ID
+      description: >
+        The listing's stable ID (required). Find it in the listing_id
+        attribute of any per-listing sensor.
+      example: l_newegg_test
+      selector:
+        text:
+    custom_parser:
+      name: Custom parser (JSON)
+      description: >
+        Parser config (JSON). An empty value CLEARS the parser, reverting
+        the listing to the default JSON-LD + AI pipeline.
+      selector:
+        object:
+    currency:
+      name: Currency
+      description: ISO currency code override (USD, EUR, ISK, …). Optional.
+      example: ISK
+      selector:
+        text:
+    retailer:
+      name: Retailer
+      description: Display-name override for the retailer. Optional.
+      example: Tölvutek
+      selector:
+        text:
+    request_cookies:
+      name: Request cookies
+      description: >
+        Optional list of cookie dicts for Cloudflare/anti-bot bypass.
+        Each cookie: {name, value, domain?, path?}.
+      selector:
+        object:
+
+track_product:
+  name: Track product
+  description: >
+    Create a new tracked product from a URL in one step (no extraction
+    preview). Used by the panel's live-search "Track" dialog. The product
+    starts polling on the next coordinator tick.
+  fields:
+    url:
+      name: URL
+      description: The product's listing URL (required).
+      example: https://www.newegg.com/p/N82E16813145529
+      selector:
+        text:
+    name:
+      name: Name
+      description: Display name for the product. Defaults to the URL.
+      example: GIGABYTE Z890 motherboard
+      selector:
+        text:
+    target_price:
+      name: Target price
+      description: Optional target price (in the product's currency).
+      example: 4500
+      selector:
+        number:
+          mode: box
+          min: 0
+          step: 0.01

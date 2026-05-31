@@ -9,7 +9,8 @@ provider configuration:
   (uses Anthropic's built-in web_search tool)
 - AI provider = anything else (Ollama, OpenAI-compat) → AISynthesizerSearchProvider
   (DuckDuckGo HTML search + AI-driven filtering)
-- No AI provider at all → no alternatives feature (coordinator surfaces a clear error)
+- No AI provider at all → DuckDuckGoSearchProvider (raw DDG hits, no AI
+  cleanup — lowest quality but the feature still works)
 
 This routing lives in the coordinator (build_search_provider helper),
 not here, because the routing decision needs runtime state (which

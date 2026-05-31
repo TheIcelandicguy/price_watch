@@ -35,6 +35,7 @@ from ..const import DEFAULT_MODEL
 from .base import (
     ALTERNATIVES_SYSTEM_PROMPT,
     ALTERNATIVES_TOOL_SCHEMA,
+    DISCOVERY_SYSTEM_PROMPT,
     Alternative,
     SearchProviderAuthError,
     SearchProviderError,
@@ -107,7 +108,11 @@ class AnthropicNativeSearchProvider:
             response = await client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                system=ALTERNATIVES_SYSTEM_PROMPT,
+                system=(
+                    DISCOVERY_SYSTEM_PROMPT
+                    if query.discovery
+                    else ALTERNATIVES_SYSTEM_PROMPT
+                ),
                 tools=tools,
                 # tool_choice forces Claude to actually use a tool. We
                 # don't pin it to a specific tool because Claude needs
@@ -175,7 +180,29 @@ class AnthropicNativeSearchProvider:
         the product description as a search target rather than as
         instructions. Includes the price/currency context so Claude
         can prefer cheaper alternatives.
+
+        In discovery mode (`query.discovery`), `title` is a free-text
+        search query rather than a known product, so the prompt is
+        framed as an open shopping search.
         """
+        if query.discovery:
+            bits = [f"Search query: {query.title}"]
+            if query.region and query.region != "worldwide":
+                bits.append(f"Regional preference: {query.region}")
+            if query.user_region:
+                bits.append(
+                    f"User's country code (ISO 3166-1 alpha-2): {query.user_region}. "
+                    "For each result, set ships_to_user_region based on whether the "
+                    "retailer ships physical goods to this country. Use null when "
+                    "genuinely uncertain - do not guess."
+                )
+            bits.append(
+                f"\nUse web_search to find up to {query.max_results} real, "
+                "currently-purchasable product listings matching this search. "
+                "Then call report_alternatives with your findings."
+            )
+            return "\n".join(bits)
+
         bits = [f"Product: {query.title}"]
         if query.current_price is not None and query.currency:
             bits.append(

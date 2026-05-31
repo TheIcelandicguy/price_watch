@@ -424,6 +424,7 @@ export function buildProducts(
       targetDiff: null,
       targetPrice:
         typeof attrs.target_price === "number" ? attrs.target_price : null,
+      paused: attrs.paused === true,
 
       inStock: null,
       stockCount:

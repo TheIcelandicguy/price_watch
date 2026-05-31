@@ -181,6 +181,11 @@ export interface TrackedProduct {
   highest: number | null;
   targetDiff: number | null;
   targetPrice: number | null;
+  // Whether polling is currently paused for this product (set via the
+  // options flow or the price_watch.set_paused service). Surfaced on the
+  // price sensor's attributes so the panel can render the inline pause
+  // toggle and a "Paused" badge without a separate WS round-trip.
+  paused: boolean;
 
   // Stock
   inStock: boolean | null;

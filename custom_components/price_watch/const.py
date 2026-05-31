@@ -84,6 +84,13 @@ CONF_ALTERNATIVES_REGION: Final = "alternatives_region"
 # RESULTS for delivery feasibility.
 CONF_USER_REGION: Final = "user_region"
 
+# Global list of retailer hostnames to drop from alternatives results.
+# Stored on the settings entry's options as a list of bare hosts (e.g.
+# ["amazon.de", "alza.cz"]). Matching is host-suffix based so "amazon.de"
+# also excludes "www.amazon.de". Distinct from the ships-to-region
+# heuristic: this removes the result entirely rather than flagging it.
+CONF_EXCLUDED_DOMAINS: Final = "excluded_domains"
+
 # Approximate fallback: when CONF_USER_REGION is not set, derive a
 # country code from the home_currency. Covers the common case where
 # a user configures their currency but doesn't know to set this
@@ -119,6 +126,14 @@ ATTR_ALTERNATIVES_ERROR: Final = "alternatives_error"
 # Defaults
 DEFAULT_SCAN_INTERVAL: Final = timedelta(hours=6)
 DEFAULT_MODEL: Final = "claude-haiku-4-5-20251001"
+# Selectable Anthropic models, newest-cheapest first. Shared by the
+# config/options flow and the panel's provider editor so both stay in
+# sync. DEFAULT_MODEL must be a member.
+ANTHROPIC_MODELS: Final = (
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+    "claude-opus-4-7",
+)
 DEFAULT_DAILY_BUDGET: Final = 0.50
 DEFAULT_MONTHLY_BUDGET: Final = 5.00
 MIN_SCAN_INTERVAL_MINUTES: Final = 15

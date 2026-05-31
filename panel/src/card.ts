@@ -48,6 +48,41 @@ export class PriceWatchCard extends LitElement {
   // the removed row.
   @property({ attribute: false })
   onRemoveListing?: (product: TrackedProduct, listing: Listing) => void;
+  // Optional callback fired when the user clicks "Add as listing" on an
+  // alternative row. The panel owner calls price_watch.add_listing with
+  // the alternative's URL (plus retailer/currency hints). After the
+  // service returns, the entry reloads, the registry-updated event
+  // fires, the panel re-fetches, and the new listing appears in the
+  // Listings section. Alternatives the user has already added as a
+  // listing are detected by URL (see `listingUrls`) and show a checked,
+  // disabled state instead of the add button.
+  @property({ attribute: false })
+  onAddListing?: (product: TrackedProduct, alt: Alternative) => void;
+  // Optional callback fired when the user clicks the ✎ (edit) button on a
+  // listing row. The panel owner opens the advanced price-selector editor
+  // for that listing — capture a CSS selector via F12 / the bookmarklet,
+  // Test it server-side, then save via price_watch.edit_listing. Allowed on
+  // every listing including the primary (unlike remove, which is
+  // secondary-only). After the service reloads the entry the new parser
+  // takes effect on the next poll.
+  @property({ attribute: false })
+  onEditListing?: (product: TrackedProduct, listing: Listing) => void;
+  // Optional callback fired when the user clicks the per-card "Refresh
+  // now" button. The panel owner calls price_watch.refresh_now. While
+  // in flight the parent sets `refreshingNow` so we spin the icon.
+  @property({ attribute: false })
+  onRefreshNow?: (product: TrackedProduct) => void;
+  @property({ type: Boolean, attribute: false })
+  refreshingNow = false;
+  // Optional callback fired when the user commits an inline target-price
+  // edit. A null target clears it. The panel owner calls
+  // price_watch.set_target.
+  @property({ attribute: false })
+  onSetTarget?: (product: TrackedProduct, target: number | null) => void;
+  // Optional callback fired when the user toggles the pause control. The
+  // panel owner calls price_watch.set_paused.
+  @property({ attribute: false })
+  onSetPaused?: (product: TrackedProduct, paused: boolean) => void;
 
   /**
    * The currency we show next to the headline price. Prefer the local
@@ -185,6 +220,12 @@ export class PriceWatchCard extends LitElement {
   private renderStatusChips() {
     const { product } = this;
     const chips: ReturnType<typeof html>[] = [];
+
+    if (product.paused) {
+      chips.push(html`<span class="chip chip--paused" title="Polling paused">
+        Paused
+      </span>`);
+    }
 
     if (product.discontinued) {
       chips.push(html`<span class="chip chip--warn" title=${product.discontinuedReason ?? ""}>
@@ -328,6 +369,23 @@ export class PriceWatchCard extends LitElement {
    * Same currency only — cross-currency comparison without FX is
    * misleading.
    */
+  /**
+   * Set of URLs already tracked as listings on this product, used to
+   * mark alternatives the user has already added so we show a checked,
+   * disabled state instead of an active "Add" button. Trailing slashes
+   * are normalised away so `…/p/123` and `…/p/123/` match.
+   */
+  private get listingUrls(): Set<string> {
+    const norm = (u: string | null | undefined) =>
+      (u ?? "").trim().replace(/\/+$/, "").toLowerCase();
+    const urls = new Set<string>();
+    for (const l of this.product.listings) {
+      const n = norm(l.url);
+      if (n) urls.add(n);
+    }
+    return urls;
+  }
+
   private renderAlternative(alt: Alternative) {
     const { product } = this;
     let delta: number | null = null;
@@ -337,6 +395,8 @@ export class PriceWatchCard extends LitElement {
       if (delta < 0) priceClass = "alts__price alts__price--cheaper";
       else if (delta > 0) priceClass = "alts__price alts__price--pricier";
     }
+    const altUrlNorm = (alt.url ?? "").trim().replace(/\/+$/, "").toLowerCase();
+    const alreadyListed = altUrlNorm !== "" && this.listingUrls.has(altUrlNorm);
     return html`
       <li class="alts__row">
         <a
@@ -373,8 +433,42 @@ export class PriceWatchCard extends LitElement {
               : html`<span class="alts__price-unknown">—</span>`}
           </div>
         </a>
+        ${this.onAddListing
+          ? alreadyListed
+            ? html`<span
+                class="alts__add alts__add--done"
+                title="Already tracked as a listing"
+                aria-label="Already a listing"
+                >✓</span
+              >`
+            : html`<button
+                class="alts__add"
+                type="button"
+                @click=${(e: Event) => this.handleAddListing(e, alt)}
+                aria-label=${`Add ${alt.retailer || "this alternative"} as a listing`}
+                title="Track this as a listing"
+              >
+                +
+              </button>`
+          : nothing}
       </li>
     `;
+  }
+
+  /**
+   * Click handler for an alternative row's "+" button. Stops
+   * propagation (so the card's open-source handler doesn't fire),
+   * confirms intent, and delegates to onAddListing. Mirrors
+   * handleRemoveListing's window.confirm approach for consistency.
+   */
+  private handleAddListing(event: Event, alt: Alternative): void {
+    event.stopPropagation();
+    event.preventDefault();
+    const label = alt.retailer
+      ? `Track the ${alt.retailer} listing for ${this.product.title}?`
+      : `Track this alternative as a listing on ${this.product.title}?`;
+    if (!window.confirm(label)) return;
+    this.onAddListing?.(this.product, alt);
   }
 
   private handleRefresh = (event: Event): void => {
@@ -547,19 +641,45 @@ export class PriceWatchCard extends LitElement {
               ${body}
             </a>`
           : html`<div class="listings__link listings__link--noUrl">${body}</div>`}
-        ${listing.isPrimary
-          ? nothing
-          : html`<button
-              class="listings__remove"
-              type="button"
-              @click=${(e: Event) => this.handleRemoveListing(e, listing)}
-              aria-label=${`Remove ${listing.retailer ?? "listing"}`}
-              title=${`Remove ${listing.retailer ?? "this listing"}`}
-            >
-              ×
-            </button>`}
+        <div class="listings__actions">
+          ${this.onEditListing
+            ? html`<button
+                class="listings__edit"
+                type="button"
+                @click=${(e: Event) => this.handleEditListing(e, listing)}
+                aria-label=${`Edit price selector for ${
+                  listing.retailer ?? "listing"
+                }`}
+                title="Advanced: set a custom price selector"
+              >
+                ✎
+              </button>`
+            : nothing}
+          ${listing.isPrimary
+            ? nothing
+            : html`<button
+                class="listings__remove"
+                type="button"
+                @click=${(e: Event) => this.handleRemoveListing(e, listing)}
+                aria-label=${`Remove ${listing.retailer ?? "listing"}`}
+                title=${`Remove ${listing.retailer ?? "this listing"}`}
+              >
+                ×
+              </button>`}
+        </div>
       </li>
     `;
+  }
+
+  /**
+   * Click handler for a row's ✎ button. Stops propagation (so the card's
+   * open-source handler doesn't fire) and delegates to onEditListing,
+   * which opens the panel's advanced selector editor for this listing.
+   */
+  private handleEditListing(event: Event, listing: Listing): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.onEditListing?.(this.product, listing);
   }
 
   /**
@@ -581,6 +701,107 @@ export class PriceWatchCard extends LitElement {
       : `Remove this listing from ${this.product.title}?`;
     if (!window.confirm(label)) return;
     this.onRemoveListing?.(this.product, listing);
+  }
+
+  private handleRefreshNow = (event: Event): void => {
+    event.stopPropagation();
+    if (this.refreshingNow) return;
+    this.onRefreshNow?.(this.product);
+  };
+
+  private handleTogglePaused = (event: Event): void => {
+    event.stopPropagation();
+    this.onSetPaused?.(this.product, !this.product.paused);
+  };
+
+  /**
+   * Commit an inline target-price edit. Parses the input value: empty
+   * (or non-numeric) clears the target (null); a valid number sets it.
+   * No-ops when the value hasn't changed so we don't fire redundant
+   * service calls on every blur.
+   */
+  private handleTargetCommit = (event: Event): void => {
+    event.stopPropagation();
+    const input = event.target as HTMLInputElement;
+    const raw = input.value.trim();
+    const next = raw === "" ? null : Number(raw);
+    if (next !== null && Number.isNaN(next)) {
+      // Invalid input — restore the displayed value and bail.
+      input.value =
+        this.product.targetPrice != null ? String(this.product.targetPrice) : "";
+      return;
+    }
+    const current = this.product.targetPrice;
+    if (next === current) return;
+    this.onSetTarget?.(this.product, next);
+  };
+
+  private handleTargetKeydown = (event: KeyboardEvent): void => {
+    event.stopPropagation();
+    if (event.key === "Enter") {
+      (event.target as HTMLInputElement).blur();
+    }
+  };
+
+  /**
+   * Per-card action bar: inline target-price editor, a pause/resume
+   * toggle, and a "Refresh now" button. Only rendered when the parent
+   * wired at least one of the callbacks (so the card stays purely
+   * presentational when used standalone, e.g. in tests).
+   */
+  private renderActions() {
+    if (!this.onRefreshNow && !this.onSetTarget && !this.onSetPaused) {
+      return nothing;
+    }
+    const { product } = this;
+    return html`
+      <div class="actions" @click=${(e: Event) => e.stopPropagation()}>
+        ${this.onSetTarget
+          ? html`<label class="actions__target" title="Notify when price drops to or below this">
+              <span class="actions__target-label">Target</span>
+              <input
+                class="actions__target-input"
+                type="number"
+                inputmode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="—"
+                .value=${product.targetPrice != null ? String(product.targetPrice) : ""}
+                @change=${this.handleTargetCommit}
+                @keydown=${this.handleTargetKeydown}
+                @click=${(e: Event) => e.stopPropagation()}
+              />
+            </label>`
+          : nothing}
+        <div class="actions__spacer"></div>
+        ${this.onSetPaused
+          ? html`<button
+              class="actions__btn"
+              type="button"
+              @click=${this.handleTogglePaused}
+              aria-label=${product.paused ? "Resume polling" : "Pause polling"}
+              title=${product.paused ? "Resume polling" : "Pause polling"}
+            >
+              <ha-icon icon=${product.paused ? "mdi:play" : "mdi:pause"}></ha-icon>
+            </button>`
+          : nothing}
+        ${this.onRefreshNow
+          ? html`<button
+              class="actions__btn"
+              type="button"
+              ?disabled=${this.refreshingNow}
+              @click=${this.handleRefreshNow}
+              aria-label="Refresh price now"
+              title="Refresh price now"
+            >
+              <ha-icon
+                icon=${this.refreshingNow ? "mdi:loading" : "mdi:refresh"}
+                class=${this.refreshingNow ? "actions__btn-spin" : ""}
+              ></ha-icon>
+            </button>`
+          : nothing}
+      </div>
+    `;
   }
 
   private handleClick(event: MouseEvent) {
@@ -633,6 +854,8 @@ export class PriceWatchCard extends LitElement {
           ${product.discontinued && product.discontinuedReason
             ? html`<p class="discontinued-reason">${product.discontinuedReason}</p>`
             : nothing}
+
+          ${this.renderActions()}
 
           <footer class="footer">
             <span class="last-check">
@@ -744,6 +967,74 @@ export class PriceWatchCard extends LitElement {
       background: transparent;
       border: 1px solid var(--divider-color, #e0e0e0);
       color: var(--secondary-text-color, #757575);
+    }
+    .chip--paused {
+      background: var(--secondary-text-color, #9e9e9e);
+      color: #fff;
+    }
+
+    /* --- Per-card action bar --- */
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--divider-color, #e0e0e0);
+    }
+    .actions__spacer {
+      flex: 1 1 auto;
+    }
+    .actions__target {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .actions__target-label {
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .actions__target-input {
+      width: 84px;
+      box-sizing: border-box;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 6px;
+      outline: none;
+    }
+    .actions__target-input:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .actions__btn {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--secondary-text-color, #757575);
+      --mdc-icon-size: 18px;
+      transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .actions__btn:hover:not(:disabled) {
+      color: var(--primary-color, #03a9f4);
+      background: var(--secondary-background-color, #f5f5f5);
+      border-color: var(--divider-color, #e0e0e0);
+    }
+    .actions__btn:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+    .actions__btn-spin {
+      animation: alts-spin 1.2s linear infinite;
     }
 
     .price-block {
@@ -916,10 +1207,15 @@ export class PriceWatchCard extends LitElement {
       gap: 4px;
     }
     .alts__row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       margin: 0;
       padding: 0;
     }
     .alts__link {
+      flex: 1 1 auto;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -928,6 +1224,40 @@ export class PriceWatchCard extends LitElement {
       text-decoration: none;
       color: inherit;
       transition: background 120ms ease;
+    }
+    .alts__add {
+      flex: 0 0 auto;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .alts__add:hover {
+      color: var(--success-color, #2e7d32);
+      background: rgba(46, 125, 50, 0.08);
+      border-color: rgba(46, 125, 50, 0.25);
+    }
+    .alts__add:focus-visible {
+      outline: 2px solid var(--success-color, #2e7d32);
+      outline-offset: 1px;
+    }
+    .alts__add--done {
+      cursor: default;
+      color: var(--success-color, #2e7d32);
+    }
+    .alts__add--done:hover {
+      background: transparent;
+      border-color: transparent;
     }
     .alts__link:hover {
       background: var(--secondary-background-color, #f5f5f5);
@@ -1191,6 +1521,35 @@ export class PriceWatchCard extends LitElement {
     }
     .listings__remove:focus-visible {
       outline: 2px solid var(--error-color, #c62828);
+      outline-offset: 1px;
+    }
+    .listings__actions {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .listings__edit {
+      flex: 0 0 auto;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .listings__edit:hover {
+      color: var(--primary-color, #1976d2);
+      background: rgba(25, 118, 210, 0.08);
+      border-color: rgba(25, 118, 210, 0.2);
+    }
+    .listings__edit:focus-visible {
+      outline: 2px solid var(--primary-color, #1976d2);
       outline-offset: 1px;
     }
   `;

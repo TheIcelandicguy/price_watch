@@ -1,27 +1,29 @@
-function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPropertyDescriptor(e,i):r;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)o=Reflect.decorate(t,e,i,r);else for(var a=t.length-1;a>=0;a--)(s=t[a])&&(o=(n<3?s(o):n>3?s(e,i,o):s(e,i))||o);return n>3&&o&&Object.defineProperty(e,i,o),o}"function"==typeof SuppressedError&&SuppressedError;const e=globalThis,i=e.ShadowRoot&&(void 0===e.ShadyCSS||e.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,r=Symbol(),s=new WeakMap;let n=class{constructor(t,e,i){if(this._$cssResult$=!0,i!==r)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e}get styleSheet(){let t=this.o;const e=this.t;if(i&&void 0===t){const i=void 0!==e&&1===e.length;i&&(t=s.get(e)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),i&&s.set(e,t))}return t}toString(){return this.cssText}};const o=(t,...e)=>{const i=1===t.length?t[0]:e.reduce((e,i,r)=>e+(t=>{if(!0===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+t[r+1],t[0]);return new n(i,t,r)},a=i?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const i of t.cssRules)e+=i.cssText;return(t=>new n("string"==typeof t?t:t+"",void 0,r))(e)})(t):t,{is:l,defineProperty:c,getOwnPropertyDescriptor:d,getOwnPropertyNames:p,getOwnPropertySymbols:h,getPrototypeOf:u}=Object,g=globalThis,_=g.trustedTypes,f=_?_.emptyScript:"",y=g.reactiveElementPolyfillSupport,m=(t,e)=>t,v={toAttribute(t,e){switch(e){case Boolean:t=t?f:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t)}return t},fromAttribute(t,e){let i=t;switch(e){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t)}catch(t){i=null}}return i}},$=(t,e)=>!l(t,e),b={attribute:!0,type:String,converter:v,reflect:!1,useDefault:!1,hasChanged:$};Symbol.metadata??=Symbol("metadata"),g.litPropertyMetadata??=new WeakMap;let x=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,e=b){if(e.state&&(e.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((e=Object.create(e)).wrapped=!0),this.elementProperties.set(t,e),!e.noAccessor){const i=Symbol(),r=this.getPropertyDescriptor(t,i,e);void 0!==r&&c(this.prototype,t,r)}}static getPropertyDescriptor(t,e,i){const{get:r,set:s}=d(this.prototype,t)??{get(){return this[e]},set(t){this[e]=t}};return{get:r,set(e){const n=r?.call(this);s?.call(this,e),this.requestUpdate(t,n,i)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??b}static _$Ei(){if(this.hasOwnProperty(m("elementProperties")))return;const t=u(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(m("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(m("properties"))){const t=this.properties,e=[...p(t),...h(t)];for(const i of e)this.createProperty(i,t[i])}const t=this[Symbol.metadata];if(null!==t){const e=litPropertyMetadata.get(t);if(void 0!==e)for(const[t,i]of e)this.elementProperties.set(t,i)}this._$Eh=new Map;for(const[t,e]of this.elementProperties){const i=this._$Eu(t,e);void 0!==i&&this._$Eh.set(i,t)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){const e=[];if(Array.isArray(t)){const i=new Set(t.flat(1/0).reverse());for(const t of i)e.unshift(a(t))}else void 0!==t&&e.push(a(t));return e}static _$Eu(t,e){const i=e.attribute;return!1===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){const t=new Map,e=this.constructor.elementProperties;for(const i of e.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t)}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((t,r)=>{if(i)t.adoptedStyleSheets=r.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const i of r){const r=document.createElement("style"),s=e.litNonce;void 0!==s&&r.setAttribute("nonce",s),r.textContent=i.cssText,t.appendChild(r)}})(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,e,i){this._$AK(t,i)}_$ET(t,e){const i=this.constructor.elementProperties.get(t),r=this.constructor._$Eu(t,i);if(void 0!==r&&!0===i.reflect){const s=(void 0!==i.converter?.toAttribute?i.converter:v).toAttribute(e,i.type);this._$Em=t,null==s?this.removeAttribute(r):this.setAttribute(r,s),this._$Em=null}}_$AK(t,e){const i=this.constructor,r=i._$Eh.get(t);if(void 0!==r&&this._$Em!==r){const t=i.getPropertyOptions(r),s="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:v;this._$Em=r;const n=s.fromAttribute(e,t.type);this[r]=n??this._$Ej?.get(r)??n,this._$Em=null}}requestUpdate(t,e,i,r=!1,s){if(void 0!==t){const n=this.constructor;if(!1===r&&(s=this[t]),i??=n.getPropertyOptions(t),!((i.hasChanged??$)(s,e)||i.useDefault&&i.reflect&&s===this._$Ej?.get(t)&&!this.hasAttribute(n._$Eu(t,i))))return;this.C(t,e,i)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(t,e,{useDefault:i,reflect:r,wrapped:s},n){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,n??e??this[t]),!0!==s||void 0!==n)||(this._$AL.has(t)||(this.hasUpdated||i||(e=void 0),this._$AL.set(t,e)),!0===r&&this._$Em!==t&&(this._$Eq??=new Set).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(t){Promise.reject(t)}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,e]of this._$Ep)this[t]=e;this._$Ep=void 0}const t=this.constructor.elementProperties;if(t.size>0)for(const[e,i]of t){const{wrapped:t}=i,r=this[e];!0!==t||this._$AL.has(e)||void 0===r||this.C(e,void 0,i,r)}}let t=!1;const e=this._$AL;try{t=this.shouldUpdate(e),t?(this.willUpdate(e),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(e)):this._$EM()}catch(e){throw t=!1,this._$EM(),e}t&&this._$AE(e)}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM()}updated(t){}firstUpdated(t){}};x.elementStyles=[],x.shadowRootOptions={mode:"open"},x[m("elementProperties")]=new Map,x[m("finalized")]=new Map,y?.({ReactiveElement:x}),(g.reactiveElementVersions??=[]).push("2.1.2");const w=globalThis,k=t=>t,A=w.trustedTypes,S=A?A.createPolicy("lit-html",{createHTML:t=>t}):void 0,E="$lit$",P=`lit$${Math.random().toFixed(9).slice(2)}$`,C="?"+P,R=`<${C}>`,I=document,U=()=>I.createComment(""),N=t=>null===t||"object"!=typeof t&&"function"!=typeof t,M=Array.isArray,O="[ \t\n\f\r]",z=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,T=/-->/g,H=/>/g,L=RegExp(`>|${O}(?:([^\\s"'>=/]+)(${O}*=${O}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),D=/'/g,j=/"/g,B=/^(?:script|style|textarea|title)$/i,F=(t=>(e,...i)=>({_$litType$:t,strings:e,values:i}))(1),q=Symbol.for("lit-noChange"),K=Symbol.for("lit-nothing"),V=new WeakMap,W=I.createTreeWalker(I,129);function Y(t,e){if(!M(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==S?S.createHTML(e):e}const G=(t,e)=>{const i=t.length-1,r=[];let s,n=2===e?"<svg>":3===e?"<math>":"",o=z;for(let e=0;e<i;e++){const i=t[e];let a,l,c=-1,d=0;for(;d<i.length&&(o.lastIndex=d,l=o.exec(i),null!==l);)d=o.lastIndex,o===z?"!--"===l[1]?o=T:void 0!==l[1]?o=H:void 0!==l[2]?(B.test(l[2])&&(s=RegExp("</"+l[2],"g")),o=L):void 0!==l[3]&&(o=L):o===L?">"===l[0]?(o=s??z,c=-1):void 0===l[1]?c=-2:(c=o.lastIndex-l[2].length,a=l[1],o=void 0===l[3]?L:'"'===l[3]?j:D):o===j||o===D?o=L:o===T||o===H?o=z:(o=L,s=void 0);const p=o===L&&t[e+1].startsWith("/>")?" ":"";n+=o===z?i+R:c>=0?(r.push(a),i.slice(0,c)+E+i.slice(c)+P+p):i+P+(-2===c?e:p)}return[Y(t,n+(t[i]||"<?>")+(2===e?"</svg>":3===e?"</math>":"")),r]};class J{constructor({strings:t,_$litType$:e},i){let r;this.parts=[];let s=0,n=0;const o=t.length-1,a=this.parts,[l,c]=G(t,e);if(this.el=J.createElement(l,i),W.currentNode=this.el.content,2===e||3===e){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes)}for(;null!==(r=W.nextNode())&&a.length<o;){if(1===r.nodeType){if(r.hasAttributes())for(const t of r.getAttributeNames())if(t.endsWith(E)){const e=c[n++],i=r.getAttribute(t).split(P),o=/([.?@])?(.*)/.exec(e);a.push({type:1,index:s,name:o[2],strings:i,ctor:"."===o[1]?et:"?"===o[1]?it:"@"===o[1]?rt:tt}),r.removeAttribute(t)}else t.startsWith(P)&&(a.push({type:6,index:s}),r.removeAttribute(t));if(B.test(r.tagName)){const t=r.textContent.split(P),e=t.length-1;if(e>0){r.textContent=A?A.emptyScript:"";for(let i=0;i<e;i++)r.append(t[i],U()),W.nextNode(),a.push({type:2,index:++s});r.append(t[e],U())}}}else if(8===r.nodeType)if(r.data===C)a.push({type:2,index:s});else{let t=-1;for(;-1!==(t=r.data.indexOf(P,t+1));)a.push({type:7,index:s}),t+=P.length-1}s++}}static createElement(t,e){const i=I.createElement("template");return i.innerHTML=t,i}}function Z(t,e,i=t,r){if(e===q)return e;let s=void 0!==r?i._$Co?.[r]:i._$Cl;const n=N(e)?void 0:e._$litDirective$;return s?.constructor!==n&&(s?._$AO?.(!1),void 0===n?s=void 0:(s=new n(t),s._$AT(t,i,r)),void 0!==r?(i._$Co??=[])[r]=s:i._$Cl=s),void 0!==s&&(e=Z(t,s._$AS(t,e.values),s,r)),e}class Q{constructor(t,e){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=e}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:e},parts:i}=this._$AD,r=(t?.creationScope??I).importNode(e,!0);W.currentNode=r;let s=W.nextNode(),n=0,o=0,a=i[0];for(;void 0!==a;){if(n===a.index){let e;2===a.type?e=new X(s,s.nextSibling,this,t):1===a.type?e=new a.ctor(s,a.name,a.strings,this,t):6===a.type&&(e=new st(s,this,t)),this._$AV.push(e),a=i[++o]}n!==a?.index&&(s=W.nextNode(),n++)}return W.currentNode=I,r}p(t){let e=0;for(const i of this._$AV)void 0!==i&&(void 0!==i.strings?(i._$AI(t,i,e),e+=i.strings.length-2):i._$AI(t[e])),e++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,e,i,r){this.type=2,this._$AH=K,this._$AN=void 0,this._$AA=t,this._$AB=e,this._$AM=i,this.options=r,this._$Cv=r?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode;const e=this._$AM;return void 0!==e&&11===t?.nodeType&&(t=e.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,e=this){t=Z(this,t,e),N(t)?t===K||null==t||""===t?(this._$AH!==K&&this._$AR(),this._$AH=K):t!==this._$AH&&t!==q&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):(t=>M(t)||"function"==typeof t?.[Symbol.iterator])(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==K&&N(this._$AH)?this._$AA.nextSibling.data=t:this.T(I.createTextNode(t)),this._$AH=t}$(t){const{values:e,_$litType$:i}=t,r="number"==typeof i?this._$AC(t):(void 0===i.el&&(i.el=J.createElement(Y(i.h,i.h[0]),this.options)),i);if(this._$AH?._$AD===r)this._$AH.p(e);else{const t=new Q(r,this),i=t.u(this.options);t.p(e),this.T(i),this._$AH=t}}_$AC(t){let e=V.get(t.strings);return void 0===e&&V.set(t.strings,e=new J(t)),e}k(t){M(this._$AH)||(this._$AH=[],this._$AR());const e=this._$AH;let i,r=0;for(const s of t)r===e.length?e.push(i=new X(this.O(U()),this.O(U()),this,this.options)):i=e[r],i._$AI(s),r++;r<e.length&&(this._$AR(i&&i._$AB.nextSibling,r),e.length=r)}_$AR(t=this._$AA.nextSibling,e){for(this._$AP?.(!1,!0,e);t!==this._$AB;){const e=k(t).nextSibling;k(t).remove(),t=e}}setConnected(t){void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t))}}class tt{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,e,i,r,s){this.type=1,this._$AH=K,this._$AN=void 0,this.element=t,this.name=e,this._$AM=r,this.options=s,i.length>2||""!==i[0]||""!==i[1]?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=K}_$AI(t,e=this,i,r){const s=this.strings;let n=!1;if(void 0===s)t=Z(this,t,e,0),n=!N(t)||t!==this._$AH&&t!==q,n&&(this._$AH=t);else{const r=t;let o,a;for(t=s[0],o=0;o<s.length-1;o++)a=Z(this,r[i+o],e,o),a===q&&(a=this._$AH[o]),n||=!N(a)||a!==this._$AH[o],a===K?t=K:t!==K&&(t+=(a??"")+s[o+1]),this._$AH[o]=a}n&&!r&&this.j(t)}j(t){t===K?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}}class et extends tt{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===K?void 0:t}}class it extends tt{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==K)}}class rt extends tt{constructor(t,e,i,r,s){super(t,e,i,r,s),this.type=5}_$AI(t,e=this){if((t=Z(this,t,e,0)??K)===q)return;const i=this._$AH,r=t===K&&i!==K||t.capture!==i.capture||t.once!==i.once||t.passive!==i.passive,s=t!==K&&(i===K||r);r&&this.element.removeEventListener(this.name,this,i),s&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}}class st{constructor(t,e,i){this.element=t,this.type=6,this._$AN=void 0,this._$AM=e,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(t){Z(this,t)}}const nt=w.litHtmlPolyfillSupport;nt?.(J,X),(w.litHtmlVersions??=[]).push("3.3.3");const ot=globalThis;class at extends x{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const e=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=((t,e,i)=>{const r=i?.renderBefore??e;let s=r._$litPart$;if(void 0===s){const t=i?.renderBefore??null;r._$litPart$=s=new X(e.insertBefore(U(),t),t,void 0,i??{})}return s._$AI(t),s})(e,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return q}}at._$litElement$=!0,at.finalized=!0,ot.litElementHydrateSupport?.({LitElement:at});const lt=ot.litElementPolyfillSupport;lt?.({LitElement:at}),(ot.litElementVersions??=[]).push("4.2.2");const ct=t=>(e,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(t,e)}):customElements.define(t,e)},dt={attribute:!0,type:String,converter:v,reflect:!1,hasChanged:$},pt=(t=dt,e,i)=>{const{kind:r,metadata:s}=i;let n=globalThis.litPropertyMetadata.get(s);if(void 0===n&&globalThis.litPropertyMetadata.set(s,n=new Map),"setter"===r&&((t=Object.create(t)).wrapped=!0),n.set(i.name,t),"accessor"===r){const{name:r}=i;return{set(i){const s=e.get.call(this);e.set.call(this,i),this.requestUpdate(r,s,t,!0,i)},init(e){return void 0!==e&&this.C(r,void 0,t,e),e}}}if("setter"===r){const{name:r}=i;return function(i){const s=this[r];e.call(this,i),this.requestUpdate(r,s,t,!0,i)}}throw Error("Unsupported decorator location: "+r)};function ht(t){return(e,i)=>"object"==typeof i?pt(t,e,i):((t,e,i)=>{const r=e.hasOwnProperty(i);return e.constructor.createProperty(i,t),r?Object.getOwnPropertyDescriptor(e,i):void 0})(t,e,i)}function ut(t){return ht({...t,state:!0,attribute:!1})}function gt(t){if(null==t||"unknown"===t||"unavailable"===t)return null;const e=Number(t);return Number.isFinite(e)?e:null}function _t(t){return null==t||"unknown"===t||"unavailable"===t?null:"on"===t||"true"===t||"off"!==t&&"false"!==t&&null}function ft(t,e,i="en"){if(null==t)return"—";if(!e)return t.toLocaleString(i);try{return new Intl.NumberFormat(i,{style:"currency",currency:e,maximumFractionDigits:2}).format(t)}catch{return`${t.toLocaleString(i,{maximumFractionDigits:2})} ${e}`}}function yt(t,e="en"){if(!t)return"never";const i=new Date(t).getTime();if(Number.isNaN(i))return t;const r=Date.now()-i,s=Math.round(r/1e3),n=Math.abs(s),o=new Intl.RelativeTimeFormat(e,{numeric:"auto"});return n<60?o.format(-s,"second"):n<3600?o.format(-Math.round(s/60),"minute"):n<86400?o.format(-Math.round(s/3600),"hour"):n<2592e3?o.format(-Math.round(s/86400),"day"):o.format(-Math.round(s/2592e3),"month")}function mt(t){if(!Array.isArray(t))return[];const e=[];for(const i of t)if(null!=i&&"object"==typeof i&&"price"in i&&"ts"in i){const t=i,r="number"==typeof t.price?t.price:null;if(null==r)continue;e.push({ts:String(t.ts??""),price:r,currency:String(t.currency??""),in_stock:!1!==t.in_stock})}return e}function vt(t){if(!Array.isArray(t))return[];const e=[];for(const i of t){if(!i||"object"!=typeof i)continue;const t=i,r="string"==typeof t.title?t.title:"",s="string"==typeof t.url?t.url:"";r&&s&&e.push({title:r,url:s,price:"number"==typeof t.price?t.price:null,currency:"string"==typeof t.currency?t.currency:"",retailer:"string"==typeof t.retailer?t.retailer:"",imageUrl:"string"==typeof t.image_url&&t.image_url?t.image_url:null,confidence:"number"==typeof t.confidence?Math.max(0,Math.min(1,t.confidence)):0,notes:"string"==typeof t.notes?t.notes:"",shipsToUserRegion:"boolean"==typeof t.ships_to_user_region?t.ships_to_user_region:null})}return e.sort((t,e)=>{if(e.confidence!==t.confidence)return e.confidence-t.confidence;return(t.price??Number.POSITIVE_INFINITY)-(e.price??Number.POSITIVE_INFINITY)}),e}function $t(t){const e=t.indexOf("_");if(e<0)return null;const i=t.slice(0,e),r=t.slice(e+1),s=/^(l_[0-9a-z]+)_(.+)$/.exec(r);return s?{entryId:i,listingId:s[1],key:s[2]}:{entryId:i,listingId:null,key:r}}function bt(t,e,i,r){const s=e.get("price");if(!s)return null;const n=t.states[s];if(!n)return null;const o=n.attributes,a={listingId:i,isPrimary:r,retailer:"string"==typeof o.retailer?o.retailer:null,url:"string"==typeof o.product_url?o.product_url:null,price:gt(n.state),currency:"string"==typeof o.unit_of_measurement?o.unit_of_measurement:"string"==typeof o.currency?o.currency:"",inStock:null,discontinued:!0===o.discontinued,stockCount:"number"==typeof o.stock_count?o.stock_count:null,lastCheck:"string"==typeof o.last_check?o.last_check:null,history:mt(o.price_history),imageProxyUrl:null,imageBroken:!1,shipsToUserRegion:"boolean"==typeof o.ships_to_user_region?o.ships_to_user_region:null,entityIds:{price:s}},l=e.get("photo");if(l){const e=t.states[l];if(e)if("unavailable"===e.state||"unknown"===e.state)a.imageBroken=!0;else{const t=e.attributes.entity_picture;"string"==typeof t&&t.length>0&&(a.imageProxyUrl=t)}}const c=e.get("in_stock");if(c){const e=t.states[c];e&&(a.inStock=_t(e.state),a.entityIds.inStock=c)}const d=e.get("discontinued");if(d){const e=t.states[d];if(e){const t=_t(e.state);null!=t&&(a.discontinued=t),a.entityIds.discontinued=d}}return a}function xt(t,e,i,r=2){if(t.length<2)return"";const s=t.length>=4?wt(t):t;if(s.length<2)return"";const n=s.map(t=>t.price),o=Math.min(...n),a=Math.max(...n)-o||1,l=i-2*r,c=e/(s.length-1);let d="";return s.forEach((t,e)=>{const s=e*c,n=i-r-(t.price-o)/a*l;d+=0===e?`M ${s.toFixed(2)} ${n.toFixed(2)}`:` L ${s.toFixed(2)} ${n.toFixed(2)}`}),d}function wt(t,e=5){if(t.length<2)return t;const i=t.map(t=>t.price),r=kt(i),s=i.map(t=>Math.abs(t-r)),n=kt(s);return 0===n?t:t.filter(t=>Math.abs(t.price-r)<=e*n)}function kt(t){const e=[...t].sort((t,e)=>t-e),i=Math.floor(e.length/2);return e.length%2==0?(e[i-1]+e[i])/2:e[i]}let At=class extends at{constructor(){super(...arguments),this.refreshingAlternatives=!1,this.hideNonShipping=!1,this.handleRefresh=t=>{t.stopPropagation(),this.refreshingAlternatives||this.onRefreshAlternatives?.(this.product)}}get headlinePrice(){const{product:t}=this;return null!=t.priceLocal&&t.localCurrency?{value:t.priceLocal,currency:t.localCurrency}:t.discontinued&&null!=t.lastKnownPrice?{value:t.lastKnownPrice,currency:t.lastKnownCurrency??t.currency}:{value:t.price,currency:t.currency||null}}get sourcePriceLine(){const{product:t}=this;return null!=t.priceLocal&&t.localCurrency?t.currency===t.localCurrency?K:ft(t.price,t.currency):K}get priceDelta(){const{product:t}=this;if(null==t.price)return null;const e=t.price;for(let i=t.history.length-1;i>=0;i--){const r=t.history[i].price;if(r!==e)return{amount:Math.abs(e-r),direction:e>r?"up":"down"}}return null}renderDelta(){const t=this.priceDelta;if(null==t)return K;const e="up"===t.direction?"↑":"↓",i="up"===t.direction?"delta delta--up":"delta delta--down";return F`<span class=${i}>${e} ${ft(t.amount,null)}</span>`}renderImage(){const{product:t}=this,e=t.imageProxyUrl??(t.imageBroken?null:t.imageUrl);return e?F`<img
+function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPropertyDescriptor(t,r):i;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)n=Reflect.decorate(e,t,r,i);else for(var a=e.length-1;a>=0;a--)(s=e[a])&&(n=(o<3?s(n):o>3?s(t,r,n):s(t,r))||n);return o>3&&n&&Object.defineProperty(t,r,n),n}"function"==typeof SuppressedError&&SuppressedError;const t=globalThis,r=t.ShadowRoot&&(void 0===t.ShadyCSS||t.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,i=Symbol(),s=new WeakMap;let o=class{constructor(e,t,r){if(this._$cssResult$=!0,r!==i)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const t=this.t;if(r&&void 0===e){const r=void 0!==t&&1===t.length;r&&(e=s.get(t)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),r&&s.set(t,e))}return e}toString(){return this.cssText}};const n=(e,...t)=>{const r=1===e.length?e[0]:t.reduce((t,r,i)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(r)+e[i+1],e[0]);return new o(r,e,i)},a=r?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const r of e.cssRules)t+=r.cssText;return(e=>new o("string"==typeof e?e:e+"",void 0,i))(t)})(e):e,{is:l,defineProperty:c,getOwnPropertyDescriptor:d,getOwnPropertyNames:p,getOwnPropertySymbols:h,getPrototypeOf:u}=Object,_=globalThis,g=_.trustedTypes,f=g?g.emptyScript:"",m=_.reactiveElementPolyfillSupport,v=(e,t)=>e,y={toAttribute(e,t){switch(t){case Boolean:e=e?f:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let r=e;switch(t){case Boolean:r=null!==e;break;case Number:r=null===e?null:Number(e);break;case Object:case Array:try{r=JSON.parse(e)}catch(e){r=null}}return r}},b=(e,t)=>!l(e,t),x={attribute:!0,type:String,converter:y,reflect:!1,useDefault:!1,hasChanged:b};Symbol.metadata??=Symbol("metadata"),_.litPropertyMetadata??=new WeakMap;let k=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=x){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const r=Symbol(),i=this.getPropertyDescriptor(e,r,t);void 0!==i&&c(this.prototype,e,i)}}static getPropertyDescriptor(e,t,r){const{get:i,set:s}=d(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:i,set(t){const o=i?.call(this);s?.call(this,t),this.requestUpdate(e,o,r)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??x}static _$Ei(){if(this.hasOwnProperty(v("elementProperties")))return;const e=u(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(v("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(v("properties"))){const e=this.properties,t=[...p(e),...h(e)];for(const r of t)this.createProperty(r,e[r])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,r]of t)this.elementProperties.set(e,r)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const r=this._$Eu(e,t);void 0!==r&&this._$Eh.set(r,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const r=new Set(e.flat(1/0).reverse());for(const e of r)t.unshift(a(e))}else void 0!==e&&t.push(a(e));return t}static _$Eu(e,t){const r=t.attribute;return!1===r?void 0:"string"==typeof r?r:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const r of t.keys())this.hasOwnProperty(r)&&(e.set(r,this[r]),delete this[r]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,i)=>{if(r)e.adoptedStyleSheets=i.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const r of i){const i=document.createElement("style"),s=t.litNonce;void 0!==s&&i.setAttribute("nonce",s),i.textContent=r.cssText,e.appendChild(i)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,r){this._$AK(e,r)}_$ET(e,t){const r=this.constructor.elementProperties.get(e),i=this.constructor._$Eu(e,r);if(void 0!==i&&!0===r.reflect){const s=(void 0!==r.converter?.toAttribute?r.converter:y).toAttribute(t,r.type);this._$Em=e,null==s?this.removeAttribute(i):this.setAttribute(i,s),this._$Em=null}}_$AK(e,t){const r=this.constructor,i=r._$Eh.get(e);if(void 0!==i&&this._$Em!==i){const e=r.getPropertyOptions(i),s="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:y;this._$Em=i;const o=s.fromAttribute(t,e.type);this[i]=o??this._$Ej?.get(i)??o,this._$Em=null}}requestUpdate(e,t,r,i=!1,s){if(void 0!==e){const o=this.constructor;if(!1===i&&(s=this[e]),r??=o.getPropertyOptions(e),!((r.hasChanged??b)(s,t)||r.useDefault&&r.reflect&&s===this._$Ej?.get(e)&&!this.hasAttribute(o._$Eu(e,r))))return;this.C(e,t,r)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:r,reflect:i,wrapped:s},o){r&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,o??t??this[e]),!0!==s||void 0!==o)||(this._$AL.has(e)||(this.hasUpdated||r||(t=void 0),this._$AL.set(e,t)),!0===i&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,r]of e){const{wrapped:e}=r,i=this[t];!0!==e||this._$AL.has(t)||void 0===i||this.C(t,void 0,r,i)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};k.elementStyles=[],k.shadowRootOptions={mode:"open"},k[v("elementProperties")]=new Map,k[v("finalized")]=new Map,m?.({ReactiveElement:k}),(_.reactiveElementVersions??=[]).push("2.1.2");const $=globalThis,w=e=>e,S=$.trustedTypes,E=S?S.createPolicy("lit-html",{createHTML:e=>e}):void 0,A="$lit$",P=`lit$${Math.random().toFixed(9).slice(2)}$`,T="?"+P,C=`<${T}>`,I=document,N=()=>I.createComment(""),R=e=>null===e||"object"!=typeof e&&"function"!=typeof e,z=Array.isArray,O="[ \t\n\f\r]",M=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,L=/-->/g,U=/>/g,D=RegExp(`>|${O}(?:([^\\s"'>=/]+)(${O}*=${O}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),H=/'/g,B=/"/g,j=/^(?:script|style|textarea|title)$/i,F=(e=>(t,...r)=>({_$litType$:e,strings:t,values:r}))(1),K=Symbol.for("lit-noChange"),q=Symbol.for("lit-nothing"),Y=new WeakMap,V=I.createTreeWalker(I,129);function W(e,t){if(!z(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==E?E.createHTML(t):t}const J=(e,t)=>{const r=e.length-1,i=[];let s,o=2===t?"<svg>":3===t?"<math>":"",n=M;for(let t=0;t<r;t++){const r=e[t];let a,l,c=-1,d=0;for(;d<r.length&&(n.lastIndex=d,l=n.exec(r),null!==l);)d=n.lastIndex,n===M?"!--"===l[1]?n=L:void 0!==l[1]?n=U:void 0!==l[2]?(j.test(l[2])&&(s=RegExp("</"+l[2],"g")),n=D):void 0!==l[3]&&(n=D):n===D?">"===l[0]?(n=s??M,c=-1):void 0===l[1]?c=-2:(c=n.lastIndex-l[2].length,a=l[1],n=void 0===l[3]?D:'"'===l[3]?B:H):n===B||n===H?n=D:n===L||n===U?n=M:(n=D,s=void 0);const p=n===D&&e[t+1].startsWith("/>")?" ":"";o+=n===M?r+C:c>=0?(i.push(a),r.slice(0,c)+A+r.slice(c)+P+p):r+P+(-2===c?t:p)}return[W(e,o+(e[r]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),i]};class Q{constructor({strings:e,_$litType$:t},r){let i;this.parts=[];let s=0,o=0;const n=e.length-1,a=this.parts,[l,c]=J(e,t);if(this.el=Q.createElement(l,r),V.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(i=V.nextNode())&&a.length<n;){if(1===i.nodeType){if(i.hasAttributes())for(const e of i.getAttributeNames())if(e.endsWith(A)){const t=c[o++],r=i.getAttribute(e).split(P),n=/([.?@])?(.*)/.exec(t);a.push({type:1,index:s,name:n[2],strings:r,ctor:"."===n[1]?te:"?"===n[1]?re:"@"===n[1]?ie:ee}),i.removeAttribute(e)}else e.startsWith(P)&&(a.push({type:6,index:s}),i.removeAttribute(e));if(j.test(i.tagName)){const e=i.textContent.split(P),t=e.length-1;if(t>0){i.textContent=S?S.emptyScript:"";for(let r=0;r<t;r++)i.append(e[r],N()),V.nextNode(),a.push({type:2,index:++s});i.append(e[t],N())}}}else if(8===i.nodeType)if(i.data===T)a.push({type:2,index:s});else{let e=-1;for(;-1!==(e=i.data.indexOf(P,e+1));)a.push({type:7,index:s}),e+=P.length-1}s++}}static createElement(e,t){const r=I.createElement("template");return r.innerHTML=e,r}}function Z(e,t,r=e,i){if(t===K)return t;let s=void 0!==i?r._$Co?.[i]:r._$Cl;const o=R(t)?void 0:t._$litDirective$;return s?.constructor!==o&&(s?._$AO?.(!1),void 0===o?s=void 0:(s=new o(e),s._$AT(e,r,i)),void 0!==i?(r._$Co??=[])[i]=s:r._$Cl=s),void 0!==s&&(t=Z(e,s._$AS(e,t.values),s,i)),t}class G{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:r}=this._$AD,i=(e?.creationScope??I).importNode(t,!0);V.currentNode=i;let s=V.nextNode(),o=0,n=0,a=r[0];for(;void 0!==a;){if(o===a.index){let t;2===a.type?t=new X(s,s.nextSibling,this,e):1===a.type?t=new a.ctor(s,a.name,a.strings,this,e):6===a.type&&(t=new se(s,this,e)),this._$AV.push(t),a=r[++n]}o!==a?.index&&(s=V.nextNode(),o++)}return V.currentNode=I,i}p(e){let t=0;for(const r of this._$AV)void 0!==r&&(void 0!==r.strings?(r._$AI(e,r,t),t+=r.strings.length-2):r._$AI(e[t])),t++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,r,i){this.type=2,this._$AH=q,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=r,this.options=i,this._$Cv=i?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=Z(this,e,t),R(e)?e===q||null==e||""===e?(this._$AH!==q&&this._$AR(),this._$AH=q):e!==this._$AH&&e!==K&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>z(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==q&&R(this._$AH)?this._$AA.nextSibling.data=e:this.T(I.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:r}=e,i="number"==typeof r?this._$AC(e):(void 0===r.el&&(r.el=Q.createElement(W(r.h,r.h[0]),this.options)),r);if(this._$AH?._$AD===i)this._$AH.p(t);else{const e=new G(i,this),r=e.u(this.options);e.p(t),this.T(r),this._$AH=e}}_$AC(e){let t=Y.get(e.strings);return void 0===t&&Y.set(e.strings,t=new Q(e)),t}k(e){z(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let r,i=0;for(const s of e)i===t.length?t.push(r=new X(this.O(N()),this.O(N()),this,this.options)):r=t[i],r._$AI(s),i++;i<t.length&&(this._$AR(r&&r._$AB.nextSibling,i),t.length=i)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=w(e).nextSibling;w(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}class ee{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,r,i,s){this.type=1,this._$AH=q,this._$AN=void 0,this.element=e,this.name=t,this._$AM=i,this.options=s,r.length>2||""!==r[0]||""!==r[1]?(this._$AH=Array(r.length-1).fill(new String),this.strings=r):this._$AH=q}_$AI(e,t=this,r,i){const s=this.strings;let o=!1;if(void 0===s)e=Z(this,e,t,0),o=!R(e)||e!==this._$AH&&e!==K,o&&(this._$AH=e);else{const i=e;let n,a;for(e=s[0],n=0;n<s.length-1;n++)a=Z(this,i[r+n],t,n),a===K&&(a=this._$AH[n]),o||=!R(a)||a!==this._$AH[n],a===q?e=q:e!==q&&(e+=(a??"")+s[n+1]),this._$AH[n]=a}o&&!i&&this.j(e)}j(e){e===q?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}}class te extends ee{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===q?void 0:e}}class re extends ee{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==q)}}class ie extends ee{constructor(e,t,r,i,s){super(e,t,r,i,s),this.type=5}_$AI(e,t=this){if((e=Z(this,e,t,0)??q)===K)return;const r=this._$AH,i=e===q&&r!==q||e.capture!==r.capture||e.once!==r.once||e.passive!==r.passive,s=e!==q&&(r===q||i);i&&this.element.removeEventListener(this.name,this,r),s&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class se{constructor(e,t,r){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=r}get _$AU(){return this._$AM._$AU}_$AI(e){Z(this,e)}}const oe=$.litHtmlPolyfillSupport;oe?.(Q,X),($.litHtmlVersions??=[]).push("3.3.3");const ne=globalThis;class ae extends k{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,r)=>{const i=r?.renderBefore??t;let s=i._$litPart$;if(void 0===s){const e=r?.renderBefore??null;i._$litPart$=s=new X(t.insertBefore(N(),e),e,void 0,r??{})}return s._$AI(e),s})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return K}}ae._$litElement$=!0,ae.finalized=!0,ne.litElementHydrateSupport?.({LitElement:ae});const le=ne.litElementPolyfillSupport;le?.({LitElement:ae}),(ne.litElementVersions??=[]).push("4.2.2");const ce=e=>(t,r)=>{void 0!==r?r.addInitializer(()=>{customElements.define(e,t)}):customElements.define(e,t)},de={attribute:!0,type:String,converter:y,reflect:!1,hasChanged:b},pe=(e=de,t,r)=>{const{kind:i,metadata:s}=r;let o=globalThis.litPropertyMetadata.get(s);if(void 0===o&&globalThis.litPropertyMetadata.set(s,o=new Map),"setter"===i&&((e=Object.create(e)).wrapped=!0),o.set(r.name,e),"accessor"===i){const{name:i}=r;return{set(r){const s=t.get.call(this);t.set.call(this,r),this.requestUpdate(i,s,e,!0,r)},init(t){return void 0!==t&&this.C(i,void 0,e,t),t}}}if("setter"===i){const{name:i}=r;return function(r){const s=this[i];t.call(this,r),this.requestUpdate(i,s,e,!0,r)}}throw Error("Unsupported decorator location: "+i)};function he(e){return(t,r)=>"object"==typeof r?pe(e,t,r):((e,t,r)=>{const i=t.hasOwnProperty(r);return t.constructor.createProperty(r,e),i?Object.getOwnPropertyDescriptor(t,r):void 0})(e,t,r)}function ue(e){return he({...e,state:!0,attribute:!1})}function _e(e){if(null==e||"unknown"===e||"unavailable"===e)return null;const t=Number(e);return Number.isFinite(t)?t:null}function ge(e){return null==e||"unknown"===e||"unavailable"===e?null:"on"===e||"true"===e||"off"!==e&&"false"!==e&&null}function fe(e,t,r="en"){if(null==e)return"—";if(!t)return e.toLocaleString(r);try{return new Intl.NumberFormat(r,{style:"currency",currency:t,maximumFractionDigits:2}).format(e)}catch{return`${e.toLocaleString(r,{maximumFractionDigits:2})} ${t}`}}function me(e,t="en"){if(!e)return"never";const r=new Date(e).getTime();if(Number.isNaN(r))return e;const i=Date.now()-r,s=Math.round(i/1e3),o=Math.abs(s),n=new Intl.RelativeTimeFormat(t,{numeric:"auto"});return o<60?n.format(-s,"second"):o<3600?n.format(-Math.round(s/60),"minute"):o<86400?n.format(-Math.round(s/3600),"hour"):o<2592e3?n.format(-Math.round(s/86400),"day"):n.format(-Math.round(s/2592e3),"month")}function ve(e){if(!Array.isArray(e))return[];const t=[];for(const r of e)if(null!=r&&"object"==typeof r&&"price"in r&&"ts"in r){const e=r,i="number"==typeof e.price?e.price:null;if(null==i)continue;t.push({ts:String(e.ts??""),price:i,currency:String(e.currency??""),in_stock:!1!==e.in_stock})}return t}function ye(e){if(!Array.isArray(e))return[];const t=[];for(const r of e){if(!r||"object"!=typeof r)continue;const e=r,i="string"==typeof e.title?e.title:"",s="string"==typeof e.url?e.url:"";i&&s&&t.push({title:i,url:s,price:"number"==typeof e.price?e.price:null,currency:"string"==typeof e.currency?e.currency:"",retailer:"string"==typeof e.retailer?e.retailer:"",imageUrl:"string"==typeof e.image_url&&e.image_url?e.image_url:null,confidence:"number"==typeof e.confidence?Math.max(0,Math.min(1,e.confidence)):0,notes:"string"==typeof e.notes?e.notes:"",shipsToUserRegion:"boolean"==typeof e.ships_to_user_region?e.ships_to_user_region:null})}return t.sort((e,t)=>{if(t.confidence!==e.confidence)return t.confidence-e.confidence;return(e.price??Number.POSITIVE_INFINITY)-(t.price??Number.POSITIVE_INFINITY)}),t}function be(e){const t=e.indexOf("_");if(t<0)return null;const r=e.slice(0,t),i=e.slice(t+1),s=/^(l_[0-9a-z]+)_(.+)$/.exec(i);return s?{entryId:r,listingId:s[1],key:s[2]}:{entryId:r,listingId:null,key:i}}function xe(e,t,r,i){const s=t.get("price");if(!s)return null;const o=e.states[s];if(!o)return null;const n=o.attributes,a={listingId:r,isPrimary:i,retailer:"string"==typeof n.retailer?n.retailer:null,url:"string"==typeof n.product_url?n.product_url:null,price:_e(o.state),currency:"string"==typeof n.unit_of_measurement?n.unit_of_measurement:"string"==typeof n.currency?n.currency:"",inStock:null,discontinued:!0===n.discontinued,stockCount:"number"==typeof n.stock_count?n.stock_count:null,lastCheck:"string"==typeof n.last_check?n.last_check:null,history:ve(n.price_history),imageProxyUrl:null,imageBroken:!1,shipsToUserRegion:"boolean"==typeof n.ships_to_user_region?n.ships_to_user_region:null,entityIds:{price:s}},l=t.get("photo");if(l){const t=e.states[l];if(t)if("unavailable"===t.state||"unknown"===t.state)a.imageBroken=!0;else{const e=t.attributes.entity_picture;"string"==typeof e&&e.length>0&&(a.imageProxyUrl=e)}}const c=t.get("in_stock");if(c){const t=e.states[c];t&&(a.inStock=ge(t.state),a.entityIds.inStock=c)}const d=t.get("discontinued");if(d){const t=e.states[d];if(t){const e=ge(t.state);null!=e&&(a.discontinued=e),a.entityIds.discontinued=d}}return a}function ke(e,t,r,i=2){if(e.length<2)return"";const s=e.length>=4?$e(e):e;if(s.length<2)return"";const o=s.map(e=>e.price),n=Math.min(...o),a=Math.max(...o)-n||1,l=r-2*i,c=t/(s.length-1);let d="";return s.forEach((e,t)=>{const s=t*c,o=r-i-(e.price-n)/a*l;d+=0===t?`M ${s.toFixed(2)} ${o.toFixed(2)}`:` L ${s.toFixed(2)} ${o.toFixed(2)}`}),d}function $e(e,t=5){if(e.length<2)return e;const r=e.map(e=>e.price),i=we(r),s=r.map(e=>Math.abs(e-i)),o=we(s);return 0===o?e:e.filter(e=>Math.abs(e.price-i)<=t*o)}function we(e){const t=[...e].sort((e,t)=>e-t),r=Math.floor(t.length/2);return t.length%2==0?(t[r-1]+t[r])/2:t[r]}let Se=class extends ae{constructor(){super(...arguments),this.refreshingAlternatives=!1,this.hideNonShipping=!1,this.refreshingNow=!1,this.handleRefresh=e=>{e.stopPropagation(),this.refreshingAlternatives||this.onRefreshAlternatives?.(this.product)},this.handleRefreshNow=e=>{e.stopPropagation(),this.refreshingNow||this.onRefreshNow?.(this.product)},this.handleTogglePaused=e=>{e.stopPropagation(),this.onSetPaused?.(this.product,!this.product.paused)},this.handleTargetCommit=e=>{e.stopPropagation();const t=e.target,r=t.value.trim(),i=""===r?null:Number(r);if(null!==i&&Number.isNaN(i))return void(t.value=null!=this.product.targetPrice?String(this.product.targetPrice):"");i!==this.product.targetPrice&&this.onSetTarget?.(this.product,i)},this.handleTargetKeydown=e=>{e.stopPropagation(),"Enter"===e.key&&e.target.blur()}}get headlinePrice(){const{product:e}=this;return null!=e.priceLocal&&e.localCurrency?{value:e.priceLocal,currency:e.localCurrency}:e.discontinued&&null!=e.lastKnownPrice?{value:e.lastKnownPrice,currency:e.lastKnownCurrency??e.currency}:{value:e.price,currency:e.currency||null}}get sourcePriceLine(){const{product:e}=this;return null!=e.priceLocal&&e.localCurrency?e.currency===e.localCurrency?q:fe(e.price,e.currency):q}get priceDelta(){const{product:e}=this;if(null==e.price)return null;const t=e.price;for(let r=e.history.length-1;r>=0;r--){const i=e.history[r].price;if(i!==t)return{amount:Math.abs(t-i),direction:t>i?"up":"down"}}return null}renderDelta(){const e=this.priceDelta;if(null==e)return q;const t="up"===e.direction?"↑":"↓",r="up"===e.direction?"delta delta--up":"delta delta--down";return F`<span class=${r}>${t} ${fe(e.amount,null)}</span>`}renderImage(){const{product:e}=this,t=e.imageProxyUrl??(e.imageBroken?null:e.imageUrl);return t?F`<img
       class="image"
-      src=${e}
-      alt=${t.title}
+      src=${t}
+      alt=${e.title}
       loading="lazy"
     />`:F`<div class="image image--placeholder" role="img" aria-label="No image">
         <ha-icon icon="mdi:tag-search"></ha-icon>
-      </div>`}renderSparkline(){const{product:t}=this;if(t.history.length<2)return K;const e=xt(t.history,280,48);return e?F`<svg
+      </div>`}renderSparkline(){const{product:e}=this;if(e.history.length<2)return q;const t=ke(e.history,280,48);return t?F`<svg
       class="sparkline"
       viewBox="0 0 ${280} ${48}"
       preserveAspectRatio="none"
       aria-hidden="true"
     >
-      <path d=${e} fill="none" stroke="currentColor" stroke-width="1.5" />
-    </svg>`:K}renderStatusChips(){const{product:t}=this,e=[];return t.discontinued?e.push(F`<span class="chip chip--warn" title=${t.discontinuedReason??""}>
+      <path d=${t} fill="none" stroke="currentColor" stroke-width="1.5" />
+    </svg>`:q}renderStatusChips(){const{product:e}=this,t=[];return e.paused&&t.push(F`<span class="chip chip--paused" title="Polling paused">
+        Paused
+      </span>`),e.discontinued?t.push(F`<span class="chip chip--warn" title=${e.discontinuedReason??""}>
         Discontinued
-      </span>`):!1===t.inStock?e.push(F`<span class="chip chip--warn">Out of stock</span>`):!0===t.inStock&&e.push(F`<span class="chip chip--ok">In stock</span>`),null!=t.stockCount&&t.stockCount>0&&e.push(F`<span class="chip">${t.stockCount} units</span>`),t.retailer&&e.push(F`<span class="chip chip--retailer">${t.retailer}</span>`),e.length?F`<div class="chips">${e}</div>`:K}get cleanedExtremes(){const{product:t}=this;if(t.history.length>=4){const e=wt(t.history);if(e.length>=2){const t=e.map(t=>t.price);return{low:Math.min(...t),high:Math.max(...t)}}}return{low:t.lowest,high:t.highest}}renderAlternatives(){const{product:t}=this,e=null!=t.alternativesError,i=null!=t.alternativesFetchedAt,r=this.hideNonShipping?t.alternatives.filter(t=>!1!==t.shipsToUserRegion):t.alternatives,s=t.alternatives.length-r.length,n=r.length>0;return F`
+      </span>`):!1===e.inStock?t.push(F`<span class="chip chip--warn">Out of stock</span>`):!0===e.inStock&&t.push(F`<span class="chip chip--ok">In stock</span>`),null!=e.stockCount&&e.stockCount>0&&t.push(F`<span class="chip">${e.stockCount} units</span>`),e.retailer&&t.push(F`<span class="chip chip--retailer">${e.retailer}</span>`),t.length?F`<div class="chips">${t}</div>`:q}get cleanedExtremes(){const{product:e}=this;if(e.history.length>=4){const t=$e(e.history);if(t.length>=2){const e=t.map(e=>e.price);return{low:Math.min(...e),high:Math.max(...e)}}}return{low:e.lowest,high:e.highest}}renderAlternatives(){const{product:e}=this,t=null!=e.alternativesError,r=null!=e.alternativesFetchedAt,i=this.hideNonShipping?e.alternatives.filter(e=>!1!==e.shipsToUserRegion):e.alternatives,s=e.alternatives.length-i.length,o=i.length>0;return F`
       <section class="alts">
         <div class="alts__header">
           <span class="alts__title">
-            ${n?F`Alternatives <span class="alts__count">${r.length}</span>`:F`Alternatives`}
+            ${o?F`Alternatives <span class="alts__count">${i.length}</span>`:F`Alternatives`}
           </span>
           <span class="alts__meta">
-            ${i?yt(t.alternativesFetchedAt):""}
+            ${r?me(e.alternativesFetchedAt):""}
           </span>
           <button
             class="alts__refresh"
@@ -37,135 +39,201 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
             ></ha-icon>
           </button>
         </div>
-        ${e?F`<p class="alts__error">${t.alternativesError}</p>`:K}
-        ${n?F`<ul class="alts__list">
-              ${r.map(t=>this.renderAlternative(t))}
-            </ul>`:e||this.refreshingAlternatives?K:F`<p class="alts__empty">
-              ${i?s>0?"All alternatives were hidden (don't ship to your region).":"No alternatives found.":"Click refresh to search for alternatives."}
+        ${t?F`<p class="alts__error">${e.alternativesError}</p>`:q}
+        ${o?F`<ul class="alts__list">
+              ${i.map(e=>this.renderAlternative(e))}
+            </ul>`:t||this.refreshingAlternatives?q:F`<p class="alts__empty">
+              ${r?s>0?"All alternatives were hidden (don't ship to your region).":"No alternatives found.":"Click refresh to search for alternatives."}
             </p>`}
-        ${n&&s>0?F`<p class="alts__hidden-note">
+        ${o&&s>0?F`<p class="alts__hidden-note">
               ${s} hidden (don't ship to your region)
-            </p>`:K}
+            </p>`:q}
       </section>
-    `}renderAlternative(t){const{product:e}=this;let i=null,r="alts__price";return null!=t.price&&null!=e.price&&t.currency===e.currency&&(i=t.price-e.price,i<0?r="alts__price alts__price--cheaper":i>0&&(r="alts__price alts__price--pricier")),F`
+    `}get listingUrls(){const e=e=>(e??"").trim().replace(/\/+$/,"").toLowerCase(),t=new Set;for(const r of this.product.listings){const i=e(r.url);i&&t.add(i)}return t}renderAlternative(e){const{product:t}=this;let r=null,i="alts__price";null!=e.price&&null!=t.price&&e.currency===t.currency&&(r=e.price-t.price,r<0?i="alts__price alts__price--cheaper":r>0&&(i="alts__price alts__price--pricier"));const s=(e.url??"").trim().replace(/\/+$/,"").toLowerCase(),o=""!==s&&this.listingUrls.has(s);return F`
       <li class="alts__row">
         <a
           class="alts__link"
-          href=${t.url}
+          href=${e.url}
           target="_blank"
           rel="noopener noreferrer"
-          @click=${t=>t.stopPropagation()}
-          title=${t.notes||t.title}
+          @click=${e=>e.stopPropagation()}
+          title=${e.notes||e.title}
         >
           <div class="alts__info">
-            <span class="alts__row-title">${t.title}</span>
+            <span class="alts__row-title">${e.title}</span>
             <span class="alts__row-meta">
-              ${t.retailer?F`<span>${t.retailer}</span>`:K}
-              ${t.confidence>0?F`<span class="alts__confidence" title="Match confidence">
-                    ${Math.round(100*t.confidence)}%
-                  </span>`:K}
-              ${!0===t.shipsToUserRegion?F`<span class="alts__ships alts__ships--yes" title="Likely ships to your region">
+              ${e.retailer?F`<span>${e.retailer}</span>`:q}
+              ${e.confidence>0?F`<span class="alts__confidence" title="Match confidence">
+                    ${Math.round(100*e.confidence)}%
+                  </span>`:q}
+              ${!0===e.shipsToUserRegion?F`<span class="alts__ships alts__ships--yes" title="Likely ships to your region">
                     ✓ ships
-                  </span>`:!1===t.shipsToUserRegion?F`<span class="alts__ships alts__ships--no" title="Likely does not ship to your region">
+                  </span>`:!1===e.shipsToUserRegion?F`<span class="alts__ships alts__ships--no" title="Likely does not ship to your region">
                     ✗ no ship
-                  </span>`:K}
+                  </span>`:q}
             </span>
           </div>
-          <div class=${r}>
-            ${null!=t.price?ft(t.price,t.currency):F`<span class="alts__price-unknown">—</span>`}
+          <div class=${i}>
+            ${null!=e.price?fe(e.price,e.currency):F`<span class="alts__price-unknown">—</span>`}
           </div>
         </a>
+        ${this.onAddListing?o?F`<span
+                class="alts__add alts__add--done"
+                title="Already tracked as a listing"
+                aria-label="Already a listing"
+                >✓</span
+              >`:F`<button
+                class="alts__add"
+                type="button"
+                @click=${t=>this.handleAddListing(t,e)}
+                aria-label=${`Add ${e.retailer||"this alternative"} as a listing`}
+                title="Track this as a listing"
+              >
+                +
+              </button>`:q}
       </li>
-    `}renderStatRow(){const{product:t}=this,e=[];if(null!=t.targetPrice){const i=null!=t.targetDiff&&t.targetDiff<=0?"stat__value stat__value--good":"stat__value";e.push(F`<div class="stat">
+    `}handleAddListing(e,t){e.stopPropagation(),e.preventDefault();const r=t.retailer?`Track the ${t.retailer} listing for ${this.product.title}?`:`Track this alternative as a listing on ${this.product.title}?`;window.confirm(r)&&this.onAddListing?.(this.product,t)}renderStatRow(){const{product:e}=this,t=[];if(null!=e.targetPrice){const r=null!=e.targetDiff&&e.targetDiff<=0?"stat__value stat__value--good":"stat__value";t.push(F`<div class="stat">
         <span class="stat__label">Target</span>
-        <span class=${i}>${ft(t.targetPrice,t.currency)}</span>
-      </div>`)}return e.length?F`<div class="stats">${e}</div>`:K}renderListings(){const{product:t}=this;if(0===t.listings.length)return K;const e=this.hideNonShipping?t.listings.filter(t=>t.isPrimary||!1!==t.shipsToUserRegion):t.listings,i=t.listings.length-e.length;return F`
+        <span class=${r}>${fe(e.targetPrice,e.currency)}</span>
+      </div>`)}return t.length?F`<div class="stats">${t}</div>`:q}renderListings(){const{product:e}=this;if(0===e.listings.length)return q;const t=this.hideNonShipping?e.listings.filter(e=>e.isPrimary||!1!==e.shipsToUserRegion):e.listings,r=e.listings.length-t.length;return F`
       <section class="listings">
         <div class="listings__header">
           <span class="listings__title">
-            Listings <span class="listings__count">${e.length}</span>
+            Listings <span class="listings__count">${t.length}</span>
           </span>
         </div>
         <ul class="listings__list">
-          ${e.map(t=>this.renderListingRow(t))}
+          ${t.map(e=>this.renderListingRow(e))}
         </ul>
-        ${i>0?F`<p class="alts__hidden-note">
-              ${i} hidden (don't ship to your region)
-            </p>`:K}
+        ${r>0?F`<p class="alts__hidden-note">
+              ${r} hidden (don't ship to your region)
+            </p>`:q}
       </section>
-    `}renderListingRow(t){const e=xt(t.history,80,24,2),i=t.discontinued?F`<span class="listings__chip listings__chip--warn">disc.</span>`:!1===t.inStock?F`<span class="listings__chip listings__chip--warn">out</span>`:!0===t.inStock?F`<span class="listings__chip listings__chip--ok">in stock</span>`:K,r=t.imageProxyUrl?F`<img
+    `}renderListingRow(e){const t=ke(e.history,80,24,2),r=e.discontinued?F`<span class="listings__chip listings__chip--warn">disc.</span>`:!1===e.inStock?F`<span class="listings__chip listings__chip--warn">out</span>`:!0===e.inStock?F`<span class="listings__chip listings__chip--ok">in stock</span>`:q,i=e.imageProxyUrl?F`<img
           class="listings__thumb"
-          src=${t.imageProxyUrl}
+          src=${e.imageProxyUrl}
           alt=""
           loading="lazy"
         />`:F`<span
           class="listings__thumb listings__thumb--placeholder"
           aria-hidden="true"
         ></span>`,s=F`
-      ${r}
+      ${i}
       <div class="listings__info">
         <span class="listings__row-retailer">
-          ${t.retailer??"Unknown"}
-          ${t.isPrimary?F`<span class="listings__badge">primary</span>`:K}
+          ${e.retailer??"Unknown"}
+          ${e.isPrimary?F`<span class="listings__badge">primary</span>`:q}
         </span>
         <span class="listings__row-meta">
-          ${i}
+          ${r}
           <span class="listings__last-check">
-            ${yt(t.lastCheck)}
+            ${me(e.lastCheck)}
           </span>
         </span>
       </div>
-      ${e?F`<svg
+      ${t?F`<svg
             class="listings__sparkline"
             viewBox="0 0 ${80} ${24}"
             preserveAspectRatio="none"
             aria-hidden="true"
           >
-            <path d=${e} fill="none" stroke="currentColor" stroke-width="1.25" />
+            <path d=${t} fill="none" stroke="currentColor" stroke-width="1.25" />
           </svg>`:F`<span class="listings__sparkline listings__sparkline--empty"></span>`}
       <div class="listings__price">
-        ${ft(t.price,t.currency||null)}
+        ${fe(e.price,e.currency||null)}
       </div>
     `;return F`
       <li class="listings__row">
-        ${t.url?F`<a
+        ${e.url?F`<a
               class="listings__link"
-              href=${t.url}
+              href=${e.url}
               target="_blank"
               rel="noopener noreferrer"
-              @click=${t=>t.stopPropagation()}
-              title=${t.retailer??t.url}
+              @click=${e=>e.stopPropagation()}
+              title=${e.retailer??e.url}
             >
               ${s}
             </a>`:F`<div class="listings__link listings__link--noUrl">${s}</div>`}
-        ${t.isPrimary?K:F`<button
-              class="listings__remove"
-              type="button"
-              @click=${e=>this.handleRemoveListing(e,t)}
-              aria-label=${`Remove ${t.retailer??"listing"}`}
-              title=${`Remove ${t.retailer??"this listing"}`}
-            >
-              ×
-            </button>`}
+        <div class="listings__actions">
+          ${this.onEditListing?F`<button
+                class="listings__edit"
+                type="button"
+                @click=${t=>this.handleEditListing(t,e)}
+                aria-label=${`Edit price selector for ${e.retailer??"listing"}`}
+                title="Advanced: set a custom price selector"
+              >
+                ✎
+              </button>`:q}
+          ${e.isPrimary?q:F`<button
+                class="listings__remove"
+                type="button"
+                @click=${t=>this.handleRemoveListing(t,e)}
+                aria-label=${`Remove ${e.retailer??"listing"}`}
+                title=${`Remove ${e.retailer??"this listing"}`}
+              >
+                ×
+              </button>`}
+        </div>
       </li>
-    `}handleRemoveListing(t,e){if(t.stopPropagation(),t.preventDefault(),e.isPrimary)return;const i=e.retailer?`Remove the ${e.retailer} listing from ${this.product.title}?`:`Remove this listing from ${this.product.title}?`;window.confirm(i)&&this.onRemoveListing?.(this.product,e)}handleClick(t){t.target.closest("a")||this.onOpen?.(this.product)}render(){const{product:t}=this,{value:e,currency:i}=this.headlinePrice,r=this.sourcePriceLine;return F`
+    `}handleEditListing(e,t){e.stopPropagation(),e.preventDefault(),this.onEditListing?.(this.product,t)}handleRemoveListing(e,t){if(e.stopPropagation(),e.preventDefault(),t.isPrimary)return;const r=t.retailer?`Remove the ${t.retailer} listing from ${this.product.title}?`:`Remove this listing from ${this.product.title}?`;window.confirm(r)&&this.onRemoveListing?.(this.product,t)}renderActions(){if(!this.onRefreshNow&&!this.onSetTarget&&!this.onSetPaused)return q;const{product:e}=this;return F`
+      <div class="actions" @click=${e=>e.stopPropagation()}>
+        ${this.onSetTarget?F`<label class="actions__target" title="Notify when price drops to or below this">
+              <span class="actions__target-label">Target</span>
+              <input
+                class="actions__target-input"
+                type="number"
+                inputmode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="—"
+                .value=${null!=e.targetPrice?String(e.targetPrice):""}
+                @change=${this.handleTargetCommit}
+                @keydown=${this.handleTargetKeydown}
+                @click=${e=>e.stopPropagation()}
+              />
+            </label>`:q}
+        <div class="actions__spacer"></div>
+        ${this.onSetPaused?F`<button
+              class="actions__btn"
+              type="button"
+              @click=${this.handleTogglePaused}
+              aria-label=${e.paused?"Resume polling":"Pause polling"}
+              title=${e.paused?"Resume polling":"Pause polling"}
+            >
+              <ha-icon icon=${e.paused?"mdi:play":"mdi:pause"}></ha-icon>
+            </button>`:q}
+        ${this.onRefreshNow?F`<button
+              class="actions__btn"
+              type="button"
+              ?disabled=${this.refreshingNow}
+              @click=${this.handleRefreshNow}
+              aria-label="Refresh price now"
+              title="Refresh price now"
+            >
+              <ha-icon
+                icon=${this.refreshingNow?"mdi:loading":"mdi:refresh"}
+                class=${this.refreshingNow?"actions__btn-spin":""}
+              ></ha-icon>
+            </button>`:q}
+      </div>
+    `}handleClick(e){e.target.closest("a")||this.onOpen?.(this.product)}render(){const{product:e}=this,{value:t,currency:r}=this.headlinePrice,i=this.sourcePriceLine;return F`
       <article
-        class="card ${t.discontinued?"card--faded":""}"
+        class="card ${e.discontinued?"card--faded":""}"
         @click=${this.handleClick}
         tabindex="0"
         role="button"
-        aria-label=${`Open ${t.title}`}
+        aria-label=${`Open ${e.title}`}
       >
         ${this.renderImage()}
         <div class="body">
           <header class="header">
-            <h3 class="title">${t.title}</h3>
+            <h3 class="title">${e.title}</h3>
             ${this.renderStatusChips()}
           </header>
 
           <div class="price-block">
-            <div class="price">${ft(e,i)}</div>
-            ${r===K?this.renderDelta():F`<div class="price-sub">${r} ${this.renderDelta()}</div>`}
+            <div class="price">${fe(t,r)}</div>
+            ${i===q?this.renderDelta():F`<div class="price-sub">${i} ${this.renderDelta()}</div>`}
           </div>
 
           ${this.renderSparkline()}
@@ -173,19 +241,21 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
           ${this.renderListings()}
           ${this.renderAlternatives()}
 
-          ${t.discontinued&&t.discontinuedReason?F`<p class="discontinued-reason">${t.discontinuedReason}</p>`:K}
+          ${e.discontinued&&e.discontinuedReason?F`<p class="discontinued-reason">${e.discontinuedReason}</p>`:q}
+
+          ${this.renderActions()}
 
           <footer class="footer">
             <span class="last-check">
-              Last check: ${yt(t.lastCheck)}
+              Last check: ${me(e.lastCheck)}
             </span>
-            ${t.url?F`<a class="link" href=${t.url} target="_blank" rel="noopener">
+            ${e.url?F`<a class="link" href=${e.url} target="_blank" rel="noopener">
                   Open at retailer ↗
-                </a>`:K}
+                </a>`:q}
           </footer>
         </div>
       </article>
-    `}};var St;At.styles=o`
+    `}};var Ee;Se.styles=n`
     :host {
       display: block;
     }
@@ -280,6 +350,74 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
       background: transparent;
       border: 1px solid var(--divider-color, #e0e0e0);
       color: var(--secondary-text-color, #757575);
+    }
+    .chip--paused {
+      background: var(--secondary-text-color, #9e9e9e);
+      color: #fff;
+    }
+
+    /* --- Per-card action bar --- */
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--divider-color, #e0e0e0);
+    }
+    .actions__spacer {
+      flex: 1 1 auto;
+    }
+    .actions__target {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .actions__target-label {
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .actions__target-input {
+      width: 84px;
+      box-sizing: border-box;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 6px;
+      outline: none;
+    }
+    .actions__target-input:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .actions__btn {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--secondary-text-color, #757575);
+      --mdc-icon-size: 18px;
+      transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .actions__btn:hover:not(:disabled) {
+      color: var(--primary-color, #03a9f4);
+      background: var(--secondary-background-color, #f5f5f5);
+      border-color: var(--divider-color, #e0e0e0);
+    }
+    .actions__btn:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+    .actions__btn-spin {
+      animation: alts-spin 1.2s linear infinite;
     }
 
     .price-block {
@@ -452,10 +590,15 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
       gap: 4px;
     }
     .alts__row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       margin: 0;
       padding: 0;
     }
     .alts__link {
+      flex: 1 1 auto;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -464,6 +607,40 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
       text-decoration: none;
       color: inherit;
       transition: background 120ms ease;
+    }
+    .alts__add {
+      flex: 0 0 auto;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .alts__add:hover {
+      color: var(--success-color, #2e7d32);
+      background: rgba(46, 125, 50, 0.08);
+      border-color: rgba(46, 125, 50, 0.25);
+    }
+    .alts__add:focus-visible {
+      outline: 2px solid var(--success-color, #2e7d32);
+      outline-offset: 1px;
+    }
+    .alts__add--done {
+      cursor: default;
+      color: var(--success-color, #2e7d32);
+    }
+    .alts__add--done:hover {
+      background: transparent;
+      border-color: transparent;
     }
     .alts__link:hover {
       background: var(--secondary-background-color, #f5f5f5);
@@ -729,15 +906,419 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
       outline: 2px solid var(--error-color, #c62828);
       outline-offset: 1px;
     }
-  `,t([ht({attribute:!1})],At.prototype,"product",void 0),t([ht({attribute:!1})],At.prototype,"onOpen",void 0),t([ht({attribute:!1})],At.prototype,"onRefreshAlternatives",void 0),t([ht({type:Boolean,attribute:!1})],At.prototype,"refreshingAlternatives",void 0),t([ht({type:Boolean,attribute:!1})],At.prototype,"hideNonShipping",void 0),t([ht({attribute:!1})],At.prototype,"onRemoveListing",void 0),At=t([ct("price-watch-card")],At);let PriceWatchPanel=St=class extends at{constructor(){super(),this._products=[],this._registry=null,this._registryError=null,this._connected=!1,this._refreshingEntries=new Set,this._hideNonShipping=!1,this._conn=null,this._states={},this._handleOpen=t=>{t.url&&window.open(t.url,"_blank","noopener,noreferrer")},this._handleRefreshAlternatives=async t=>{if(this._conn&&!this._refreshingEntries.has(t.entryId)){this._refreshingEntries=new Set([...this._refreshingEntries,t.entryId]);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"find_alternatives",service_data:{entry_id:t.entryId}})}catch(t){console.error("[price-watch-panel] find_alternatives failed:",t)}finally{const e=new Set(this._refreshingEntries);e.delete(t.entryId),this._refreshingEntries=e}}},this._handleRemoveListing=async(t,e)=>{if(this._conn)if(e.isPrimary)console.warn("[price-watch-panel] refusing to remove primary listing",e.listingId);else try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"remove_listing",service_data:{entry_id:t.entryId,listing_id:e.listingId}})}catch(t){console.error("[price-watch-panel] remove_listing failed:",t)}},this._handleToggleHideNonShipping=()=>{this._hideNonShipping=!this._hideNonShipping;try{localStorage.setItem(St.HIDE_NONSHIP_KEY,this._hideNonShipping?"1":"0")}catch{}},this._handleAddProduct=()=>{window.history.pushState(null,"","/config/integrations/dashboard/add?domain=price_watch"),window.dispatchEvent(new CustomEvent("location-changed"))};try{this._hideNonShipping="1"===localStorage.getItem(St.HIDE_NONSHIP_KEY)}catch{}}connectedCallback(){super.connectedCallback(),this._bootstrap()}disconnectedCallback(){super.disconnectedCallback(),this._unsubState?.(),this._unsubRegistry?.(),this._unsubState=void 0,this._unsubRegistry=void 0}async _bootstrap(){const t=window.hassConnection;if(!t)return void(this._registryError="Home Assistant WebSocket connection not available on this page. Try reloading.");let e;try{const i=await t;e=i.conn,this._conn=e,this._connected=!0}catch(t){const e=t instanceof Error?t.message:String(t);return void(this._registryError=`Could not open HA connection: ${e}`)}try{await this._fetchRegistry(e),await this._fetchInitialStates(e),this._unsubState=await e.subscribeEvents(t=>this._onStateChanged(t),"state_changed"),this._unsubRegistry=await e.subscribeEvents(()=>{this._fetchRegistry(e).then(()=>this._fetchInitialStates(e))},"entity_registry_updated")}catch(t){const e=t instanceof Error?t.message:String(t);this._registryError=`Setup failed after connection: ${e}`,console.error("[price-watch-panel]",t)}}async _fetchRegistry(t){const e=await t.sendMessagePromise({type:"config/entity_registry/list"}),i=new Map;for(const t of e)"price_watch"===t.platform&&i.set(t.unique_id,t.entity_id);this._registry={byUniqueId:i},this._registryError=null,this._rebuildProducts()}async _fetchInitialStates(t){if(!this._registry)return;const e=new Set(this._registry.byUniqueId.values()),i=await t.sendMessagePromise({type:"get_states"}),r={};for(const t of i)e.has(t.entity_id)&&(r[t.entity_id]=t);this._states=r,this._rebuildProducts()}_onStateChanged(t){const{entity_id:e,new_state:i}=t.data;if(!this._registry)return;new Set(this._registry.byUniqueId.values()).has(e)&&(null===i?delete this._states[e]:this._states={...this._states,[e]:i},this._rebuildProducts())}_rebuildProducts(){if(!this._registry)return void(this._products=[]);const t={states:this._states};this._products=function(t,e){const i=new Map;for(const[t,r]of e.byUniqueId){const e=$t(t);if(!e)continue;let s=i.get(e.entryId);if(s||(s={legacy:new Map,listings:new Map},i.set(e.entryId,s)),null===e.listingId)s.legacy.set(e.key,r);else{let t=s.listings.get(e.listingId);t||(t=new Map,s.listings.set(e.listingId,t)),t.set(e.key,r)}}const r=[];for(const[e,s]of i){const i=s.legacy,n=i.get("price");if(!n)continue;const o=t.states[n];if(!o)continue;const a=o.attributes,l={entryId:e,title:String(a.title??a.friendly_name??"Unknown product"),url:String(a.product_url??""),retailer:"string"==typeof a.retailer?a.retailer:null,imageUrl:"string"==typeof a.image_url?a.image_url:null,imageProxyUrl:null,imageBroken:!1,price:gt(o.state),currency:"string"==typeof a.unit_of_measurement?a.unit_of_measurement:"string"==typeof a.currency?a.currency:"",priceLocal:null,localCurrency:null,lowest:null,highest:null,targetDiff:null,targetPrice:"number"==typeof a.target_price?a.target_price:null,inStock:null,stockCount:"number"==typeof a.stock_count?a.stock_count:null,discontinued:!0===a.discontinued,discontinuedReason:"string"==typeof a.discontinued_reason?a.discontinued_reason:null,discontinuedAt:"string"==typeof a.discontinued_at?a.discontinued_at:null,lastKnownPrice:"number"==typeof a.last_known_price?a.last_known_price:null,lastKnownCurrency:"string"==typeof a.last_known_currency?a.last_known_currency:null,lastCheck:"string"==typeof a.last_check?a.last_check:null,history:mt(a.price_history),alternatives:vt(a.alternatives),alternativesFetchedAt:"string"==typeof a.alternatives_fetched_at?a.alternatives_fetched_at:null,alternativesError:"string"==typeof a.alternatives_error&&a.alternatives_error?a.alternatives_error:null,entityIds:{price:n},listings:[]},c=[["price_local",t=>{l.priceLocal=gt(t.state),l.localCurrency="string"==typeof t.attributes.unit_of_measurement?t.attributes.unit_of_measurement:null,l.entityIds.priceLocal=t.entity_id}],["lowest",t=>{l.lowest=gt(t.state),l.entityIds.lowest=t.entity_id}],["highest",t=>{l.highest=gt(t.state),l.entityIds.highest=t.entity_id}],["target_diff",t=>{l.targetDiff=gt(t.state),l.entityIds.targetDiff=t.entity_id}],["stock_count",t=>{l.stockCount=gt(t.state),l.entityIds.stockCount=t.entity_id}],["in_stock",t=>{l.inStock=_t(t.state),l.entityIds.inStock=t.entity_id}],["discontinued",t=>{const e=_t(t.state);null!=e&&(l.discontinued=e),l.entityIds.discontinued=t.entity_id}],["photo",t=>{if("unavailable"===t.state||"unknown"===t.state)return void(l.imageBroken=!0);const e=t.attributes.entity_picture;"string"==typeof e&&e.length>0&&(l.imageProxyUrl=e)}]];for(const[e,r]of c){const s=i.get(e);if(!s)continue;const n=t.states[s];n&&r(n)}const d="string"==typeof a.listing_id&&a.listing_id?a.listing_id:`l_${e.slice(-12).toLowerCase()}`,p=bt(t,s.legacy,d,!0);p&&l.listings.push(p);for(const[e,i]of s.listings){const r=bt(t,i,e,!1);r&&l.listings.push(r)}r.push(l)}return r.sort((t,e)=>t.discontinued!==e.discontinued?t.discontinued?1:-1:t.title.localeCompare(e.title)),r}(t,this._registry)}_renderHeader(){const t=this._products.length,e=this._products.filter(t=>t.discontinued).length;return F`
+    .listings__actions {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .listings__edit {
+      flex: 0 0 auto;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .listings__edit:hover {
+      color: var(--primary-color, #1976d2);
+      background: rgba(25, 118, 210, 0.08);
+      border-color: rgba(25, 118, 210, 0.2);
+    }
+    .listings__edit:focus-visible {
+      outline: 2px solid var(--primary-color, #1976d2);
+      outline-offset: 1px;
+    }
+  `,e([he({attribute:!1})],Se.prototype,"product",void 0),e([he({attribute:!1})],Se.prototype,"onOpen",void 0),e([he({attribute:!1})],Se.prototype,"onRefreshAlternatives",void 0),e([he({type:Boolean,attribute:!1})],Se.prototype,"refreshingAlternatives",void 0),e([he({type:Boolean,attribute:!1})],Se.prototype,"hideNonShipping",void 0),e([he({attribute:!1})],Se.prototype,"onRemoveListing",void 0),e([he({attribute:!1})],Se.prototype,"onAddListing",void 0),e([he({attribute:!1})],Se.prototype,"onEditListing",void 0),e([he({attribute:!1})],Se.prototype,"onRefreshNow",void 0),e([he({type:Boolean,attribute:!1})],Se.prototype,"refreshingNow",void 0),e([he({attribute:!1})],Se.prototype,"onSetTarget",void 0),e([he({attribute:!1})],Se.prototype,"onSetPaused",void 0),Se=e([ce("price-watch-card")],Se);const Ae=["name","drop","cheapest","last_checked","below_target"],Pe={name:"Name (A–Z)",drop:"Biggest drop",cheapest:"Cheapest",last_checked:"Last checked",below_target:"Below target"},Te={anthropic_native:"AI web search",ai_synthesizer:"AI + web search",duckduckgo:"Web results (no AI)",none:""},Ce={none:"Free — web search, no AI",anthropic:"Anthropic (Claude)",openai_compatible:"OpenAI-compatible (Ollama, OpenAI, …)"};let PriceWatchPanel=Ee=class extends ae{constructor(){super(),this._products=[],this._registry=null,this._registryError=null,this._connected=!1,this._refreshingEntries=new Set,this._hideNonShipping=!1,this._search="",this._sort="name",this._hideDiscontinued=!1,this._refreshingNow=new Set,this._searchOpen=!1,this._searchQuery="",this._searchLoading=!1,this._searchResults=[],this._searchEngine="none",this._searchRan=!1,this._searchError=null,this._trackTarget=null,this._trackName="",this._trackUrl="",this._trackTargetPrice="",this._tracking=!1,this._trackError=null,this._providerOpen=!1,this._providerLoading=!1,this._providerSaving=!1,this._providerError=null,this._providerSuccess=!1,this._providerAdvancedOpen=!1,this._pProvider="none",this._pApiKey="",this._pModel="",this._pBaseUrl="",this._pInputCost="",this._pOutputCost="",this._pMaxHtml="",this._pForceJson=!1,this._pExtraHeaders="",this._pExcludedDomains="",this._providerHasKey=!1,this._providerModels=[],this._selectorOpen=!1,this._selProduct=null,this._selListing=null,this._selPriceSelector="",this._selTitleSelector="",this._selTesting=!1,this._selTestResult=null,this._selTestError=null,this._selSaving=!1,this._selSaveError=null,this._selSaved=!1,this._selBookmarkletOpen=!1,this._conn=null,this._states={},this._handleOpen=e=>{e.url&&window.open(e.url,"_blank","noopener,noreferrer")},this._handleRefreshAlternatives=async e=>{if(this._conn&&!this._refreshingEntries.has(e.entryId)){this._refreshingEntries=new Set([...this._refreshingEntries,e.entryId]);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"find_alternatives",service_data:{entry_id:e.entryId}})}catch(e){console.error("[price-watch-panel] find_alternatives failed:",e)}finally{const t=new Set(this._refreshingEntries);t.delete(e.entryId),this._refreshingEntries=t}}},this._handleRemoveListing=async(e,t)=>{if(this._conn)if(t.isPrimary)console.warn("[price-watch-panel] refusing to remove primary listing",t.listingId);else try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"remove_listing",service_data:{entry_id:e.entryId,listing_id:t.listingId}})}catch(e){console.error("[price-watch-panel] remove_listing failed:",e)}},this._handleAddListing=async(e,t)=>{if(!this._conn)return;const r=(t.url??"").trim();if(!r)return;const i={entry_id:e.entryId,url:r};t.retailer&&(i.retailer=t.retailer),t.currency&&(i.currency=t.currency);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"add_listing",service_data:i})}catch(e){console.error("[price-watch-panel] add_listing failed:",e)}},this._handleEditListing=(e,t)=>{this._selProduct=e,this._selListing=t,this._selPriceSelector="",this._selTitleSelector="",this._selTestResult=null,this._selTestError=null,this._selSaveError=null,this._selSaved=!1,this._selBookmarkletOpen=!1,this._selectorOpen=!0},this._closeSelectorEditor=()=>{this._selectorOpen=!1,this._selProduct=null,this._selListing=null},this._onSelectorBackdropClick=e=>{e.target===e.currentTarget&&this._closeSelectorEditor()},this._onSelPriceInput=e=>{this._selPriceSelector=e.target.value},this._onSelTitleInput=e=>{this._selTitleSelector=e.target.value},this._runSelectorTest=async()=>{if(!this._conn||!this._selListing)return;const e=(this._selListing.url??"").trim(),t=this._selPriceSelector.trim();if(!e)return void(this._selTestError="This listing has no URL to test against.");if(!t)return void(this._selTestError="Enter a price selector first.");this._selTesting=!0,this._selTestError=null,this._selTestResult=null;const r=this._selTitleSelector.trim()||"h1";try{const i=await this._conn.sendMessagePromise({type:"price_watch/test_selector",url:e,price_selector:t,title_selector:r});this._selTestResult=i}catch(e){this._selTestError=e?.message??"Test failed."}finally{this._selTesting=!1}},this._saveSelector=async()=>{if(!this._conn||!this._selProduct||!this._selListing)return;const e=this._selPriceSelector.trim();if(!e)return void(this._selSaveError="Enter a price selector first.");const t={type:"css",selectors:{price:e,title:this._selTitleSelector.trim()||"h1"},transforms:{price:"price_clean"}};this._selSaving=!0,this._selSaveError=null,this._selSaved=!1;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._selProduct.entryId,listing_id:this._selListing.listingId,custom_parser:t}}),this._selSaved=!0,window.setTimeout(()=>this._closeSelectorEditor(),1200)}catch(e){this._selSaveError=e?.message??"Save failed."}finally{this._selSaving=!1}},this._clearSelector=async()=>{if(this._conn&&this._selProduct&&this._selListing&&window.confirm("Remove the custom price selector and go back to automatic extraction?")){this._selSaving=!0,this._selSaveError=null;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._selProduct.entryId,listing_id:this._selListing.listingId,custom_parser:""}}),this._selSaved=!0,window.setTimeout(()=>this._closeSelectorEditor(),1200)}catch(e){this._selSaveError=e?.message??"Clear failed."}finally{this._selSaving=!1}}},this._copyBookmarklet=async()=>{const e=this._bookmarkletHref();try{await navigator.clipboard.writeText(e)}catch{this._selBookmarkletOpen=!0}},this._handleToggleHideNonShipping=()=>{this._hideNonShipping=!this._hideNonShipping;try{localStorage.setItem(Ee.HIDE_NONSHIP_KEY,this._hideNonShipping?"1":"0")}catch{}},this._handleToggleHideDiscontinued=()=>{this._hideDiscontinued=!this._hideDiscontinued;try{localStorage.setItem(Ee.HIDE_DISCONTINUED_KEY,this._hideDiscontinued?"1":"0")}catch{}},this._handleSearch=e=>{this._search=e.target.value},this._handleSort=e=>{const t=e.target.value;this._sort=t;try{localStorage.setItem(Ee.SORT_KEY,t)}catch{}},this._handleRefreshNow=async e=>{if(this._conn&&!this._refreshingNow.has(e.entryId)){this._refreshingNow=new Set([...this._refreshingNow,e.entryId]);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"refresh_now",service_data:{entry_id:e.entryId}})}catch(e){console.error("[price-watch-panel] refresh_now failed:",e)}finally{const t=new Set(this._refreshingNow);t.delete(e.entryId),this._refreshingNow=t}}},this._handleSetTarget=async(e,t)=>{if(this._conn)try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"set_target",service_data:null===t?{entry_id:e.entryId}:{entry_id:e.entryId,target_price:t}})}catch(e){console.error("[price-watch-panel] set_target failed:",e)}},this._handleSetPaused=async(e,t)=>{if(this._conn)try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"set_paused",service_data:{entry_id:e.entryId,paused:t}})}catch(e){console.error("[price-watch-panel] set_paused failed:",e)}},this._handleAddProduct=()=>{window.history.pushState(null,"","/config/integrations/dashboard/add?domain=price_watch"),window.dispatchEvent(new CustomEvent("location-changed"))},this._openSearch=()=>{this._searchOpen=!0,this._trackTarget=null,this._trackError=null},this._closeSearch=()=>{this._searchOpen=!1,this._trackTarget=null,this._searchError=null,this._trackError=null},this._onBackdropClick=e=>{e.target===e.currentTarget&&this._closeSearch()},this._handleSearchQueryInput=e=>{this._searchQuery=e.target.value},this._handleSearchKeydown=e=>{"Enter"===e.key?(e.preventDefault(),this._runSearch()):"Escape"===e.key&&this._closeSearch()},this._runSearch=async()=>{if(!this._conn)return;const e=this._searchQuery.trim();if(e&&!this._searchLoading){this._searchLoading=!0,this._searchError=null,this._trackTarget=null;try{const t=await this._conn.sendMessagePromise({type:"price_watch/search",query:e,max_results:8});this._searchResults=t.results??[],this._searchEngine=t.engine??"none",this._searchRan=!0}catch(e){const t=String(e&&"object"==typeof e&&"message"in e?e.message:e);this._searchError=t||"Search failed.",this._searchResults=[],this._searchRan=!0,console.error("[price-watch-panel] search failed:",e)}finally{this._searchLoading=!1}}},this._pickResult=e=>{this._trackTarget=e,this._trackName=e.title,this._trackUrl=e.url,this._trackTargetPrice="",this._trackError=null},this._cancelTrack=()=>{this._trackTarget=null,this._trackError=null},this._handleTrackNameInput=e=>{this._trackName=e.target.value},this._handleTrackUrlInput=e=>{this._trackUrl=e.target.value},this._handleTrackTargetInput=e=>{this._trackTargetPrice=e.target.value},this._confirmTrack=async()=>{if(!this._conn||this._tracking)return;const e=this._trackUrl.trim();if(!e)return void(this._trackError="A URL is required to track a product.");const t=this._trackName.trim(),r=this._trackTargetPrice.trim();let i=null;if(""!==r){const e=Number(r);if(Number.isNaN(e))return void(this._trackError="Target price must be a number.");i=e}this._tracking=!0,this._trackError=null;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"track_product",service_data:{url:e,...t?{name:t}:{},...null!==i?{target_price:i}:{}}}),this._closeSearch()}catch(e){const t=String(e&&"object"==typeof e&&"message"in e?e.message:e);this._trackError=t||"Could not add product.",console.error("[price-watch-panel] track_product failed:",e)}finally{this._tracking=!1}},this._openProviderEditor=async()=>{if(this._providerOpen=!0,this._providerError=null,this._providerSuccess=!1,this._providerAdvancedOpen=!1,this._conn){this._providerLoading=!0;try{const e=await this._conn.sendMessagePromise({type:"price_watch/get_provider_settings"});this._applyProviderSettings(e)}catch(e){this._providerError=this._wsErrorMessage(e)||"Could not load provider settings.",console.error("[price-watch-panel] get_provider_settings failed:",e)}finally{this._providerLoading=!1}}else this._providerError="Not connected to Home Assistant yet."},this._closeProviderEditor=()=>{this._providerOpen=!1,this._providerError=null,this._providerSuccess=!1},this._onProviderBackdropClick=e=>{e.target===e.currentTarget&&this._closeProviderEditor()},this._onProviderChange=e=>{this._pProvider=e.target.value,this._providerSuccess=!1,this._providerError=null},this._saveProvider=async()=>{if(!this._conn||this._providerSaving)return;this._providerSaving=!0,this._providerError=null,this._providerSuccess=!1;const e={provider:this._pProvider},t=this._pApiKey.trim();if(t&&(e.api_key=t),"anthropic"===this._pProvider)e.model=this._pModel;else if("openai_compatible"===this._pProvider){e.base_url=this._pBaseUrl.trim(),e.model=this._pModel.trim(),e.input_cost_per_mtok=Number(this._pInputCost)||0,e.output_cost_per_mtok=Number(this._pOutputCost)||0,e.max_html_chars=Number(this._pMaxHtml)||1e5,e.force_json_mode=this._pForceJson;const t=this._pExtraHeaders.trim();t&&(e.extra_headers=t)}e.excluded_domains=this._pExcludedDomains;try{const t=await this._conn.sendMessagePromise({type:"price_watch/set_provider_settings",...e});this._applyProviderSettings(t),this._providerSuccess=!0}catch(e){this._providerError=this._wsErrorMessage(e)||"Could not save provider settings.",console.error("[price-watch-panel] set_provider_settings failed:",e)}finally{this._providerSaving=!1}};try{this._hideNonShipping="1"===localStorage.getItem(Ee.HIDE_NONSHIP_KEY),this._hideDiscontinued="1"===localStorage.getItem(Ee.HIDE_DISCONTINUED_KEY);const e=localStorage.getItem(Ee.SORT_KEY);e&&Ae.includes(e)&&(this._sort=e)}catch{}}connectedCallback(){super.connectedCallback(),this._bootstrap()}disconnectedCallback(){super.disconnectedCallback(),this._unsubState?.(),this._unsubRegistry?.(),this._unsubState=void 0,this._unsubRegistry=void 0}async _bootstrap(){const e=window.hassConnection;if(!e)return void(this._registryError="Home Assistant WebSocket connection not available on this page. Try reloading.");let t;try{const r=await e;t=r.conn,this._conn=t,this._connected=!0}catch(e){const t=e instanceof Error?e.message:String(e);return void(this._registryError=`Could not open HA connection: ${t}`)}try{await this._fetchRegistry(t),await this._fetchInitialStates(t),this._unsubState=await t.subscribeEvents(e=>this._onStateChanged(e),"state_changed"),this._unsubRegistry=await t.subscribeEvents(()=>{this._fetchRegistry(t).then(()=>this._fetchInitialStates(t))},"entity_registry_updated")}catch(e){const t=e instanceof Error?e.message:String(e);this._registryError=`Setup failed after connection: ${t}`,console.error("[price-watch-panel]",e)}}async _fetchRegistry(e){const t=await e.sendMessagePromise({type:"config/entity_registry/list"}),r=new Map;for(const e of t)"price_watch"===e.platform&&r.set(e.unique_id,e.entity_id);this._registry={byUniqueId:r},this._registryError=null,this._rebuildProducts()}async _fetchInitialStates(e){if(!this._registry)return;const t=new Set(this._registry.byUniqueId.values()),r=await e.sendMessagePromise({type:"get_states"}),i={};for(const e of r)t.has(e.entity_id)&&(i[e.entity_id]=e);this._states=i,this._rebuildProducts()}_onStateChanged(e){const{entity_id:t,new_state:r}=e.data;if(!this._registry)return;new Set(this._registry.byUniqueId.values()).has(t)&&(null===r?delete this._states[t]:this._states={...this._states,[t]:r},this._rebuildProducts())}_rebuildProducts(){if(!this._registry)return void(this._products=[]);const e={states:this._states};this._products=function(e,t){const r=new Map;for(const[e,i]of t.byUniqueId){const t=be(e);if(!t)continue;let s=r.get(t.entryId);if(s||(s={legacy:new Map,listings:new Map},r.set(t.entryId,s)),null===t.listingId)s.legacy.set(t.key,i);else{let e=s.listings.get(t.listingId);e||(e=new Map,s.listings.set(t.listingId,e)),e.set(t.key,i)}}const i=[];for(const[t,s]of r){const r=s.legacy,o=r.get("price");if(!o)continue;const n=e.states[o];if(!n)continue;const a=n.attributes,l={entryId:t,title:String(a.title??a.friendly_name??"Unknown product"),url:String(a.product_url??""),retailer:"string"==typeof a.retailer?a.retailer:null,imageUrl:"string"==typeof a.image_url?a.image_url:null,imageProxyUrl:null,imageBroken:!1,price:_e(n.state),currency:"string"==typeof a.unit_of_measurement?a.unit_of_measurement:"string"==typeof a.currency?a.currency:"",priceLocal:null,localCurrency:null,lowest:null,highest:null,targetDiff:null,targetPrice:"number"==typeof a.target_price?a.target_price:null,paused:!0===a.paused,inStock:null,stockCount:"number"==typeof a.stock_count?a.stock_count:null,discontinued:!0===a.discontinued,discontinuedReason:"string"==typeof a.discontinued_reason?a.discontinued_reason:null,discontinuedAt:"string"==typeof a.discontinued_at?a.discontinued_at:null,lastKnownPrice:"number"==typeof a.last_known_price?a.last_known_price:null,lastKnownCurrency:"string"==typeof a.last_known_currency?a.last_known_currency:null,lastCheck:"string"==typeof a.last_check?a.last_check:null,history:ve(a.price_history),alternatives:ye(a.alternatives),alternativesFetchedAt:"string"==typeof a.alternatives_fetched_at?a.alternatives_fetched_at:null,alternativesError:"string"==typeof a.alternatives_error&&a.alternatives_error?a.alternatives_error:null,entityIds:{price:o},listings:[]},c=[["price_local",e=>{l.priceLocal=_e(e.state),l.localCurrency="string"==typeof e.attributes.unit_of_measurement?e.attributes.unit_of_measurement:null,l.entityIds.priceLocal=e.entity_id}],["lowest",e=>{l.lowest=_e(e.state),l.entityIds.lowest=e.entity_id}],["highest",e=>{l.highest=_e(e.state),l.entityIds.highest=e.entity_id}],["target_diff",e=>{l.targetDiff=_e(e.state),l.entityIds.targetDiff=e.entity_id}],["stock_count",e=>{l.stockCount=_e(e.state),l.entityIds.stockCount=e.entity_id}],["in_stock",e=>{l.inStock=ge(e.state),l.entityIds.inStock=e.entity_id}],["discontinued",e=>{const t=ge(e.state);null!=t&&(l.discontinued=t),l.entityIds.discontinued=e.entity_id}],["photo",e=>{if("unavailable"===e.state||"unknown"===e.state)return void(l.imageBroken=!0);const t=e.attributes.entity_picture;"string"==typeof t&&t.length>0&&(l.imageProxyUrl=t)}]];for(const[t,i]of c){const s=r.get(t);if(!s)continue;const o=e.states[s];o&&i(o)}const d="string"==typeof a.listing_id&&a.listing_id?a.listing_id:`l_${t.slice(-12).toLowerCase()}`,p=xe(e,s.legacy,d,!0);p&&l.listings.push(p);for(const[t,r]of s.listings){const i=xe(e,r,t,!1);i&&l.listings.push(i)}i.push(l)}return i.sort((e,t)=>e.discontinued!==t.discontinued?e.discontinued?1:-1:e.title.localeCompare(t.title)),i}(e,this._registry)}_bookmarkletHref(){return"javascript:"+encodeURIComponent("(function(){\n  if(window.__pwPickerActive){return;}\n  window.__pwPickerActive=true;\n  var hl=document.createElement('div');\n  hl.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:rgba(25,118,210,0.25);border:2px solid #1976d2;border-radius:3px;transition:all 40ms ease';\n  var tip=document.createElement('div');\n  tip.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:#1976d2;color:#fff;font:12px/1.4 sans-serif;padding:3px 6px;border-radius:4px;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';\n  document.body.appendChild(hl);document.body.appendChild(tip);\n  function sel(el){\n    if(!el||el.nodeType!==1)return'';\n    if(el.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(el.id))return'#'+el.id;\n    var parts=[],node=el,depth=0;\n    while(node&&node.nodeType===1&&depth<5){\n      var part=node.tagName.toLowerCase();\n      if(node.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(node.id)){parts.unshift('#'+node.id);break;}\n      var cls=(node.getAttribute('class')||'').trim().split(/\\s+/).filter(function(c){return c&&!/^(is-|has-|js-)/.test(c)&&c.length<30;}).slice(0,2);\n      if(cls.length)part+='.'+cls.join('.');\n      var p=node.parentElement;\n      if(p){var sib=Array.prototype.filter.call(p.children,function(c){return c.tagName===node.tagName;});if(sib.length>1){part+=':nth-of-type('+(sib.indexOf(node)+1)+')';}}\n      parts.unshift(part);node=p;depth++;\n    }\n    return parts.join(' > ');\n  }\n  function move(e){\n    var el=e.target;if(!el||el===hl||el===tip)return;\n    var r=el.getBoundingClientRect();\n    hl.style.left=r.left+'px';hl.style.top=r.top+'px';hl.style.width=r.width+'px';hl.style.height=r.height+'px';\n    var s=sel(el);tip.textContent=s;\n    tip.style.left=r.left+'px';tip.style.top=(r.top>24?r.top-24:r.bottom+4)+'px';\n  }\n  function done(){window.removeEventListener('mousemove',move,true);window.removeEventListener('click',click,true);window.removeEventListener('keydown',key,true);hl.remove();tip.remove();window.__pwPickerActive=false;}\n  function click(e){\n    e.preventDefault();e.stopPropagation();\n    var s=sel(e.target);\n    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(function(){},function(){window.prompt('Copy this selector:',s);});}\n    else{window.prompt('Copy this selector:',s);}\n    done();\n  }\n  function key(e){if(e.key==='Escape'){done();}}\n  window.addEventListener('mousemove',move,true);\n  window.addEventListener('click',click,true);\n  window.addEventListener('keydown',key,true);\n})();")}_visibleProducts(){const e=this._search.trim().toLowerCase();let t=this._products.filter(t=>{if(this._hideDiscontinued&&t.discontinued)return!1;if(!e)return!0;return`${t.title} ${t.retailer??""}`.toLowerCase().includes(e)});const r=(e,t)=>e.title.localeCompare(t.title),i=e=>null===e?Number.POSITIVE_INFINITY:e;return t=[...t].sort((e,t)=>{switch(this._sort){case"cheapest":return i(e.price)-i(t.price)||r(e,t);case"last_checked":{const i=e.lastCheck?Date.parse(e.lastCheck):-1/0;return(t.lastCheck?Date.parse(t.lastCheck):-1/0)-i||r(e,t)}case"drop":{const i=null!==e.highest&&null!==e.price?e.highest-e.price:-1;return(null!==t.highest&&null!==t.price?t.highest-t.price:-1)-i||r(e,t)}case"below_target":{const i=e=>null!==e.targetPrice&&null!==e.price&&e.price<=e.targetPrice?e.targetPrice-e.price:-1;return i(t)-i(e)||r(e,t)}default:return r(e,t)}}),t}_wsErrorMessage(e){return String(e&&"object"==typeof e&&"message"in e?e.message:e)}_applyProviderSettings(e){this._providerModels=e.anthropic_models??[],this._pProvider=e.provider,this._pModel=e.model||this._providerModels[0]||"",this._pBaseUrl=e.base_url??"",this._providerHasKey=!!e.has_api_key,this._pApiKey="",this._pInputCost=String(e.input_cost_per_mtok??0),this._pOutputCost=String(e.output_cost_per_mtok??0),this._pMaxHtml=String(e.max_html_chars??1e5),this._pForceJson=!!e.force_json_mode,this._pExtraHeaders=e.extra_headers??"",this._pExcludedDomains=(e.excluded_domains??[]).join("\n")}_renderHeader(){return F`
       <header class="panel-header">
         <div class="panel-header__title">
           <h1>Price Watch</h1>
-          <div class="panel-header__counts">
-            ${t-e} active${e>0?F` · ${e} discontinued`:K}
-          </div>
         </div>
         <div class="panel-header__actions">
+          <button
+            class="add-button add-button--secondary"
+            @click=${this._openProviderEditor}
+            title="Choose AI provider (Free / Anthropic / OpenAI-compatible)"
+          >
+            ⚙ AI provider
+          </button>
+          <button
+            class="add-button add-button--secondary"
+            @click=${this._openSearch}
+          >
+            🔍 Search &amp; add
+          </button>
+          <button class="add-button" @click=${this._handleAddProduct}>
+            + Add product
+          </button>
+        </div>
+      </header>
+    `}_renderSearchModal(){return this._searchOpen?F`
+      <div
+        class="modal-backdrop"
+        @click=${this._onBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search and add a product"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>${this._trackTarget?"Track this product":"Search & add"}</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeSearch}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          ${this._trackTarget?this._renderTrackForm():this._renderSearchBody()}
+        </div>
+      </div>
+    `:null}_renderSearchBody(){return F`
+      <div class="modal__searchbar">
+        <input
+          type="search"
+          class="modal__searchinput"
+          placeholder="Search for a product to track…"
+          .value=${this._searchQuery}
+          @input=${this._handleSearchQueryInput}
+          @keydown=${this._handleSearchKeydown}
+          aria-label="Product search query"
+          autofocus
+        />
+        <button
+          class="add-button"
+          @click=${this._runSearch}
+          ?disabled=${this._searchLoading||!this._searchQuery.trim()}
+        >
+          ${this._searchLoading?"Searching…":"Search"}
+        </button>
+      </div>
+      ${this._renderSearchResults()}
+    `}_renderSearchResults(){return this._searchLoading?F`<div class="modal__status">Searching the web…</div>`:this._searchError?F`
+        <div class="modal__status modal__status--error">
+          ⚠ ${this._searchError}
+        </div>
+      `:this._searchRan?0===this._searchResults.length?F`
+        <div class="modal__status">
+          No results. Try a different or more specific query.
+        </div>
+      `:F`
+      <div class="modal__engine">${Te[this._searchEngine]}</div>
+      <ul class="results">
+        ${this._searchResults.map(e=>this._renderResultRow(e))}
+      </ul>
+    `:F`
+        <div class="modal__status">
+          Type what you're looking for and press Enter — e.g. a product
+          name, model number, or brand.
+        </div>
+      `}_renderResultRow(e){const t=null!==e.price?`${e.price} ${e.currency}`.trim():"Price unknown",r=!0===e.ships_to_user_region?F`<span class="results__ship results__ship--yes">Ships to you</span>`:!1===e.ships_to_user_region?F`<span class="results__ship results__ship--no">Doesn't ship</span>`:null;return F`
+      <li class="results__row">
+        <div class="results__thumb">
+          ${e.image_url?F`<img src=${e.image_url} alt="" loading="lazy" />`:F`<span class="results__thumb-ph">🏷️</span>`}
+        </div>
+        <div class="results__info">
+          <div class="results__title" title=${e.title}>${e.title}</div>
+          <div class="results__meta">
+            <span class="results__price">${t}</span>
+            ${e.retailer?F`<span class="results__retailer">${e.retailer}</span>`:null}
+            ${r}
+          </div>
+          ${e.notes?F`<div class="results__notes">${e.notes}</div>`:null}
+        </div>
+        <button class="results__add" @click=${()=>this._pickResult(e)}>
+          Track
+        </button>
+      </li>
+    `}_renderTrackForm(){const e=this._trackTarget;return F`
+      <div class="trackform">
+        ${e&&null!==e.price?F`<div class="trackform__hint">
+              Currently ${e.price} ${e.currency} at
+              ${e.retailer||"this retailer"}.
+            </div>`:null}
+        <label class="trackform__field">
+          <span>Name</span>
+          <input
+            type="text"
+            .value=${this._trackName}
+            @input=${this._handleTrackNameInput}
+            placeholder="Display name"
+          />
+        </label>
+        <label class="trackform__field">
+          <span>URL</span>
+          <input
+            type="url"
+            .value=${this._trackUrl}
+            @input=${this._handleTrackUrlInput}
+            placeholder="https://…"
+          />
+        </label>
+        <label class="trackform__field">
+          <span>Target price <em>(optional)</em></span>
+          <input
+            type="number"
+            step="any"
+            .value=${this._trackTargetPrice}
+            @input=${this._handleTrackTargetInput}
+            placeholder="Alert when at or below…"
+          />
+        </label>
+        ${this._trackError?F`<div class="modal__status modal__status--error">
+              ⚠ ${this._trackError}
+            </div>`:null}
+        <div class="trackform__actions">
+          <button class="trackform__cancel" @click=${this._cancelTrack}>
+            Back
+          </button>
+          <button
+            class="add-button"
+            @click=${this._confirmTrack}
+            ?disabled=${this._tracking||!this._trackUrl.trim()}
+          >
+            ${this._tracking?"Adding…":"Track product"}
+          </button>
+        </div>
+      </div>
+    `}_renderProviderModal(){return this._providerOpen?F`
+      <div
+        class="modal-backdrop"
+        @click=${this._onProviderBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI provider settings"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>AI provider</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeProviderEditor}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          ${this._providerLoading?F`<div class="modal__status">Loading current settings…</div>`:this._renderProviderForm()}
+        </div>
+      </div>
+    `:null}_renderProviderForm(){return F`
+      <div class="trackform">
+        <label class="trackform__field">
+          <span>Provider</span>
+          <select @change=${this._onProviderChange}>
+            ${["none","anthropic","openai_compatible"].map(e=>F`
+                <option value=${e} ?selected=${this._pProvider===e}>
+                  ${Ce[e]}
+                </option>
+              `)}
+          </select>
+        </label>
+
+        ${"none"===this._pProvider?this._renderNoneInfo():null}
+        ${"anthropic"===this._pProvider?this._renderAnthropicFields():null}
+        ${"openai_compatible"===this._pProvider?this._renderOpenAIFields():null}
+
+        ${this._renderExcludedDomains()}
+
+        ${this._providerError?F`<div class="modal__status modal__status--error">
+              ⚠ ${this._providerError}
+            </div>`:null}
+        ${this._providerSuccess?F`<div class="modal__status modal__status--ok">
+              ✓ Saved — reloading tracked products to apply the change.
+            </div>`:null}
+
+        <div class="trackform__actions">
+          <button
+            class="trackform__cancel"
+            @click=${this._closeProviderEditor}
+          >
+            Close
+          </button>
+          <button
+            class="add-button"
+            @click=${this._saveProvider}
+            ?disabled=${this._providerSaving}
+          >
+            ${this._providerSaving?"Saving…":"Save & apply"}
+          </button>
+        </div>
+      </div>
+    `}_renderExcludedDomains(){return F`
+      <label class="trackform__field">
+        <span>Excluded sites</span>
+        <textarea
+          class="provider__textarea"
+          rows="3"
+          placeholder="One site per line, e.g.&#10;amazon.de&#10;alza.cz"
+          .value=${this._pExcludedDomains}
+          @input=${e=>this._pExcludedDomains=e.target.value}
+        ></textarea>
+      </label>
+      <div class="trackform__hint">
+        Retailers listed here are dropped from every alternatives search
+        and from Search &amp; add — useful for foreign sites that claim to
+        ship to Iceland but you don't want to see. One hostname per line
+        (e.g. <code>amazon.de</code>); subdomains are matched too.
+      </div>
+    `}_renderNoneInfo(){return F`
+      <div class="trackform__hint">
+        Free mode uses DuckDuckGo web search with deterministic price
+        extraction — no API key and no per-call cost. AI-powered HTML
+        parsing and richer alternative ranking are disabled.
+      </div>
+    `}_renderAnthropicFields(){return F`
+      <label class="trackform__field">
+        <span>Model</span>
+        <select
+          @change=${e=>this._pModel=e.target.value}
+        >
+          ${this._providerModels.map(e=>F`
+              <option value=${e} ?selected=${this._pModel===e}>${e}</option>
+            `)}
+        </select>
+      </label>
+      <label class="trackform__field">
+        <span>
+          API key
+          ${this._providerHasKey?F`<em>(leave blank to keep current)</em>`:null}
+        </span>
+        <input
+          type="password"
+          autocomplete="off"
+          .value=${this._pApiKey}
+          @input=${e=>this._pApiKey=e.target.value}
+          placeholder=${this._providerHasKey?"•••••• stored — type to replace":"sk-ant-…"}
+        />
+      </label>
+    `}_renderOpenAIFields(){return F`
+      <label class="trackform__field">
+        <span>Base URL</span>
+        <input
+          type="url"
+          .value=${this._pBaseUrl}
+          @input=${e=>this._pBaseUrl=e.target.value}
+          placeholder="http://192.168.0.92:11434/v1"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>Model</span>
+        <input
+          type="text"
+          .value=${this._pModel}
+          @input=${e=>this._pModel=e.target.value}
+          placeholder="qwen2.5:7b"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>API key <em>(optional for local endpoints)</em></span>
+        <input
+          type="password"
+          autocomplete="off"
+          .value=${this._pApiKey}
+          @input=${e=>this._pApiKey=e.target.value}
+          placeholder=${this._providerHasKey?"•••••• stored — type to replace":"optional"}
+        />
+      </label>
+
+      <button
+        type="button"
+        class="provider__advtoggle"
+        @click=${()=>this._providerAdvancedOpen=!this._providerAdvancedOpen}
+      >
+        ${this._providerAdvancedOpen?"▾":"▸"} Advanced (cost &amp; format)
+      </button>
+      ${this._providerAdvancedOpen?this._renderOpenAIAdvanced():null}
+    `}_renderOpenAIAdvanced(){return F`
+      <label class="trackform__field">
+        <span>Input cost / Mtok (USD)</span>
+        <input
+          type="number"
+          step="any"
+          .value=${this._pInputCost}
+          @input=${e=>this._pInputCost=e.target.value}
+          placeholder="0"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>Output cost / Mtok (USD)</span>
+        <input
+          type="number"
+          step="any"
+          .value=${this._pOutputCost}
+          @input=${e=>this._pOutputCost=e.target.value}
+          placeholder="0"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>Max HTML chars</span>
+        <input
+          type="number"
+          .value=${this._pMaxHtml}
+          @input=${e=>this._pMaxHtml=e.target.value}
+          placeholder="100000"
+        />
+      </label>
+      <label class="ship-toggle provider__check">
+        <input
+          type="checkbox"
+          .checked=${this._pForceJson}
+          @change=${e=>this._pForceJson=e.target.checked}
+        />
+        <span>Force JSON response mode</span>
+      </label>
+      <label class="trackform__field">
+        <span>Extra headers <em>(JSON object)</em></span>
+        <textarea
+          class="provider__textarea"
+          rows="3"
+          .value=${this._pExtraHeaders}
+          @input=${e=>this._pExtraHeaders=e.target.value}
+          placeholder='{"Authorization": "Bearer …"}'
+        ></textarea>
+      </label>
+    `}_renderSummary(){const e=this._products,t=e.length,r=e.filter(e=>!0===e.inStock).length,i=e.filter(e=>null!==e.targetPrice&&null!==e.price&&e.price<=e.targetPrice).length,s=e.filter(e=>e.discontinued).length,o=(e,t,r)=>F`
+      <div class="stat ${r}">
+        <span class="stat__value">${t}</span>
+        <span class="stat__label">${e}</span>
+      </div>
+    `;return F`
+      <div class="summary">
+        ${o("Tracked",t,"stat--total")}
+        ${o("In stock",r,"stat--stock")}
+        ${o("Below target",i,"stat--target")}
+        ${o("Discontinued",s,"stat--disc")}
+      </div>
+    `}_renderToolbar(){return F`
+      <div class="toolbar">
+        <div class="toolbar__search">
+          <input
+            type="search"
+            placeholder="Search products or retailers…"
+            .value=${this._search}
+            @input=${this._handleSearch}
+            aria-label="Search products"
+          />
+        </div>
+        <div class="toolbar__controls">
+          <label class="sort-label">
+            <span>Sort</span>
+            <select @change=${this._handleSort} aria-label="Sort products">
+              ${Ae.map(e=>F`
+                  <option value=${e} ?selected=${this._sort===e}>
+                    ${Pe[e]}
+                  </option>
+                `)}
+            </select>
+          </label>
           <label
             class="ship-toggle"
             title="Hide alternatives that don't ship to your region"
@@ -749,11 +1330,19 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
             />
             <span>Ships to me only</span>
           </label>
-          <button class="add-button" @click=${this._handleAddProduct}>
-            + Add product
-          </button>
+          <label
+            class="ship-toggle"
+            title="Hide products marked discontinued"
+          >
+            <input
+              type="checkbox"
+              .checked=${this._hideDiscontinued}
+              @change=${this._handleToggleHideDiscontinued}
+            />
+            <span>Hide discontinued</span>
+          </label>
         </div>
-      </header>
+      </div>
     `}_renderEmptyState(){return F`
       <div class="empty">
         <div class="empty__icon">🏷️</div>
@@ -772,25 +1361,204 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
       <div class="loading">
         <p>Loading tracked products…</p>
       </div>
-    `}_renderGrid(){return F`
+    `}_renderGrid(){const e=this._visibleProducts();return 0===e.length?F`
+        <div class="empty">
+          <div class="empty__icon">🔍</div>
+          <h2>No matches</h2>
+          <p>No tracked products match your search or filters.</p>
+        </div>
+      `:F`
       <div class="grid">
-        ${this._products.map(t=>F`
+        ${e.map(e=>F`
             <price-watch-card
-              .product=${t}
+              .product=${e}
               .onOpen=${this._handleOpen}
               .onRefreshAlternatives=${this._handleRefreshAlternatives}
-              .refreshingAlternatives=${this._refreshingEntries.has(t.entryId)}
+              .refreshingAlternatives=${this._refreshingEntries.has(e.entryId)}
+              .onRefreshNow=${this._handleRefreshNow}
+              .refreshingNow=${this._refreshingNow.has(e.entryId)}
+              .onSetTarget=${this._handleSetTarget}
+              .onSetPaused=${this._handleSetPaused}
               .hideNonShipping=${this._hideNonShipping}
               .onRemoveListing=${this._handleRemoveListing}
+              .onAddListing=${this._handleAddListing}
+              .onEditListing=${this._handleEditListing}
             ></price-watch-card>
           `)}
       </div>
-    `}render(){return F`
+    `}render(){const e=this._connected&&this._registry,t=this._products.length>0;return F`
       <div class="panel">
         ${this._renderHeader()}
-        ${this._registryError?this._renderError():this._connected&&this._registry?0===this._products.length?this._renderEmptyState():this._renderGrid():this._renderLoading()}
+        ${this._registryError?this._renderError():e?t?F`
+              ${this._renderSummary()} ${this._renderToolbar()}
+              ${this._renderGrid()}
+            `:this._renderEmptyState():this._renderLoading()}
       </div>
-    `}};PriceWatchPanel.HIDE_NONSHIP_KEY="price-watch:hide-non-shipping",PriceWatchPanel.styles=o`
+      ${this._renderSearchModal()}
+      ${this._renderProviderModal()}
+      ${this._renderSelectorModal()}
+    `}_renderSelectorModal(){if(!this._selectorOpen||!this._selListing)return null;const e=this._selListing,t=this._selProduct,r=e.url??"",i=this._selTestResult;return F`
+      <div
+        class="modal-backdrop"
+        @click=${this._onSelectorBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Advanced price selector"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>Custom price selector</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeSelectorEditor}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="trackform">
+            <p class="sel__intro">
+              For ${e.retailer||"this listing"}${t?F` on <strong>${t.title}</strong>`:null}. Use this when the automatic price reader can't
+              find the price. Open the page in your browser, press
+              <kbd>F12</kbd>, right-click the price →
+              <em>Copy → Copy selector</em>, and paste it below — or use
+              the point-and-click picker further down.
+            </p>
+            ${r?F`<div class="sel__url" title=${r}>${r}</div>`:F`<div class="modal__status modal__status--error">
+                  ⚠ This listing has no URL, so Test won't work.
+                </div>`}
+
+            <label class="trackform__field">
+              <span>Price selector <em>(CSS)</em></span>
+              <input
+                type="text"
+                .value=${this._selPriceSelector}
+                @input=${this._onSelPriceInput}
+                placeholder=".product-price .amount  (or  span#price@content)"
+                spellcheck="false"
+                autocapitalize="off"
+              />
+            </label>
+            <label class="trackform__field">
+              <span>Title selector <em>(optional — defaults to h1)</em></span>
+              <input
+                type="text"
+                .value=${this._selTitleSelector}
+                @input=${this._onSelTitleInput}
+                placeholder="h1"
+                spellcheck="false"
+                autocapitalize="off"
+              />
+            </label>
+
+            <div class="sel__test-row">
+              <button
+                class="sel__test-btn"
+                @click=${this._runSelectorTest}
+                ?disabled=${this._selTesting||!r}
+              >
+                ${this._selTesting?"Testing…":"Test on live page"}
+              </button>
+              <span class="sel__hint"
+                >Append <code>@attr</code> to read an attribute, e.g.
+                <code>meta[itemprop=price]@content</code>.</span
+              >
+            </div>
+
+            ${this._selTestError?F`<div class="modal__status modal__status--error">
+                  ⚠ ${this._selTestError}
+                </div>`:null}
+            ${i?this._renderSelectorTestResult(i):null}
+
+            ${this._renderBookmarklet()}
+
+            ${this._selSaveError?F`<div class="modal__status modal__status--error">
+                  ⚠ ${this._selSaveError}
+                </div>`:null}
+            ${this._selSaved?F`<div class="modal__status modal__status--ok">
+                  ✓ Saved — the listing will use it on the next check.
+                </div>`:null}
+
+            <div class="trackform__actions sel__actions">
+              <button
+                class="trackform__cancel"
+                @click=${this._clearSelector}
+                ?disabled=${this._selSaving}
+                title="Revert to automatic extraction"
+              >
+                Clear custom parser
+              </button>
+              <button
+                class="add-button"
+                @click=${this._saveSelector}
+                ?disabled=${this._selSaving||!this._selPriceSelector.trim()}
+              >
+                ${this._selSaving?"Saving…":"Save selector"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `}_renderSelectorTestResult(e){const t=e.price,r=e.title;return F`
+      <div class="sel__result">
+        <div class="sel__result-head">
+          Tested${e.page_title?F` — <span class="sel__page-title">${e.page_title}</span>`:null}
+        </div>
+        <div class="sel__result-row">
+          <span class="sel__result-label">Price</span>
+          ${t.found?F`<span class="sel__result-ok">
+                  ${null!==t.value&&void 0!==t.value?F`<strong>${t.value}</strong>`:F`<em>matched, but not a number</em>`}
+                </span>
+                <code class="sel__raw">${t.raw}</code>`:F`<span class="sel__result-bad"
+                >No match${t.error?F` — ${t.error}`:null}</span
+              >`}
+        </div>
+        ${r?F`<div class="sel__result-row">
+              <span class="sel__result-label">Title</span>
+              ${r.found?F`<code class="sel__raw">${r.raw}</code>`:F`<span class="sel__result-bad">No match</span>`}
+            </div>`:null}
+        ${!t.found||null!==t.value&&void 0!==t.value?null:F`<p class="sel__warn">
+              The element matched but no number could be parsed from it. Try a
+              more specific selector, or append <code>@content</code> /
+              <code>@data-price</code> to read a price attribute.
+            </p>`}
+      </div>
+    `}_renderBookmarklet(){const e=this._bookmarkletHref();return F`
+      <details
+        class="sel__bm"
+        ?open=${this._selBookmarkletOpen}
+        @toggle=${e=>this._selBookmarkletOpen=e.target.open}
+      >
+        <summary>Point-and-click picker (bookmarklet)</summary>
+        <div class="sel__bm-body">
+          <p>
+            Drag this button to your bookmarks bar. Then, on the retailer's
+            product page, click the bookmark and click the price — its CSS
+            selector is copied to your clipboard. Paste it above.
+            <kbd>Esc</kbd> cancels.
+          </p>
+          <p>
+            <a class="sel__bm-link" href=${e} @click=${e=>e.preventDefault()}
+              >📍 Pick price selector</a
+            >
+          </p>
+          <p class="sel__hint">
+            Can't drag it? Copy the code and make a bookmark whose URL is this:
+          </p>
+          <div class="sel__bm-copy">
+            <button class="sel__test-btn" @click=${this._copyBookmarklet}>
+              Copy bookmarklet code
+            </button>
+          </div>
+          <textarea
+            class="sel__bm-code"
+            readonly
+            rows="3"
+            @click=${e=>e.target.select()}
+          >${e}</textarea>
+        </div>
+      </details>
+    `}};PriceWatchPanel.HIDE_NONSHIP_KEY="price-watch:hide-non-shipping",PriceWatchPanel.SORT_KEY="price-watch:sort",PriceWatchPanel.HIDE_DISCONTINUED_KEY="price-watch:hide-discontinued",PriceWatchPanel.styles=n`
     :host {
       display: block;
       width: 100%;
@@ -862,6 +1630,522 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
     .add-button:hover {
       filter: brightness(1.1);
     }
+    .add-button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      filter: none;
+    }
+    .add-button--secondary {
+      background: transparent;
+      color: var(--primary-color, #03a9f4);
+      border: 1px solid var(--primary-color, #03a9f4);
+    }
+
+    /* --- Search & add modal --- */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 48px 16px;
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    .modal {
+      width: 100%;
+      max-width: 560px;
+      background: var(--card-background-color, #fff);
+      border-radius: 16px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 96px);
+      overflow: hidden;
+    }
+    .modal__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--divider-color, #e0e0e0);
+    }
+    .modal__head h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 500;
+    }
+    .modal__close {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: var(--secondary-text-color, #757575);
+      padding: 4px 8px;
+      border-radius: 8px;
+      line-height: 1;
+    }
+    .modal__close:hover {
+      background: var(--divider-color, #e0e0e0);
+    }
+    .modal__searchbar {
+      display: flex;
+      gap: 8px;
+      padding: 16px 20px;
+    }
+    .modal__searchinput {
+      flex: 1;
+      box-sizing: border-box;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      color: var(--primary-text-color, #212121);
+      background: var(--primary-background-color, #fafafa);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      outline: none;
+    }
+    .modal__searchinput:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .modal__status {
+      padding: 8px 20px 20px;
+      color: var(--secondary-text-color, #757575);
+      font-size: 0.9rem;
+    }
+    .modal__status--error {
+      color: var(--error-color, #f44336);
+    }
+    .modal__status--ok {
+      color: var(--success-color, #4caf50);
+    }
+    .modal__engine {
+      padding: 0 20px 8px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .results {
+      list-style: none;
+      margin: 0;
+      padding: 0 12px 16px;
+      overflow-y: auto;
+    }
+    .results__row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 8px;
+      border-radius: 12px;
+    }
+    .results__row:hover {
+      background: var(--primary-background-color, #f5f5f5);
+    }
+    .results__thumb {
+      flex: 0 0 48px;
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--primary-background-color, #f0f0f0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .results__thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .results__thumb-ph {
+      font-size: 22px;
+      opacity: 0.5;
+    }
+    .results__info {
+      flex: 1;
+      min-width: 0;
+    }
+    .results__title {
+      font-size: 0.9rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .results__meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .results__price {
+      font-weight: 600;
+      color: var(--primary-text-color, #212121);
+    }
+    .results__ship {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 999px;
+    }
+    .results__ship--yes {
+      background: rgba(76, 175, 80, 0.16);
+      color: var(--success-color, #4caf50);
+    }
+    .results__ship--no {
+      background: rgba(158, 158, 158, 0.18);
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .results__notes {
+      font-size: 0.76rem;
+      color: var(--secondary-text-color, #9e9e9e);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .results__add {
+      flex: 0 0 auto;
+      padding: 6px 14px;
+      background: var(--primary-color, #03a9f4);
+      color: var(--text-primary-color, #fff);
+      border: none;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .results__add:hover {
+      filter: brightness(1.1);
+    }
+
+    /* --- Track-this confirm form --- */
+    .trackform {
+      padding: 16px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .trackform__hint {
+      font-size: 0.85rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .trackform__field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .trackform__field em {
+      font-style: normal;
+      opacity: 0.7;
+    }
+    .trackform__field input,
+    .trackform__field select,
+    .trackform__field textarea {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: var(--primary-text-color, #212121);
+      background: var(--primary-background-color, #fafafa);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 10px;
+      outline: none;
+    }
+    .trackform__field input:focus,
+    .trackform__field select:focus,
+    .trackform__field textarea:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .provider__textarea {
+      resize: vertical;
+      min-height: 56px;
+    }
+    .provider__advtoggle {
+      align-self: flex-start;
+      background: none;
+      border: none;
+      padding: 2px 0;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--primary-color, #03a9f4);
+      cursor: pointer;
+    }
+    .provider__check {
+      align-self: flex-start;
+    }
+    .trackform__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .trackform__cancel {
+      padding: 8px 16px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .trackform__cancel:hover {
+      background: var(--primary-background-color, #f5f5f5);
+    }
+
+    /* --- Advanced price-selector editor --- */
+    .sel__intro {
+      margin: 0 0 4px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      color: var(--secondary-text-color, #757575);
+    }
+    .sel__intro kbd,
+    .sel__bm-body kbd {
+      font-family: monospace;
+      font-size: 0.78rem;
+      padding: 1px 5px;
+      border: 1px solid var(--divider-color, #d0d0d0);
+      border-radius: 4px;
+      background: var(--primary-background-color, #f5f5f5);
+    }
+    .sel__url {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #757575);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding: 4px 8px;
+      background: var(--primary-background-color, #f5f5f5);
+      border-radius: 6px;
+    }
+    .sel__test-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .sel__test-btn {
+      padding: 7px 14px;
+      background: var(--primary-color, #1976d2);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .sel__test-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .sel__hint {
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .sel__hint code,
+    .sel__result code,
+    .sel__warn code {
+      font-family: monospace;
+      font-size: 0.78rem;
+      background: var(--primary-background-color, #f0f0f0);
+      padding: 0 3px;
+      border-radius: 3px;
+    }
+    .sel__result {
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sel__result-head {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .sel__page-title {
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .sel__result-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+    }
+    .sel__result-label {
+      flex: 0 0 44px;
+      color: var(--secondary-text-color, #757575);
+    }
+    .sel__result-ok strong {
+      font-size: 1.05rem;
+      color: var(--success-color, #2e7d32);
+    }
+    .sel__result-bad {
+      color: var(--error-color, #c62828);
+    }
+    .sel__raw {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--primary-text-color, #212121);
+      word-break: break-all;
+    }
+    .sel__warn {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--secondary-text-color, #757575);
+      line-height: 1.4;
+    }
+    .sel__bm {
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 8px;
+      padding: 0 12px;
+    }
+    .sel__bm summary {
+      cursor: pointer;
+      padding: 10px 0;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .sel__bm-body {
+      padding-bottom: 12px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: var(--secondary-text-color, #757575);
+    }
+    .sel__bm-body p {
+      margin: 0 0 8px;
+    }
+    .sel__bm-link {
+      display: inline-block;
+      padding: 6px 12px;
+      background: var(--primary-background-color, #f0f0f0);
+      border: 1px dashed var(--primary-color, #1976d2);
+      border-radius: 8px;
+      color: var(--primary-color, #1976d2);
+      text-decoration: none;
+      font-weight: 600;
+      cursor: grab;
+    }
+    .sel__bm-code {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: monospace;
+      font-size: 0.7rem;
+      resize: vertical;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 6px;
+      padding: 6px;
+    }
+    .sel__actions {
+      justify-content: space-between;
+    }
+
+    /* --- Summary stat bar --- */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 12px 16px;
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 12px;
+      border-left-width: 4px;
+    }
+    .stat__value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .stat__label {
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #757575);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stat--total {
+      border-left-color: var(--primary-color, #03a9f4);
+    }
+    .stat--stock {
+      border-left-color: var(--success-color, #4caf50);
+    }
+    .stat--target {
+      border-left-color: var(--warning-color, #ff9800);
+    }
+    .stat--disc {
+      border-left-color: var(--secondary-text-color, #9e9e9e);
+    }
+
+    /* --- Toolbar --- */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .toolbar__search {
+      flex: 1 1 240px;
+      min-width: 180px;
+    }
+    .toolbar__search input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      outline: none;
+    }
+    .toolbar__search input:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .toolbar__controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .sort-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #757575);
+      white-space: nowrap;
+    }
+    .sort-label select {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+    }
+    .sort-label select:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
 
     .grid {
       display: grid;
@@ -897,4 +2181,4 @@ function t(t,e,i,r){var s,n=arguments.length,o=n<3?e:null===r?r=Object.getOwnPro
     .loading p {
       margin: 0;
     }
-  `,t([ut()],PriceWatchPanel.prototype,"_products",void 0),t([ut()],PriceWatchPanel.prototype,"_registry",void 0),t([ut()],PriceWatchPanel.prototype,"_registryError",void 0),t([ut()],PriceWatchPanel.prototype,"_connected",void 0),t([ut()],PriceWatchPanel.prototype,"_refreshingEntries",void 0),t([ut()],PriceWatchPanel.prototype,"_hideNonShipping",void 0),PriceWatchPanel=St=t([ct("price-watch-panel")],PriceWatchPanel);export{PriceWatchPanel};
+  `,e([ue()],PriceWatchPanel.prototype,"_products",void 0),e([ue()],PriceWatchPanel.prototype,"_registry",void 0),e([ue()],PriceWatchPanel.prototype,"_registryError",void 0),e([ue()],PriceWatchPanel.prototype,"_connected",void 0),e([ue()],PriceWatchPanel.prototype,"_refreshingEntries",void 0),e([ue()],PriceWatchPanel.prototype,"_hideNonShipping",void 0),e([ue()],PriceWatchPanel.prototype,"_search",void 0),e([ue()],PriceWatchPanel.prototype,"_sort",void 0),e([ue()],PriceWatchPanel.prototype,"_hideDiscontinued",void 0),e([ue()],PriceWatchPanel.prototype,"_refreshingNow",void 0),e([ue()],PriceWatchPanel.prototype,"_searchOpen",void 0),e([ue()],PriceWatchPanel.prototype,"_searchQuery",void 0),e([ue()],PriceWatchPanel.prototype,"_searchLoading",void 0),e([ue()],PriceWatchPanel.prototype,"_searchResults",void 0),e([ue()],PriceWatchPanel.prototype,"_searchEngine",void 0),e([ue()],PriceWatchPanel.prototype,"_searchRan",void 0),e([ue()],PriceWatchPanel.prototype,"_searchError",void 0),e([ue()],PriceWatchPanel.prototype,"_trackTarget",void 0),e([ue()],PriceWatchPanel.prototype,"_trackName",void 0),e([ue()],PriceWatchPanel.prototype,"_trackUrl",void 0),e([ue()],PriceWatchPanel.prototype,"_trackTargetPrice",void 0),e([ue()],PriceWatchPanel.prototype,"_tracking",void 0),e([ue()],PriceWatchPanel.prototype,"_trackError",void 0),e([ue()],PriceWatchPanel.prototype,"_providerOpen",void 0),e([ue()],PriceWatchPanel.prototype,"_providerLoading",void 0),e([ue()],PriceWatchPanel.prototype,"_providerSaving",void 0),e([ue()],PriceWatchPanel.prototype,"_providerError",void 0),e([ue()],PriceWatchPanel.prototype,"_providerSuccess",void 0),e([ue()],PriceWatchPanel.prototype,"_providerAdvancedOpen",void 0),e([ue()],PriceWatchPanel.prototype,"_pProvider",void 0),e([ue()],PriceWatchPanel.prototype,"_pApiKey",void 0),e([ue()],PriceWatchPanel.prototype,"_pModel",void 0),e([ue()],PriceWatchPanel.prototype,"_pBaseUrl",void 0),e([ue()],PriceWatchPanel.prototype,"_pInputCost",void 0),e([ue()],PriceWatchPanel.prototype,"_pOutputCost",void 0),e([ue()],PriceWatchPanel.prototype,"_pMaxHtml",void 0),e([ue()],PriceWatchPanel.prototype,"_pForceJson",void 0),e([ue()],PriceWatchPanel.prototype,"_pExtraHeaders",void 0),e([ue()],PriceWatchPanel.prototype,"_pExcludedDomains",void 0),e([ue()],PriceWatchPanel.prototype,"_providerHasKey",void 0),e([ue()],PriceWatchPanel.prototype,"_providerModels",void 0),e([ue()],PriceWatchPanel.prototype,"_selectorOpen",void 0),e([ue()],PriceWatchPanel.prototype,"_selPriceSelector",void 0),e([ue()],PriceWatchPanel.prototype,"_selTitleSelector",void 0),e([ue()],PriceWatchPanel.prototype,"_selTesting",void 0),e([ue()],PriceWatchPanel.prototype,"_selTestResult",void 0),e([ue()],PriceWatchPanel.prototype,"_selTestError",void 0),e([ue()],PriceWatchPanel.prototype,"_selSaving",void 0),e([ue()],PriceWatchPanel.prototype,"_selSaveError",void 0),e([ue()],PriceWatchPanel.prototype,"_selSaved",void 0),e([ue()],PriceWatchPanel.prototype,"_selBookmarkletOpen",void 0),PriceWatchPanel=Ee=e([ce("price-watch-panel")],PriceWatchPanel);export{PriceWatchPanel};

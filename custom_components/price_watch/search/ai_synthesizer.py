@@ -37,6 +37,7 @@ from ..ai.base import AIProvider, AIProviderError
 from .base import (
     ALTERNATIVES_SYSTEM_PROMPT,
     ALTERNATIVES_TOOL_SCHEMA,
+    DISCOVERY_SYSTEM_PROMPT,
     Alternative,
     SearchProviderError,
     SearchQuery,
@@ -117,14 +118,17 @@ def _build_user_prompt(query: SearchQuery, hits_json: str) -> str:
     and the JSON list of search hits. Closes with an explicit
     instruction to call report_alternatives.
     """
-    bits = [f"Original product: {query.title}"]
-    if query.current_price is not None and query.currency:
-        bits.append(
-            f"Currently tracked at: {query.current_price} {query.currency} "
-            f"({query.retailer or 'unknown retailer'})"
-        )
-    elif query.current_price is not None:
-        bits.append(f"Currently tracked at: {query.current_price}")
+    if query.discovery:
+        bits = [f"Search query: {query.title}"]
+    else:
+        bits = [f"Original product: {query.title}"]
+        if query.current_price is not None and query.currency:
+            bits.append(
+                f"Currently tracked at: {query.current_price} {query.currency} "
+                f"({query.retailer or 'unknown retailer'})"
+            )
+        elif query.current_price is not None:
+            bits.append(f"Currently tracked at: {query.current_price}")
 
     if query.region and query.region != "worldwide":
         bits.append(f"Regional preference: {query.region}")
@@ -132,7 +136,7 @@ def _build_user_prompt(query: SearchQuery, hits_json: str) -> str:
     if query.user_region:
         bits.append(
             f"User's country code (ISO 3166-1 alpha-2): {query.user_region}. "
-            "For each alternative, set ships_to_user_region based on whether "
+            "For each result, set ships_to_user_region based on whether "
             "the retailer ships physical goods to this country. Use null when "
             "genuinely uncertain - do not guess."
         )
@@ -141,15 +145,25 @@ def _build_user_prompt(query: SearchQuery, hits_json: str) -> str:
     bits.append("Web search returned these candidates (JSON):")
     bits.append(hits_json)
     bits.append("")
-    bits.append(
-        f"From the candidates above, pick up to {query.max_results} that "
-        "are clearly the SAME product (same SKU / model number / "
-        "configuration). Reject random similar-but-different items. "
-        "Use ONLY the URLs from the candidates list — do not invent "
-        "URLs. Extract price from the snippet when possible; leave "
-        "price null when you can't determine it. Call "
-        "report_alternatives with your selections."
-    )
+    if query.discovery:
+        bits.append(
+            f"From the candidates above, pick up to {query.max_results} real, "
+            "currently-purchasable product listings that best match the search "
+            "query. Prefer direct product pages over search/category pages. "
+            "Use ONLY the URLs from the candidates list — do not invent URLs. "
+            "Extract price from the snippet when possible; leave price null when "
+            "you can't determine it. Call report_alternatives with your selections."
+        )
+    else:
+        bits.append(
+            f"From the candidates above, pick up to {query.max_results} that "
+            "are clearly the SAME product (same SKU / model number / "
+            "configuration). Reject random similar-but-different items. "
+            "Use ONLY the URLs from the candidates list — do not invent "
+            "URLs. Extract price from the snippet when possible; leave "
+            "price null when you can't determine it. Call "
+            "report_alternatives with your selections."
+        )
     return "\n".join(bits)
 
 
@@ -202,8 +216,11 @@ class AISynthesizerSearchProvider:
         hits_json = _build_hits_payload(hits)
         user_prompt = _build_user_prompt(query, hits_json)
 
+        system_prompt = (
+            DISCOVERY_SYSTEM_PROMPT if query.discovery else ALTERNATIVES_SYSTEM_PROMPT
+        )
         try:
-            result_data = await self._call_ai(user_prompt)
+            result_data = await self._call_ai(user_prompt, system_prompt)
         except AIProviderError as err:
             raise SearchProviderError(f"AI synthesis failed: {err}") from err
 
@@ -325,13 +342,16 @@ class AISynthesizerSearchProvider:
             )
         )
 
-    async def _call_ai(self, user_prompt: str) -> dict[str, Any]:
+    async def _call_ai(
+        self, user_prompt: str, system_prompt: str = ALTERNATIVES_SYSTEM_PROMPT
+    ) -> dict[str, Any]:
         """Invoke the AI provider with the alternatives tool schema.
 
         Each AIProvider implementation exposes a generic interface
         for one-shot tool calls. We call the same low-level method
         used by the extraction path but with our alternatives schema
-        and system prompt.
+        and system prompt. `system_prompt` differs between the strict
+        same-SKU alternatives task and the open discovery search.
 
         Returns the raw input dict that the AI passed to
         report_alternatives.
@@ -344,7 +364,7 @@ class AISynthesizerSearchProvider:
         # we can wire it up.
         if hasattr(self._ai, "call_with_tool"):
             return await self._ai.call_with_tool(  # type: ignore[attr-defined]
-                system_prompt=ALTERNATIVES_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 tool_schema=ALTERNATIVES_TOOL_SCHEMA,
             )

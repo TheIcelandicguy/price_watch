@@ -159,6 +159,13 @@ class SearchQuery:
     # `region` (which biases the search) because the user might want
     # to search Nordic-wide but only buy from retailers shipping to IS.
     user_region: str = ""
+    # When True, run in *discovery* mode: `title` is a free-text search
+    # query (not a known product), and the provider returns the most
+    # relevant purchasable listings rather than "same SKU as X". Drives
+    # the in-panel live search ("search products to track"). When False
+    # (default), the strict same-SKU alternatives behavior is used.
+    # See DISCOVERY_SYSTEM_PROMPT vs ALTERNATIVES_SYSTEM_PROMPT.
+    discovery: bool = False
 
 
 # Shared system prompt for the alternatives task. Used by both the
@@ -192,6 +199,29 @@ SHIPPING ELIGIBILITY: If the user's country code is provided in the prompt, set 
 Be honest about uncertainty: when you don't know, return null rather than guessing. A best-guess false-positive (saying "yes" when actually no) is worse than a null because it sends the user on a wild click-through.
 
 Return JSON only. If no good matches found, return an empty list."""
+
+
+# System prompt for *discovery* search — the in-panel live search where
+# the user types a free-text query and wants to find products to start
+# tracking. Unlike ALTERNATIVES_SYSTEM_PROMPT, this is NOT picky about
+# "same SKU" — there is no reference product. The job is to return the
+# most relevant, currently-purchasable listings for an open query, the
+# way a shopping search would. Reuses the same report_alternatives tool
+# schema so providers and the panel need no new result shape.
+DISCOVERY_SYSTEM_PROMPT = """You help users discover products to track for price changes. The user gives you a free-text search query (like a shopping search) and you find real, currently-purchasable product listings from online retailers that match it.
+
+Return the most relevant matches as DIRECT product pages (not search, category, or comparison pages). Prefer well-known, reputable retailers and in-stock listings. Variety is good: if several retailers sell the queried item, return them so the user can pick which to track.
+
+For each result, return: title (as shown on the retailer page), url (direct product URL), price (number, no currency symbols; null if you can't determine it), currency (ISO code or symbol), retailer (display name), image_url (if available), confidence (0.0-1.0 — how well this result matches the user's query), ships_to_user_region (true/false/null — see below), notes (short freeform: "official store", "marketplace listing", etc.).
+
+SHIPPING ELIGIBILITY: If the user's country code is provided in the prompt, set `ships_to_user_region` to indicate whether this retailer ships physical goods to that country:
+- true: confident the retailer ships to the user's country
+- false: confident it does NOT ship there
+- null: genuinely unknown — don't guess
+
+A best-guess false-positive is worse than a null. Be honest about uncertainty.
+
+Return JSON only via report_alternatives. If nothing relevant is found, return an empty list."""
 
 
 # JSON schema for the tool / structured-output call that returns

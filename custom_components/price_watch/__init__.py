@@ -22,6 +22,7 @@ from .const import CONF_TARGET_PRICE, DOMAIN, STORAGE_VERSION
 from .coordinator import PriceWatchCoordinator
 from .extractor import shutdown_persistent_session
 from .panel import async_register_panel
+from .websocket import async_register_websocket_api
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -147,6 +148,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.services.has_service(DOMAIN, "refresh_now"):
         await _register_services(hass)
 
+    # Register the panel's WebSocket commands (live product search).
+    # Idempotent — HA's command registry replaces a same-typed handler,
+    # so calling this on every product entry is harmless.
+    async_register_websocket_api(hass)
+
     # Register the sidebar panel. Idempotent — second and later calls
     # return early. Doing this here (rather than in async_setup) means
     # the panel only appears once a product entry exists. If the bundle
@@ -250,6 +256,18 @@ async def _register_services(hass: HomeAssistant) -> None:
         """Wipe price history."""
         for coord in _coordinators_for(call):
             await coord.async_reset_history()
+
+    async def set_paused(call: ServiceCall) -> None:
+        """Pause or resume polling for one or all products.
+
+        Thin wrapper over the coordinator's async_set_paused, which
+        persists the flag on entry.options and stops/restarts the
+        polling interval immediately. Lets the panel offer a per-card
+        pause toggle without opening the options dialog.
+        """
+        paused = bool(call.data.get("paused", True))
+        for coord in _coordinators_for(call):
+            await coord.async_set_paused(paused)
 
     async def find_alternatives(call: ServiceCall) -> None:
         """Run an alternatives search for one or all products.
@@ -492,6 +510,113 @@ async def _register_services(hass: HomeAssistant) -> None:
         )
         await hass.config_entries.async_reload(entry.entry_id)
 
+    async def edit_listing(call: ServiceCall) -> None:
+        """Update an existing listing's parser / metadata in place.
+
+        Args:
+            entry_id: the product entry
+            listing_id: the listing to edit
+            custom_parser: JSON string (or dict) with the parser config.
+                An explicit empty string / null CLEARS the parser (reverts
+                the listing to the default JSON-LD + AI pipeline).
+            currency: ISO currency override (optional)
+            retailer: display name override (optional)
+            request_cookies: list of cookie dicts (optional)
+
+        Only the fields present in the call are touched; everything else on
+        the listing is preserved. Reloads the entry so the coordinator
+        re-reads the parser and the next poll uses it. Unlike remove_listing
+        this is allowed on the PRIMARY listing — a custom price selector is
+        exactly as useful there.
+        """
+        entry = _resolve_entry(call)
+        listing_id = (call.data.get("listing_id") or "").strip()
+        if not listing_id:
+            raise HomeAssistantError("listing_id is required")
+
+        existing = list(entry.options.get("listings") or [])
+        target = None
+        for listing in existing:
+            if isinstance(listing, dict) and listing.get("id") == listing_id:
+                target = listing
+                break
+        if target is None:
+            raise HomeAssistantError(
+                f"Listing {listing_id!r} not found on entry {entry.entry_id}"
+            )
+
+        # custom_parser: present-and-empty clears it; present-and-set parses
+        # it; absent leaves it untouched.
+        if "custom_parser" in call.data:
+            raw = call.data.get("custom_parser")
+            if not raw:
+                target["custom_parser"] = None
+            elif isinstance(raw, dict):
+                target["custom_parser"] = raw
+            else:
+                try:
+                    import json as _json
+                    target["custom_parser"] = _json.loads(raw)
+                except Exception as err:  # noqa: BLE001
+                    raise HomeAssistantError(
+                        f"custom_parser is not valid JSON: {err}"
+                    ) from err
+
+        if "currency" in call.data:
+            target["currency"] = call.data.get("currency") or ""
+        if "retailer" in call.data and call.data.get("retailer"):
+            target["retailer"] = call.data["retailer"]
+        if "request_cookies" in call.data:
+            cookies = call.data.get("request_cookies") or []
+            if cookies and not isinstance(cookies, list):
+                raise HomeAssistantError("request_cookies must be a list")
+            target["request_cookies"] = cookies
+
+        new_options = dict(entry.options)
+        new_options["listings"] = existing
+        hass.config_entries.async_update_entry(entry, options=new_options)
+
+        _LOGGER.info(
+            "edit_listing: updated listing %s on entry %s; reloading",
+            listing_id, entry.entry_id,
+        )
+        await hass.config_entries.async_reload(entry.entry_id)
+
+    async def track_product(call: ServiceCall) -> None:
+        """Create a tracked product from an in-panel search pick.
+
+        Drives the config flow's `panel_track` source step, which creates
+        the product entry in one shot (no extraction preview). Used by the
+        panel's live-search "Track" dialog. The new entry's entities then
+        surface in the panel via its entity_registry_updated subscription,
+        so this is effectively fire-and-forget from the caller's side —
+        but we raise on a flow abort so the panel can show a clear message
+        (e.g. the product is already tracked).
+        """
+        url = (call.data.get("url") or "").strip()
+        if not url:
+            raise HomeAssistantError("url is required")
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": "panel_track"},
+            data={
+                "url": url,
+                "name": (call.data.get("name") or "").strip(),
+                "target_price": call.data.get("target_price"),
+            },
+        )
+
+        if result.get("type") == "abort":
+            reason = result.get("reason", "unknown")
+            if reason == "already_configured":
+                raise HomeAssistantError(
+                    "This product is already being tracked."
+                )
+            raise HomeAssistantError(f"Could not add product: {reason}")
+
+        _LOGGER.info("track_product: created entry for %s", url)
+
     target_schema = vol.Schema(
         {
             vol.Optional("entry_id"): str,
@@ -509,6 +634,14 @@ async def _register_services(hass: HomeAssistant) -> None:
         ),
     )
     hass.services.async_register(DOMAIN, "reset_history", reset_history, schema=target_schema)
+    hass.services.async_register(
+        DOMAIN,
+        "set_paused",
+        set_paused,
+        schema=target_schema.extend(
+            {vol.Optional("paused", default=True): vol.Coerce(bool)}
+        ),
+    )
     hass.services.async_register(
         DOMAIN,
         "find_alternatives",
@@ -544,6 +677,33 @@ async def _register_services(hass: HomeAssistant) -> None:
             {
                 vol.Required("entry_id"): str,
                 vol.Required("listing_id"): str,
+            }
+        ),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "edit_listing",
+        edit_listing,
+        schema=vol.Schema(
+            {
+                vol.Required("entry_id"): str,
+                vol.Required("listing_id"): str,
+                vol.Optional("custom_parser"): vol.Any(None, str, dict),
+                vol.Optional("currency"): str,
+                vol.Optional("retailer"): str,
+                vol.Optional("request_cookies"): list,
+            }
+        ),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "track_product",
+        track_product,
+        schema=vol.Schema(
+            {
+                vol.Required("url"): str,
+                vol.Optional("name"): str,
+                vol.Optional("target_price"): vol.Any(None, vol.Coerce(float)),
             }
         ),
     )

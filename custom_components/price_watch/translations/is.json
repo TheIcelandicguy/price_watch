@@ -2,20 +2,48 @@
   "config": {
     "step": {
       "settings": {
-        "title": "Price Watch — fyrsta uppsetning",
-        "description": "Price Watch getur lesið vöruupplýsingar á tvo vegu:\n\n1. **Ókeypis, án API** — virkar á hvaða síðu sem er með Schema.org Product merkingu (flestar stærri verslanir), eða í gegnum eigin þáttara sem þú skilgreinir.\n\n2. **AI lestur** — virkar á hvaða síðu sem er. Veldu þjónustu:\n\n• **Anthropic (Claude)** — settu inn `sk-ant-…` lykil. Dæmigerður kostnaður: $0.50–$2 á mánuði fyrir ~10 vörur. Sjá {docs_url}.\n• **OpenAI-samhæft** — bendir á hvaða þjónustu sem talar OpenAI chat-completions API: OpenAI sjálft, Ollama (ókeypis, staðbundið), Groq, OpenRouter, LM Studio o.fl. Fylltu `base_url` (t.d. `https://api.openai.com/v1` eða `http://localhost:11434/v1`) og `model`. Skildu API lykil eftir auðan fyrir staðbundna þjóna.\n\nSkildu báða API lykla eftir auða til að byrja í ókeypis ham.\n\nStilltu heimagjaldmiðil (3-stafa kóði eins og ISK, EUR, USD). Stuðningur við: AUD BGN BRL CAD CHF CNY CZK DKK EUR GBP HKD HUF IDR ILS INR ISK JPY KRW MXN MYR NOK NZD PHP PLN RON SEK SGD THB TRY USD ZAR.",
+        "title": "Price Watch — veldu hvernig verð eru lesin",
+        "description": "Price Watch les vöruupplýsingar af vefsíðum. Veldu hvernig:\n\n• **Ókeypis** — engin AI, enginn lykill. Virkar á hvaða síðu sem er með Schema.org Product merkingu (flestar stærri verslanir) eða eigin þáttara sem þú skilgreinir.\n\n• **Anthropic (Claude)** — settu inn `sk-ant-…` lykil. AI lestur á hvaða síðu sem er. Dæmigerður kostnaður: $0.50–$2 á mánuði fyrir ~10 vörur.\n\n• **OpenAI-samhæft** — OpenAI, Ollama (ókeypis/staðbundið), Groq, OpenRouter, LM Studio o.fl. AI lestur í gegnum hvaða chat-completions endapunkt sem er.\n\nÞú getur breytt þessu hvenær sem er í valkostum samþættingarinnar.",
         "data": {
-          "ai_provider": "AI þjónusta",
-          "api_key": "API lykill (Anthropic: sk-ant-… / OpenAI: sk-… / staðbundið: skildu autt)",
-          "model_anthropic": "Anthropic líkan (skiptir aðeins máli ef Anthropic er valið)",
-          "base_url": "OpenAI-samhæft base URL (t.d. https://api.openai.com/v1 eða http://localhost:11434/v1)",
-          "model_openai": "OpenAI-samhæft líkan (t.d. gpt-4o-mini, llama3.3, qwen-coder)",
+          "ai_provider": "Hvernig á að lesa verð?"
+        }
+      },
+      "settings_free": {
+        "title": "Ókeypis hamur — engin AI",
+        "description": "Enginn API lykill þarf. Verð eru lesin úr Schema.org Product merkingu eða eigin þáttara.\n\nStilltu heimagjaldmiðil (3-stafa kóði eins og ISK, EUR, USD) til að virkja verð-í-heimagjaldmiðli skynjarann. Stuðningur: AUD BGN BRL CAD CHF CNY CZK DKK EUR GBP HKD HUF IDR ILS INR ISK JPY KRW MXN MYR NOK NZD PHP PLN RON SEK SGD THB TRY USD ZAR.",
+        "data": {
+          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði, valfrjálst)",
+          "user_region": "Landskóði þinn (2-stafa, t.d. IS, US — fyrir 'sendir til mín')",
+          "daily_budget_usd": "Dagleg þak (USD — ónotað í ókeypis ham)",
+          "monthly_budget_usd": "Mánaðarlegt þak (USD — ónotað í ókeypis ham)"
+        }
+      },
+      "settings_anthropic": {
+        "title": "Anthropic (Claude)",
+        "description": "Settu inn `sk-ant-…` lykilinn þinn. Skildu hann eftir auðan til að byrja í ókeypis ham (þú getur bætt honum við síðar). Verðlagning: {docs_url}.",
+        "data": {
+          "api_key": "Anthropic API lykill (sk-ant-… — skildu autt fyrir ókeypis ham)",
+          "model_anthropic": "Anthropic líkan",
+          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði, valfrjálst)",
+          "user_region": "Landskóði þinn (2-stafa, t.d. IS, US — fyrir 'sendir til mín')",
+          "daily_budget_usd": "Dagleg þak (USD)",
+          "monthly_budget_usd": "Mánaðarlegt þak (USD)"
+        }
+      },
+      "settings_openai": {
+        "title": "OpenAI-samhæfð þjónusta",
+        "description": "Bendir á hvaða þjónustu sem talar OpenAI chat-completions API: OpenAI, Ollama (ókeypis/staðbundið), Groq, OpenRouter, LM Studio, Together, Fireworks o.fl.\n\nFylltu base URL (t.d. `https://api.openai.com/v1` eða `http://localhost:11434/v1`) og líkan. Skildu API lykil eftir auðan fyrir staðbundna þjóna.",
+        "data": {
+          "base_url": "Base URL (t.d. https://api.openai.com/v1 eða http://localhost:11434/v1)",
+          "model_openai": "Líkansheiti (t.d. gpt-4o-mini, llama3.3, qwen-coder)",
+          "api_key": "API lykill (sk-… — skildu autt fyrir staðbundna þjóna)",
           "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
           "output_cost_per_mtok": "Úttakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
           "max_html_chars": "Hámark HTML stafa sent á líkanið (minna fyrir lítil staðbundin líkön)",
           "force_json_mode": "Þvinga JSON ham í stað tool calls (eldri Ollama, sum staðbundin líkön)",
           "extra_headers": "Aukahöfuð (valfrjáls JSON hlutur, t.d. fyrir OpenRouter)",
           "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði, valfrjálst)",
+          "user_region": "Landskóði þinn (2-stafa, t.d. IS, US — fyrir 'sendir til mín')",
           "daily_budget_usd": "Dagleg þak (USD)",
           "monthly_budget_usd": "Mánaðarlegt þak (USD)"
         }
@@ -59,6 +87,7 @@
       "invalid_key_format": "API lyklar byrja á 'sk-ant-'.",
       "invalid_key": "API lykill er ógildur.",
       "validation_error": "Gat ekki staðfest API lykil. Athugaðu netnotkun.",
+      "invalid_region_code": "Landskóði verður að vera 2 stafir (t.d. IS, US, GB).",
       "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur (t.d. https://api.openai.com/v1).",
       "model_required": "Líkansheiti er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
       "openai_compat_unreachable": "Gat ekki náð í OpenAI-samhæfða þjónustu. Athugaðu URL, net, og að þjónninn sé í gangi. Ef þjónninn styður ekki tool calls, prófaðu 'Force JSON mode'.",
@@ -70,7 +99,8 @@
       "name_required": "Vöruheiti er nauðsynlegt."
     },
     "abort": {
-      "already_configured": "Þessi vefslóð er þegar í eftirliti."
+      "already_configured": "Þessi vefslóð er þegar í eftirliti.",
+      "no_url": "Engin vefslóð var gefin til að fylgjast með."
     }
   },
   "options": {
@@ -86,17 +116,45 @@
           "save_exit": "Vista og loka"
         },
         "data": {
-          "ai_provider": "AI þjónusta",
-          "api_key": "API lykill (Anthropic: sk-ant-… / OpenAI: sk-… / staðbundið: skildu autt)",
+          "ai_provider": "Hvernig á að lesa verð?"
+        }
+      },
+      "settings_opt_free": {
+        "title": "Ókeypis hamur — engin AI",
+        "description": "Enginn API lykill þarf. Verð eru lesin úr Schema.org Product merkingu eða eigin þáttara.\n\nStilltu heimagjaldmiðil (3-stafa kóði eins og ISK, EUR, USD) til að virkja verð-í-heimagjaldmiðli skynjarann.",
+        "data": {
+          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði, valfrjálst)",
+          "user_region": "Landskóði þinn (2-stafa, t.d. IS, US — fyrir 'sendir til mín')",
+          "daily_budget_usd": "Dagleg þak (USD — ónotað í ókeypis ham)",
+          "monthly_budget_usd": "Mánaðarlegt þak (USD — ónotað í ókeypis ham)"
+        }
+      },
+      "settings_opt_anthropic": {
+        "title": "Anthropic (Claude)",
+        "description": "Settu inn `sk-ant-…` lykilinn þinn. Skildu hann eftir auðan fyrir ókeypis ham. Verðlagning: {docs_url}.",
+        "data": {
+          "api_key": "Anthropic API lykill (sk-ant-… — skildu autt fyrir ókeypis ham)",
           "model_anthropic": "Anthropic líkan",
-          "base_url": "OpenAI-samhæft base URL",
-          "model_openai": "OpenAI-samhæft líkan",
-          "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD)",
-          "output_cost_per_mtok": "Úttakskostnaður á milljón tókena (USD)",
-          "max_html_chars": "Hámark HTML stafa send á líkan",
-          "force_json_mode": "Þvinga JSON ham",
-          "extra_headers": "Aukahöfuð (JSON hlutur, valfrjálst)",
-          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði)",
+          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði, valfrjálst)",
+          "user_region": "Landskóði þinn (2-stafa, t.d. IS, US — fyrir 'sendir til mín')",
+          "daily_budget_usd": "Dagleg þak (USD)",
+          "monthly_budget_usd": "Mánaðarlegt þak (USD)"
+        }
+      },
+      "settings_opt_openai": {
+        "title": "OpenAI-samhæfð þjónusta",
+        "description": "Bendir á hvaða þjónustu sem talar OpenAI chat-completions API: OpenAI, Ollama (ókeypis/staðbundið), Groq, OpenRouter, LM Studio o.fl. Skildu API lykil eftir auðan fyrir staðbundna þjóna.",
+        "data": {
+          "base_url": "Base URL (t.d. https://api.openai.com/v1 eða http://localhost:11434/v1)",
+          "model_openai": "Líkansheiti (t.d. gpt-4o-mini, llama3.3, qwen-coder)",
+          "api_key": "API lykill (sk-… — skildu autt fyrir staðbundna þjóna)",
+          "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
+          "output_cost_per_mtok": "Úttakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
+          "max_html_chars": "Hámark HTML stafa sent á líkanið (minna fyrir lítil staðbundin líkön)",
+          "force_json_mode": "Þvinga JSON ham í stað tool calls (eldri Ollama, sum staðbundin líkön)",
+          "extra_headers": "Aukahöfuð (valfrjáls JSON hlutur)",
+          "home_currency": "Heimagjaldmiðill (3-stafa ISO kóði, valfrjálst)",
+          "user_region": "Landskóði þinn (2-stafa, t.d. IS, US — fyrir 'sendir til mín')",
           "daily_budget_usd": "Dagleg þak (USD)",
           "monthly_budget_usd": "Mánaðarlegt þak (USD)"
         }
@@ -152,6 +210,7 @@
       "invalid_key_format": "API lyklar byrja á 'sk-ant-'.",
       "invalid_key": "API lykill er ógildur.",
       "validation_error": "Gat ekki staðfest API lykil. Athugaðu netnotkun.",
+      "invalid_region_code": "Landskóði verður að vera 2 stafir (t.d. IS, US, GB).",
       "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur (t.d. https://api.openai.com/v1).",
       "model_required": "Líkansheiti er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
       "openai_compat_unreachable": "Gat ekki náð í OpenAI-samhæfða þjónustu. Athugaðu URL, net, og að þjónninn sé í gangi. Ef þjónninn styður ekki tool calls, prófaðu 'Force JSON mode'.",
@@ -211,6 +270,24 @@
     "reset_history": {
       "name": "Núllstilla sögu",
       "description": "Eyða verðsögu fyrir vöru."
+    },
+    "set_paused": {
+      "name": "Pása / halda áfram",
+      "description": "Gera hlé á eða halda áfram verðathugunum fyrir vöktaða vöru.",
+      "fields": {
+        "entry_id": {
+          "name": "Vöru-ID",
+          "description": "Aðeins þessi vara (valfrjálst)."
+        },
+        "device_id": {
+          "name": "Tæki",
+          "description": "Aðeins þessi vara, eftir HA tæki."
+        },
+        "paused": {
+          "name": "Í pásu",
+          "description": "True til að gera hlé, false til að halda áfram."
+        }
+      }
     },
     "find_alternatives": {
       "name": "Finna samkeppnislistun",

@@ -38,6 +38,12 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .ai import (
     AIAuthenticationError,
@@ -47,6 +53,7 @@ from .ai import (
     get_provider,
 )
 from .const import (
+    ANTHROPIC_MODELS,
     CONF_AI_PROVIDER,
     CONF_API_KEY,
     CONF_BASE_URL,
@@ -97,6 +104,58 @@ CONF_MODEL_OPENAI = "model_openai"
 # real provider types in the ai/ package.
 PROVIDER_INHERIT = "_inherit"
 
+# Form-local sentinel for the provider-picker step's "Free / no AI"
+# choice. Selecting it stores CONF_AI_PROVIDER=anthropic with a null
+# api_key, which the provider resolver treats as "JSON-LD / custom
+# parser only" (no AI). Kept distinct from the real provider types so
+# the picker can offer Free as a first-class, clearly-labelled option.
+PROVIDER_NONE = "none"
+
+
+def _provider_choice_selector(
+    *, include_inherit: bool = False, default_label_free: str = "Free"
+) -> SelectSelector:
+    """Radio-style selector for the provider-picker step.
+
+    Renders as a vertical list of radio buttons (mode=list) rather than
+    a cramped dropdown — far friendlier for a 3-way choice. Labels are
+    inline so they don't need separate translation keys.
+
+    include_inherit adds the per-product "Inherit from settings" option
+    used by the options override flow; the install/settings flows omit
+    it (there's nothing to inherit from yet).
+    """
+    options: list[SelectOptionDict] = []
+    if include_inherit:
+        options.append(
+            SelectOptionDict(
+                value=PROVIDER_INHERIT,
+                label="Inherit from shared settings (recommended)",
+            )
+        )
+    options.extend(
+        [
+            SelectOptionDict(
+                value=PROVIDER_NONE,
+                label=f"{default_label_free} — no AI, free (Schema.org / custom parser)",
+            ),
+            SelectOptionDict(
+                value=PROVIDER_ANTHROPIC,
+                label="Anthropic (Claude) — paste an sk-ant-… key",
+            ),
+            SelectOptionDict(
+                value=PROVIDER_OPENAI_COMPATIBLE,
+                label="OpenAI-compatible — OpenAI / Ollama / Groq / OpenRouter / LM Studio",
+            ),
+        ]
+    )
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=options,
+            mode=SelectSelectorMode.LIST,
+        )
+    )
+
 # Form field name used on every per-product sub-step to provide a
 # "back without saving" path. HA's options flow framework doesn't
 # render an explicit back button on form steps — only menu steps —
@@ -107,12 +166,8 @@ PROVIDER_INHERIT = "_inherit"
 # sub-steps' pending edits are preserved.
 BACK_TO_MENU = "back_to_menu"
 
-# Anthropic model choices, used in both flows.
-ANTHROPIC_MODELS = (
-    "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-6",
-    "claude-opus-4-7",
-)
+# Anthropic model choices live in const.ANTHROPIC_MODELS (shared with the
+# panel's provider editor). Imported above.
 
 
 def _read_setting(entry: ConfigEntry, key: str, default: Any = None) -> Any:
@@ -196,6 +251,242 @@ def _parser_with_cookies(custom_parser_raw: Any, cookies: str) -> str:
     if not parsed:
         return ""  # No parser config at all
     return json.dumps(parsed)
+
+
+# ---- Shared settings-form helpers (used by both install + options flows) ----
+#
+# The settings form was historically one flat 13-field page that crammed
+# Anthropic and OpenAI-compatible fields together unconditionally — ugly
+# and confusing. It's now a provider PICKER step (radio list) that routes
+# to a short, provider-specific detail step. These module-level helpers
+# hold the schema-building and validation logic so the install ConfigFlow
+# and the post-install OptionsFlow stay in lockstep without duplicating it.
+
+# OpenAI-compat fields zeroed when switching to Anthropic/Free, so a
+# provider change doesn't leave stale endpoint config confusing the
+# coordinator.
+_OPENAI_CLEARED: dict[str, Any] = {
+    CONF_BASE_URL: None,
+    CONF_INPUT_COST_PER_MTOK: 0.0,
+    CONF_OUTPUT_COST_PER_MTOK: 0.0,
+    CONF_MAX_HTML_CHARS: 100_000,
+    CONF_FORCE_JSON_MODE: False,
+    CONF_EXTRA_HEADERS: None,
+}
+
+
+def _common_fields(ui: dict[str, Any]) -> dict[Any, Any]:
+    """Currency / region / budget fields shared by every provider detail step."""
+    return {
+        vol.Optional(
+            CONF_HOME_CURRENCY, default=ui.get(CONF_HOME_CURRENCY, "") or ""
+        ): str,
+        vol.Optional(
+            CONF_USER_REGION, default=ui.get(CONF_USER_REGION, "") or ""
+        ): str,
+        vol.Optional(
+            CONF_DAILY_BUDGET_USD,
+            default=ui.get(CONF_DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET),
+        ): vol.Coerce(float),
+        vol.Optional(
+            CONF_MONTHLY_BUDGET_USD,
+            default=ui.get(CONF_MONTHLY_BUDGET_USD, DEFAULT_MONTHLY_BUDGET),
+        ): vol.Coerce(float),
+    }
+
+
+def _free_schema(ui: dict[str, Any]) -> vol.Schema:
+    """Free / no-AI detail step: just the common fields."""
+    return vol.Schema(_common_fields(ui))
+
+
+def _anthropic_schema(ui: dict[str, Any]) -> vol.Schema:
+    """Anthropic detail step: API key + model + common fields."""
+    return vol.Schema(
+        {
+            vol.Optional(
+                CONF_API_KEY, default=ui.get(CONF_API_KEY, "") or ""
+            ): str,
+            vol.Optional(
+                CONF_MODEL_ANTHROPIC,
+                default=ui.get(CONF_MODEL_ANTHROPIC, DEFAULT_MODEL),
+            ): vol.In(list(ANTHROPIC_MODELS)),
+            **_common_fields(ui),
+        }
+    )
+
+
+def _openai_schema(ui: dict[str, Any]) -> vol.Schema:
+    """OpenAI-compatible detail step: endpoint + model + costs + common."""
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_BASE_URL, default=ui.get(CONF_BASE_URL, "") or ""
+            ): str,
+            vol.Required(
+                CONF_MODEL_OPENAI, default=ui.get(CONF_MODEL_OPENAI, "") or ""
+            ): str,
+            vol.Optional(
+                CONF_API_KEY, default=ui.get(CONF_API_KEY, "") or ""
+            ): str,
+            vol.Optional(
+                CONF_INPUT_COST_PER_MTOK,
+                default=ui.get(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0,
+            ): vol.Coerce(float),
+            vol.Optional(
+                CONF_OUTPUT_COST_PER_MTOK,
+                default=ui.get(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0,
+            ): vol.Coerce(float),
+            vol.Optional(
+                CONF_MAX_HTML_CHARS,
+                default=ui.get(CONF_MAX_HTML_CHARS, 100_000) or 100_000,
+            ): vol.Coerce(int),
+            vol.Optional(
+                CONF_FORCE_JSON_MODE,
+                default=bool(ui.get(CONF_FORCE_JSON_MODE, False)),
+            ): bool,
+            vol.Optional(
+                CONF_EXTRA_HEADERS, default=ui.get(CONF_EXTRA_HEADERS, "") or ""
+            ): str,
+            **_common_fields(ui),
+        }
+    )
+
+
+def _parse_common(ui: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    """Validate + normalize the common fields. Returns (values, errors)."""
+    errors: dict[str, str] = {}
+    region_raw = (ui.get(CONF_USER_REGION) or "").strip().upper()
+    if region_raw and not (len(region_raw) == 2 and region_raw.isalpha()):
+        errors[CONF_USER_REGION] = "invalid_region_code"
+        region_raw = ""
+    values = {
+        CONF_HOME_CURRENCY: (ui.get(CONF_HOME_CURRENCY) or "").upper() or None,
+        CONF_USER_REGION: region_raw or None,
+        CONF_DAILY_BUDGET_USD: ui.get(CONF_DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET),
+        CONF_MONTHLY_BUDGET_USD: ui.get(
+            CONF_MONTHLY_BUDGET_USD, DEFAULT_MONTHLY_BUDGET
+        ),
+    }
+    return values, errors
+
+
+def _free_config() -> dict[str, Any]:
+    """Provider config for the Free / no-AI choice.
+
+    Stored as provider=anthropic + null key, which the provider resolver
+    treats as "Schema.org / custom parser only" (no AI calls). OpenAI
+    endpoint fields are cleared so a later switch doesn't see stale config.
+    """
+    return {
+        CONF_AI_PROVIDER: PROVIDER_ANTHROPIC,
+        CONF_API_KEY: None,
+        CONF_MODEL: DEFAULT_MODEL,
+        **_OPENAI_CLEARED,
+    }
+
+
+async def _validate_anthropic(
+    ui: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Validate the Anthropic detail form. Returns (provider_config, errors).
+
+    An empty key is allowed — it's equivalent to the Free choice (no AI),
+    just reached via the Anthropic page. Endpoint fields are cleared.
+    """
+    errors: dict[str, str] = {}
+    api_key = (ui.get(CONF_API_KEY) or "").strip() or None
+    model = ui.get(CONF_MODEL_ANTHROPIC, DEFAULT_MODEL)
+    config = {
+        CONF_AI_PROVIDER: PROVIDER_ANTHROPIC,
+        CONF_API_KEY: api_key,
+        CONF_MODEL: model,
+        **_OPENAI_CLEARED,
+    }
+    if api_key:
+        if not api_key.startswith("sk-ant-"):
+            errors[CONF_API_KEY] = "invalid_key_format"
+        else:
+            try:
+                provider = get_provider(
+                    PROVIDER_ANTHROPIC, api_key=api_key, model=model
+                )
+                await provider.validate_credentials()
+            except AIAuthenticationError:
+                errors[CONF_API_KEY] = "invalid_key"
+            except AIProviderError:
+                _LOGGER.exception("Failed to validate API key")
+                errors[CONF_API_KEY] = "validation_error"
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Unexpected error validating API key")
+                errors[CONF_API_KEY] = "validation_error"
+    return config, errors
+
+
+async def _validate_openai(
+    ui: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Validate the OpenAI-compatible detail form. Returns (config, errors)."""
+    errors: dict[str, str] = {}
+    api_key = (ui.get(CONF_API_KEY) or "").strip() or None
+    base_url = (ui.get(CONF_BASE_URL) or "").strip()
+    model = (ui.get(CONF_MODEL_OPENAI) or "").strip()
+    if not base_url:
+        errors[CONF_BASE_URL] = "base_url_required"
+    if not model:
+        errors[CONF_MODEL_OPENAI] = "model_required"
+
+    extra_headers_raw = (ui.get(CONF_EXTRA_HEADERS) or "").strip()
+    extra_headers: dict[str, str] | None = None
+    if extra_headers_raw:
+        try:
+            parsed = json.loads(extra_headers_raw)
+            if not isinstance(parsed, dict):
+                errors[CONF_EXTRA_HEADERS] = "extra_headers_not_object"
+            else:
+                extra_headers = {str(k): str(v) for k, v in parsed.items()}
+        except json.JSONDecodeError:
+            errors[CONF_EXTRA_HEADERS] = "extra_headers_invalid_json"
+
+    config = {
+        CONF_AI_PROVIDER: PROVIDER_OPENAI_COMPATIBLE,
+        CONF_API_KEY: api_key,
+        CONF_MODEL: model,
+        CONF_BASE_URL: base_url or None,
+        CONF_INPUT_COST_PER_MTOK: float(
+            ui.get(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0
+        ),
+        CONF_OUTPUT_COST_PER_MTOK: float(
+            ui.get(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0
+        ),
+        CONF_MAX_HTML_CHARS: int(ui.get(CONF_MAX_HTML_CHARS, 100_000) or 100_000),
+        CONF_FORCE_JSON_MODE: bool(ui.get(CONF_FORCE_JSON_MODE, False)),
+        CONF_EXTRA_HEADERS: extra_headers,
+    }
+
+    if not errors:
+        try:
+            provider = get_provider(
+                PROVIDER_OPENAI_COMPATIBLE,
+                api_key=api_key,
+                model=model,
+                base_url=base_url,
+                input_cost_per_mtok=config[CONF_INPUT_COST_PER_MTOK],
+                output_cost_per_mtok=config[CONF_OUTPUT_COST_PER_MTOK],
+                max_html_chars=config[CONF_MAX_HTML_CHARS],
+                force_json_mode=config[CONF_FORCE_JSON_MODE],
+                extra_headers=extra_headers,
+            )
+            await provider.validate_credentials()
+        except AIAuthenticationError:
+            errors[CONF_API_KEY] = "invalid_key"
+        except AIProviderError as err:
+            _LOGGER.warning("OpenAI-compat validation failed: %s", err)
+            errors["base"] = "openai_compat_unreachable"
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Unexpected error validating OpenAI-compat endpoint")
+            errors["base"] = "validation_error"
+    return config, errors
 
 
 class PriceWatchConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -299,226 +590,103 @@ class PriceWatchConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """First-run settings: pick AI provider and credentials."""
-        errors: dict[str, str] = {}
+        """First-run settings: pick an AI provider (radio list).
 
+        This is now just a router — it shows a friendly 3-way radio
+        picker (Free / Anthropic / OpenAI-compatible) and forwards to a
+        short, provider-specific detail step. No credential fields live
+        here, so the user isn't faced with a wall of irrelevant inputs.
+        """
         if user_input is not None:
-            provider_type = user_input.get(
-                CONF_AI_PROVIDER, PROVIDER_ANTHROPIC
-            )
-            api_key = (user_input.get(CONF_API_KEY) or "").strip() or None
-
-            common_settings = {
-                "entry_type": ENTRY_TYPE_SETTINGS,
-                CONF_AI_PROVIDER: provider_type,
-                CONF_HOME_CURRENCY: (user_input.get(CONF_HOME_CURRENCY) or "").upper() or None,
-                CONF_USER_REGION: (
-                    (user_input.get(CONF_USER_REGION) or "").strip().upper() or None
-                ),
-                CONF_DAILY_BUDGET_USD: user_input.get(
-                    CONF_DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET
-                ),
-                CONF_MONTHLY_BUDGET_USD: user_input.get(
-                    CONF_MONTHLY_BUDGET_USD, DEFAULT_MONTHLY_BUDGET
-                ),
-            }
-
-            if provider_type == PROVIDER_ANTHROPIC:
-                model = user_input.get(CONF_MODEL_ANTHROPIC, DEFAULT_MODEL)
-                # Empty key = no-AI mode. Skip validation entirely.
-                if not api_key:
-                    return self.async_create_entry(
-                        title="Price Watch (settings)",
-                        data={
-                            **common_settings,
-                            CONF_API_KEY: None,
-                            CONF_MODEL: model,
-                        },
-                    )
-
-                if not api_key.startswith("sk-ant-"):
-                    errors[CONF_API_KEY] = "invalid_key_format"
-                else:
-                    try:
-                        provider = get_provider(
-                            PROVIDER_ANTHROPIC,
-                            api_key=api_key,
-                            model=model,
-                        )
-                        await provider.validate_credentials()
-                    except AIAuthenticationError:
-                        errors[CONF_API_KEY] = "invalid_key"
-                    except AIProviderError:
-                        _LOGGER.exception("Failed to validate API key")
-                        errors[CONF_API_KEY] = "validation_error"
-                    except Exception:  # noqa: BLE001
-                        _LOGGER.exception("Unexpected error validating API key")
-                        errors[CONF_API_KEY] = "validation_error"
-                    else:
-                        return self.async_create_entry(
-                            title="Price Watch (settings)",
-                            data={
-                                **common_settings,
-                                CONF_API_KEY: api_key,
-                                CONF_MODEL: model,
-                            },
-                        )
-
-            elif provider_type == PROVIDER_OPENAI_COMPATIBLE:
-                base_url = (user_input.get(CONF_BASE_URL) or "").strip()
-                model = (user_input.get(CONF_MODEL_OPENAI) or "").strip()
-                if not base_url:
-                    errors[CONF_BASE_URL] = "base_url_required"
-                if not model:
-                    errors[CONF_MODEL_OPENAI] = "model_required"
-
-                # Parse extra_headers JSON if provided
-                extra_headers_raw = (user_input.get(CONF_EXTRA_HEADERS) or "").strip()
-                extra_headers: dict[str, str] | None = None
-                if extra_headers_raw:
-                    try:
-                        parsed = json.loads(extra_headers_raw)
-                        if not isinstance(parsed, dict):
-                            errors[CONF_EXTRA_HEADERS] = "extra_headers_not_object"
-                        else:
-                            extra_headers = {str(k): str(v) for k, v in parsed.items()}
-                    except json.JSONDecodeError:
-                        errors[CONF_EXTRA_HEADERS] = "extra_headers_invalid_json"
-
-                if not errors:
-                    # Try to validate by pinging the endpoint.
-                    try:
-                        provider = get_provider(
-                            PROVIDER_OPENAI_COMPATIBLE,
-                            api_key=api_key,
-                            model=model,
-                            base_url=base_url,
-                            input_cost_per_mtok=float(
-                                user_input.get(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0
-                            ),
-                            output_cost_per_mtok=float(
-                                user_input.get(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0
-                            ),
-                            max_html_chars=int(
-                                user_input.get(CONF_MAX_HTML_CHARS, 100_000) or 100_000
-                            ),
-                            force_json_mode=bool(
-                                user_input.get(CONF_FORCE_JSON_MODE, False)
-                            ),
-                            extra_headers=extra_headers,
-                        )
-                        await provider.validate_credentials()
-                    except AIAuthenticationError:
-                        errors[CONF_API_KEY] = "invalid_key"
-                    except AIProviderError as err:
-                        _LOGGER.warning("OpenAI-compat validation failed: %s", err)
-                        errors["base"] = "openai_compat_unreachable"
-                    except Exception:  # noqa: BLE001
-                        _LOGGER.exception("Unexpected error validating OpenAI-compat endpoint")
-                        errors["base"] = "validation_error"
-                    else:
-                        return self.async_create_entry(
-                            title="Price Watch (settings)",
-                            data={
-                                **common_settings,
-                                CONF_API_KEY: api_key,
-                                CONF_MODEL: model,
-                                CONF_BASE_URL: base_url,
-                                CONF_INPUT_COST_PER_MTOK: float(
-                                    user_input.get(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0
-                                ),
-                                CONF_OUTPUT_COST_PER_MTOK: float(
-                                    user_input.get(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0
-                                ),
-                                CONF_MAX_HTML_CHARS: int(
-                                    user_input.get(CONF_MAX_HTML_CHARS, 100_000) or 100_000
-                                ),
-                                CONF_FORCE_JSON_MODE: bool(
-                                    user_input.get(CONF_FORCE_JSON_MODE, False)
-                                ),
-                                CONF_EXTRA_HEADERS: extra_headers,
-                            },
-                        )
+            choice = user_input[CONF_AI_PROVIDER]
+            if choice == PROVIDER_NONE:
+                return await self.async_step_settings_free()
+            if choice == PROVIDER_OPENAI_COMPATIBLE:
+                return await self.async_step_settings_openai()
+            return await self.async_step_settings_anthropic()
 
         return self.async_show_form(
             step_id="settings",
-            data_schema=self._build_settings_schema(user_input),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_AI_PROVIDER, default=PROVIDER_NONE
+                    ): _provider_choice_selector(),
+                }
+            ),
+        )
+
+    async def async_step_settings_free(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Free / no-AI detail: currency, region, budgets only."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            common, errors = _parse_common(user_input)
+            if not errors:
+                return self.async_create_entry(
+                    title="Price Watch (settings)",
+                    data={
+                        "entry_type": ENTRY_TYPE_SETTINGS,
+                        **_free_config(),
+                        **common,
+                    },
+                )
+        return self.async_show_form(
+            step_id="settings_free",
+            data_schema=_free_schema(user_input or {}),
+            errors=errors,
+        )
+
+    async def async_step_settings_anthropic(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Anthropic detail: API key + model + common fields."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            config, errors = await _validate_anthropic(user_input)
+            common, common_errors = _parse_common(user_input)
+            errors.update(common_errors)
+            if not errors:
+                return self.async_create_entry(
+                    title="Price Watch (settings)",
+                    data={
+                        "entry_type": ENTRY_TYPE_SETTINGS,
+                        **config,
+                        **common,
+                    },
+                )
+        return self.async_show_form(
+            step_id="settings_anthropic",
+            data_schema=_anthropic_schema(user_input or {}),
             errors=errors,
             description_placeholders={
                 "docs_url": "https://docs.claude.com/en/docs/about-claude/pricing",
             },
         )
 
-    @staticmethod
-    def _build_settings_schema(
-        user_input: dict[str, Any] | None,
-    ) -> vol.Schema:
-        """Build the settings step's schema."""
-        ui = user_input or {}
-        return vol.Schema(
-            {
-                vol.Required(
-                    CONF_AI_PROVIDER,
-                    default=ui.get(CONF_AI_PROVIDER, PROVIDER_ANTHROPIC),
-                ): vol.In(
-                    {
-                        PROVIDER_ANTHROPIC: "Anthropic (Claude)",
-                        PROVIDER_OPENAI_COMPATIBLE: "OpenAI-compatible (OpenAI / Ollama / Groq / OpenRouter / LM Studio / ...)",
-                    }
-                ),
-                vol.Optional(
-                    CONF_API_KEY,
-                    default=ui.get(CONF_API_KEY, ""),
-                ): str,
-                vol.Optional(
-                    CONF_MODEL_ANTHROPIC,
-                    default=ui.get(CONF_MODEL_ANTHROPIC, DEFAULT_MODEL),
-                ): vol.In(list(ANTHROPIC_MODELS)),
-                vol.Optional(
-                    CONF_BASE_URL,
-                    default=ui.get(CONF_BASE_URL, ""),
-                ): str,
-                vol.Optional(
-                    CONF_MODEL_OPENAI,
-                    default=ui.get(CONF_MODEL_OPENAI, ""),
-                ): str,
-                vol.Optional(
-                    CONF_INPUT_COST_PER_MTOK,
-                    default=ui.get(CONF_INPUT_COST_PER_MTOK, 0.0),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_OUTPUT_COST_PER_MTOK,
-                    default=ui.get(CONF_OUTPUT_COST_PER_MTOK, 0.0),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_MAX_HTML_CHARS,
-                    default=ui.get(CONF_MAX_HTML_CHARS, 100_000),
-                ): vol.Coerce(int),
-                vol.Optional(
-                    CONF_FORCE_JSON_MODE,
-                    default=ui.get(CONF_FORCE_JSON_MODE, False),
-                ): bool,
-                vol.Optional(
-                    CONF_EXTRA_HEADERS,
-                    default=ui.get(CONF_EXTRA_HEADERS, ""),
-                ): str,
-                vol.Optional(
-                    CONF_HOME_CURRENCY,
-                    default=ui.get(CONF_HOME_CURRENCY, ""),
-                ): str,
-                vol.Optional(
-                    CONF_USER_REGION,
-                    default=ui.get(CONF_USER_REGION, ""),
-                ): str,
-                vol.Optional(
-                    CONF_DAILY_BUDGET_USD,
-                    default=ui.get(CONF_DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_MONTHLY_BUDGET_USD,
-                    default=ui.get(CONF_MONTHLY_BUDGET_USD, DEFAULT_MONTHLY_BUDGET),
-                ): vol.Coerce(float),
-            }
+    async def async_step_settings_openai(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """OpenAI-compatible detail: endpoint + model + costs + common."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            config, errors = await _validate_openai(user_input)
+            common, common_errors = _parse_common(user_input)
+            errors.update(common_errors)
+            if not errors:
+                return self.async_create_entry(
+                    title="Price Watch (settings)",
+                    data={
+                        "entry_type": ENTRY_TYPE_SETTINGS,
+                        **config,
+                        **common,
+                    },
+                )
+        return self.async_show_form(
+            step_id="settings_openai",
+            data_schema=_openai_schema(user_input or {}),
+            errors=errors,
         )
 
     async def async_step_product(
@@ -714,6 +882,87 @@ class PriceWatchConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def async_step_panel_track(
+        self, info: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Create a product entry directly from an in-panel search pick.
+
+        Source-based, single-step flow invoked by the
+        price_watch.track_product service (which the panel calls after
+        the user picks a live-search result and confirms in the dialog).
+
+        Unlike async_step_product, this does NOT fetch/extract a preview:
+        the panel already has the title/url from the search, and forcing
+        a synchronous extraction here would make "Track" slow and able to
+        fail on transient fetch errors. We just persist the entry; the
+        coordinator runs the first live fetch on setup like any product.
+
+        `info` carries: url (required), name (optional, defaults to url),
+        target_price (optional float). Mirrors the entry data/options
+        shape produced by async_step_confirm so the coordinator and
+        options flow treat it identically to a URL-added product.
+        """
+        info = info or {}
+        url = (info.get(CONF_URL) or "").strip()
+        if not url:
+            return self.async_abort(reason="no_url")
+
+        name = (info.get(CONF_NAME) or "").strip()
+        target_raw = info.get(CONF_TARGET_PRICE)
+        try:
+            target = float(target_raw) if target_raw is not None else None
+        except (TypeError, ValueError):
+            target = None
+
+        await self.async_set_unique_id(url)
+        self._abort_if_unique_id_configured()
+
+        # Preset detection for a better parser (mirrors async_step_product).
+        preset = find_preset(url)
+        preset_parser: dict[str, Any] | None = None
+        if preset is not None:
+            normalized = preset_normalize_url(preset, url)
+            if normalized != url:
+                url = normalized
+                await self.async_set_unique_id(url)
+                self._abort_if_unique_id_configured()
+            try:
+                preset_parser = preset.build_parser(url)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Preset %s build_parser raised", preset.NAME)
+                preset_parser = None
+
+        options: dict[str, Any] = {
+            CONF_TARGET_PRICE: target,
+            CONF_SCAN_INTERVAL: int(DEFAULT_SCAN_INTERVAL.total_seconds() / 60),
+        }
+        if preset_parser:
+            options[CONF_CUSTOM_PARSER] = json.dumps(preset_parser)
+
+        entry_data: dict[str, Any] = {
+            "entry_type": ENTRY_TYPE_PRODUCT,
+            CONF_URL: url,
+        }
+        # Snapshot the Anthropic key/model onto the entry like
+        # async_step_confirm does, so the coordinator can run AI
+        # extraction without re-reading the settings entry.
+        settings = self._settings_entry()
+        if settings is not None:
+            provider_type = _read_setting(
+                settings, CONF_AI_PROVIDER, PROVIDER_ANTHROPIC
+            )
+            if provider_type == PROVIDER_ANTHROPIC:
+                entry_data[CONF_API_KEY] = _read_setting(settings, CONF_API_KEY)
+                entry_data[CONF_MODEL] = _read_setting(
+                    settings, CONF_MODEL, DEFAULT_MODEL
+                )
+
+        return self.async_create_entry(
+            title=name or url,
+            data=entry_data,
+            options=options,
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
@@ -755,233 +1004,140 @@ class PriceWatchOptionsFlow(OptionsFlow):
 
     # ---- Settings options (single step) ------------------------------------
 
+    def _settings_seed(self) -> dict[str, Any]:
+        """Seed dict of current settings values, keyed by form-field name.
+
+        Used to prefill the provider detail steps with the live config so
+        editing feels like editing, not re-entering from scratch. Maps the
+        stored CONF_MODEL onto the right form-local model field
+        (CONF_MODEL_ANTHROPIC / CONF_MODEL_OPENAI) based on current provider.
+        """
+        o = self.config_entry.options
+        d = self.config_entry.data
+
+        def cur(key: str, default: Any = None) -> Any:
+            return o.get(key, d.get(key, default))
+
+        provider = cur(CONF_AI_PROVIDER, PROVIDER_ANTHROPIC)
+        extra = cur(CONF_EXTRA_HEADERS)
+        return {
+            CONF_API_KEY: cur(CONF_API_KEY, "") or "",
+            CONF_MODEL_ANTHROPIC: (
+                cur(CONF_MODEL, DEFAULT_MODEL)
+                if provider == PROVIDER_ANTHROPIC
+                else DEFAULT_MODEL
+            ),
+            CONF_MODEL_OPENAI: (
+                cur(CONF_MODEL, "")
+                if provider == PROVIDER_OPENAI_COMPATIBLE
+                else ""
+            )
+            or "",
+            CONF_BASE_URL: cur(CONF_BASE_URL, "") or "",
+            CONF_INPUT_COST_PER_MTOK: cur(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0,
+            CONF_OUTPUT_COST_PER_MTOK: cur(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0,
+            CONF_MAX_HTML_CHARS: cur(CONF_MAX_HTML_CHARS, 100_000) or 100_000,
+            CONF_FORCE_JSON_MODE: bool(cur(CONF_FORCE_JSON_MODE, False)),
+            CONF_EXTRA_HEADERS: (
+                json.dumps(extra) if isinstance(extra, dict) else (extra or "")
+            ),
+            CONF_HOME_CURRENCY: cur(CONF_HOME_CURRENCY, "") or "",
+            CONF_USER_REGION: cur(CONF_USER_REGION, "") or "",
+            CONF_DAILY_BUDGET_USD: cur(CONF_DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET),
+            CONF_MONTHLY_BUDGET_USD: cur(
+                CONF_MONTHLY_BUDGET_USD, DEFAULT_MONTHLY_BUDGET
+            ),
+        }
+
     async def _async_step_settings_options(
         self, user_input: dict[str, Any] | None
     ) -> ConfigFlowResult:
-        """Settings entry options: full provider + currency + budgets form.
+        """Settings entry options: provider PICKER (radio list) router.
 
-        Mirrors the first-install settings step so users can switch from
-        Anthropic to OpenAI-compatible (or vice versa) post-install. The
-        original options flow was Anthropic-only; this rewrite restores
-        symmetry with the install flow.
+        Same shape as the install flow — a clean 3-way picker that routes
+        to a focused detail step — so switching providers post-install is
+        just as friendly as first setup. Defaults the radio to the current
+        provider.
         """
-        errors: dict[str, str] = {}
-
         if user_input is not None:
-            provider_type = user_input.get(CONF_AI_PROVIDER, PROVIDER_ANTHROPIC)
-            api_key = (user_input.get(CONF_API_KEY) or "").strip() or None
+            choice = user_input[CONF_AI_PROVIDER]
+            if choice == PROVIDER_NONE:
+                return await self.async_step_settings_opt_free()
+            if choice == PROVIDER_OPENAI_COMPATIBLE:
+                return await self.async_step_settings_opt_openai()
+            return await self.async_step_settings_opt_anthropic()
 
-            user_region_raw = (user_input.get(CONF_USER_REGION) or "").strip().upper()
-            if user_region_raw and not (len(user_region_raw) == 2 and user_region_raw.isalpha()):
-                errors[CONF_USER_REGION] = "invalid_region_code"
-                user_region_raw = ""
-
-            new_options: dict[str, Any] = {
-                CONF_AI_PROVIDER: provider_type,
-                CONF_HOME_CURRENCY: (
-                    (user_input.get(CONF_HOME_CURRENCY) or "").upper() or None
-                ),
-                CONF_USER_REGION: user_region_raw or None,
-                CONF_DAILY_BUDGET_USD: user_input.get(
-                    CONF_DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET
-                ),
-                CONF_MONTHLY_BUDGET_USD: user_input.get(
-                    CONF_MONTHLY_BUDGET_USD, DEFAULT_MONTHLY_BUDGET
-                ),
-                CONF_API_KEY: api_key,
-            }
-
-            if provider_type == PROVIDER_ANTHROPIC:
-                model = user_input.get(CONF_MODEL_ANTHROPIC, DEFAULT_MODEL)
-                new_options[CONF_MODEL] = model
-
-                if api_key and not api_key.startswith("sk-ant-"):
-                    errors[CONF_API_KEY] = "invalid_key_format"
-                elif api_key:
-                    try:
-                        provider = get_provider(
-                            PROVIDER_ANTHROPIC,
-                            api_key=api_key,
-                            model=model,
-                        )
-                        await provider.validate_credentials()
-                    except AIAuthenticationError:
-                        errors[CONF_API_KEY] = "invalid_key"
-                    except AIProviderError:
-                        _LOGGER.exception("Failed to validate API key")
-                        errors[CONF_API_KEY] = "validation_error"
-                    except Exception:  # noqa: BLE001
-                        _LOGGER.exception("Unexpected error validating API key")
-                        errors[CONF_API_KEY] = "validation_error"
-
-                # OpenAI-compat fields explicitly cleared so a switch
-                # from openai_compatible -> anthropic doesn't leave
-                # stale config lying around to confuse the coordinator.
-                new_options[CONF_BASE_URL] = None
-                new_options[CONF_INPUT_COST_PER_MTOK] = 0.0
-                new_options[CONF_OUTPUT_COST_PER_MTOK] = 0.0
-                new_options[CONF_MAX_HTML_CHARS] = 100_000
-                new_options[CONF_FORCE_JSON_MODE] = False
-                new_options[CONF_EXTRA_HEADERS] = None
-
-            elif provider_type == PROVIDER_OPENAI_COMPATIBLE:
-                base_url = (user_input.get(CONF_BASE_URL) or "").strip()
-                model = (user_input.get(CONF_MODEL_OPENAI) or "").strip()
-                if not base_url:
-                    errors[CONF_BASE_URL] = "base_url_required"
-                if not model:
-                    errors[CONF_MODEL_OPENAI] = "model_required"
-
-                extra_headers_raw = (user_input.get(CONF_EXTRA_HEADERS) or "").strip()
-                extra_headers: dict[str, str] | None = None
-                if extra_headers_raw:
-                    try:
-                        parsed = json.loads(extra_headers_raw)
-                        if not isinstance(parsed, dict):
-                            errors[CONF_EXTRA_HEADERS] = "extra_headers_not_object"
-                        else:
-                            extra_headers = {str(k): str(v) for k, v in parsed.items()}
-                    except json.JSONDecodeError:
-                        errors[CONF_EXTRA_HEADERS] = "extra_headers_invalid_json"
-
-                new_options.update(
-                    {
-                        CONF_MODEL: model,
-                        CONF_BASE_URL: base_url or None,
-                        CONF_INPUT_COST_PER_MTOK: float(
-                            user_input.get(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0
-                        ),
-                        CONF_OUTPUT_COST_PER_MTOK: float(
-                            user_input.get(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0
-                        ),
-                        CONF_MAX_HTML_CHARS: int(
-                            user_input.get(CONF_MAX_HTML_CHARS, 100_000) or 100_000
-                        ),
-                        CONF_FORCE_JSON_MODE: bool(
-                            user_input.get(CONF_FORCE_JSON_MODE, False)
-                        ),
-                        CONF_EXTRA_HEADERS: extra_headers,
-                    }
-                )
-
-                if not errors and base_url and model:
-                    try:
-                        provider = get_provider(
-                            PROVIDER_OPENAI_COMPATIBLE,
-                            api_key=api_key,
-                            model=model,
-                            base_url=base_url,
-                            input_cost_per_mtok=new_options[CONF_INPUT_COST_PER_MTOK],
-                            output_cost_per_mtok=new_options[CONF_OUTPUT_COST_PER_MTOK],
-                            max_html_chars=new_options[CONF_MAX_HTML_CHARS],
-                            force_json_mode=new_options[CONF_FORCE_JSON_MODE],
-                            extra_headers=extra_headers,
-                        )
-                        await provider.validate_credentials()
-                    except AIAuthenticationError:
-                        errors[CONF_API_KEY] = "invalid_key"
-                    except AIProviderError as err:
-                        _LOGGER.warning(
-                            "OpenAI-compat validation failed: %s", err
-                        )
-                        errors["base"] = "openai_compat_unreachable"
-                    except Exception:  # noqa: BLE001
-                        _LOGGER.exception(
-                            "Unexpected error validating OpenAI-compat endpoint"
-                        )
-                        errors["base"] = "validation_error"
-
-            if not errors:
-                return self.async_create_entry(title="", data=new_options)
-
-        # Render form. Defaults pull from live options -> data ->
-        # hardcoded fallback so the form always reflects current state.
-        current_options = self.config_entry.options
-        current_data = self.config_entry.data
-
-        def cur(key: str, default: Any = None) -> Any:
-            if user_input is not None and key in user_input:
-                return user_input[key]
-            return current_options.get(key, current_data.get(key, default))
-
+        current = self.config_entry.options.get(
+            CONF_AI_PROVIDER,
+            self.config_entry.data.get(CONF_AI_PROVIDER, PROVIDER_ANTHROPIC),
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Required(
-                        CONF_AI_PROVIDER,
-                        default=cur(CONF_AI_PROVIDER, PROVIDER_ANTHROPIC),
-                    ): vol.In(
-                        {
-                            PROVIDER_ANTHROPIC: "Anthropic (Claude)",
-                            PROVIDER_OPENAI_COMPATIBLE: "OpenAI-compatible (OpenAI / Ollama / Groq / OpenRouter / LM Studio / ...)",
-                        }
-                    ),
-                    vol.Optional(CONF_API_KEY, default=cur(CONF_API_KEY, "") or ""): str,
-                    vol.Optional(
-                        CONF_MODEL_ANTHROPIC,
-                        default=(
-                            cur(CONF_MODEL, DEFAULT_MODEL)
-                            if cur(CONF_AI_PROVIDER, PROVIDER_ANTHROPIC)
-                            == PROVIDER_ANTHROPIC
-                            else DEFAULT_MODEL
-                        ),
-                    ): vol.In(list(ANTHROPIC_MODELS)),
-                    vol.Optional(CONF_BASE_URL, default=cur(CONF_BASE_URL, "") or ""): str,
-                    vol.Optional(
-                        CONF_MODEL_OPENAI,
-                        default=(
-                            cur(CONF_MODEL, "")
-                            if cur(CONF_AI_PROVIDER) == PROVIDER_OPENAI_COMPATIBLE
-                            else ""
-                        ) or "",
-                    ): str,
-                    vol.Optional(
-                        CONF_INPUT_COST_PER_MTOK,
-                        default=cur(CONF_INPUT_COST_PER_MTOK, 0.0) or 0.0,
-                    ): vol.Coerce(float),
-                    vol.Optional(
-                        CONF_OUTPUT_COST_PER_MTOK,
-                        default=cur(CONF_OUTPUT_COST_PER_MTOK, 0.0) or 0.0,
-                    ): vol.Coerce(float),
-                    vol.Optional(
-                        CONF_MAX_HTML_CHARS,
-                        default=cur(CONF_MAX_HTML_CHARS, 100_000) or 100_000,
-                    ): vol.Coerce(int),
-                    vol.Optional(
-                        CONF_FORCE_JSON_MODE,
-                        default=bool(cur(CONF_FORCE_JSON_MODE, False)),
-                    ): bool,
-                    vol.Optional(
-                        CONF_EXTRA_HEADERS,
-                        default=(
-                            json.dumps(cur(CONF_EXTRA_HEADERS))
-                            if isinstance(cur(CONF_EXTRA_HEADERS), dict)
-                            else (cur(CONF_EXTRA_HEADERS) or "")
-                        ),
-                    ): str,
-                    vol.Optional(
-                        CONF_HOME_CURRENCY,
-                        default=cur(CONF_HOME_CURRENCY, "") or "",
-                    ): str,
-                    vol.Optional(
-                        CONF_USER_REGION,
-                        default=cur(CONF_USER_REGION, "") or "",
-                    ): str,
-                    vol.Optional(
-                        CONF_DAILY_BUDGET_USD,
-                        default=cur(CONF_DAILY_BUDGET_USD, DEFAULT_DAILY_BUDGET),
-                    ): vol.Coerce(float),
-                    vol.Optional(
-                        CONF_MONTHLY_BUDGET_USD,
-                        default=cur(CONF_MONTHLY_BUDGET_USD, DEFAULT_MONTHLY_BUDGET),
-                    ): vol.Coerce(float),
+                        CONF_AI_PROVIDER, default=current
+                    ): _provider_choice_selector(),
                 }
             ),
+        )
+
+    async def async_step_settings_opt_free(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Options: Free / no-AI detail."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            common, errors = _parse_common(user_input)
+            if not errors:
+                return self.async_create_entry(
+                    title="", data={**_free_config(), **common}
+                )
+        return self.async_show_form(
+            step_id="settings_opt_free",
+            data_schema=_free_schema(user_input or self._settings_seed()),
+            errors=errors,
+        )
+
+    async def async_step_settings_opt_anthropic(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Options: Anthropic detail."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            config, errors = await _validate_anthropic(user_input)
+            common, common_errors = _parse_common(user_input)
+            errors.update(common_errors)
+            if not errors:
+                return self.async_create_entry(
+                    title="", data={**config, **common}
+                )
+        return self.async_show_form(
+            step_id="settings_opt_anthropic",
+            data_schema=_anthropic_schema(user_input or self._settings_seed()),
             errors=errors,
             description_placeholders={
                 "docs_url": "https://docs.claude.com/en/docs/about-claude/pricing",
             },
+        )
+
+    async def async_step_settings_opt_openai(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Options: OpenAI-compatible detail."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            config, errors = await _validate_openai(user_input)
+            common, common_errors = _parse_common(user_input)
+            errors.update(common_errors)
+            if not errors:
+                return self.async_create_entry(
+                    title="", data={**config, **common}
+                )
+        return self.async_show_form(
+            step_id="settings_opt_openai",
+            data_schema=_openai_schema(user_input or self._settings_seed()),
+            errors=errors,
         )
 
     # ---- Product options (multi-step menu) ---------------------------------

@@ -311,6 +311,12 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
                 float(state.get("lifetime_cost_usd") or 0.0), 4
             ),
             "listing_id": self._listing_id,
+            # Product-level edit context surfaced for the panel's
+            # inline controls (edit target / pause). Harmless to repeat
+            # on every listing's price sensor since both are
+            # product-scoped; the panel reads them off the primary.
+            "target_price": self.coordinator.target_price,
+            "paused": self.coordinator.paused,
         }
 
         # Per-listing shipping signal, reusing the same heuristic that

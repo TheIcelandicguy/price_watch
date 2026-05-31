@@ -19,17 +19,37 @@
  * presenting it as if it were `hass.states`.
  */
 
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import "./card.js";
 import type {
+  Alternative,
   HomeAssistant,
   HassState,
   Listing,
   TrackedProduct,
 } from "./types.js";
 import { buildProducts, type EntityRegistryIndex } from "./utils.js";
+
+// Sort options offered in the toolbar. Order here is the order shown
+// in the <select>. "name" is the default (stable, predictable).
+const SORT_KEYS = [
+  "name",
+  "drop",
+  "cheapest",
+  "last_checked",
+  "below_target",
+] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+
+const SORT_LABELS: Record<SortKey, string> = {
+  name: "Name (A–Z)",
+  drop: "Biggest drop",
+  cheapest: "Cheapest",
+  last_checked: "Last checked",
+  below_target: "Below target",
+};
 
 // Shape of the entity_registry/list response.
 interface RegistryEntry {
@@ -38,6 +58,152 @@ interface RegistryEntry {
   platform: string;
   config_entry_id: string | null;
 }
+
+// One result row from the price_watch/search WS command. Mirrors the
+// backend Alternative.to_dict() shape (snake_case keys, straight off
+// the wire — we don't camel-case these like buildProducts does).
+interface SearchResult {
+  title: string;
+  url: string;
+  price: number | null;
+  currency: string;
+  retailer: string;
+  image_url: string | null;
+  confidence: number;
+  notes: string;
+  ships_to_user_region: boolean | null;
+}
+
+// Reply envelope from price_watch/search.
+interface SearchResponse {
+  engine: "anthropic_native" | "ai_synthesizer" | "duckduckgo" | "none";
+  results: SearchResult[];
+}
+
+// Human labels for the engine that produced the results, shown as a
+// small caption so the user understands result quality (AI-cleaned vs
+// raw web hits).
+const ENGINE_LABELS: Record<SearchResponse["engine"], string> = {
+  anthropic_native: "AI web search",
+  ai_synthesizer: "AI + web search",
+  duckduckgo: "Web results (no AI)",
+  none: "",
+};
+
+// How many results to ask the backend for.
+const SEARCH_MAX_RESULTS = 8;
+
+// --- AI provider editor ---
+// The three provider modes the panel editor exposes. "none" is the
+// backend's name for Free mode (anthropic provider with a null key).
+type ProviderKind = "none" | "anthropic" | "openai_compatible";
+
+// Reply shape of price_watch/get_provider_settings (and the body of the
+// set reply). Mirrors websocket._current_provider_state(). SECURITY: the
+// backend never sends the raw key — only has_api_key.
+interface ProviderSettings {
+  provider: ProviderKind;
+  model: string;
+  base_url: string;
+  has_api_key: boolean;
+  input_cost_per_mtok: number;
+  output_cost_per_mtok: number;
+  max_html_chars: number;
+  force_json_mode: boolean;
+  extra_headers: string;
+  anthropic_models: string[];
+  // Global blocklist of retailer hostnames dropped from every
+  // alternatives/search result. Returned normalized (bare lowercase
+  // hosts); sent back as a list on save.
+  excluded_domains: string[];
+}
+
+// set_provider_settings adds a count of product entries scheduled for
+// reload on top of the refreshed settings snapshot.
+interface SetProviderResponse extends ProviderSettings {
+  reloaded: number;
+}
+
+// Human labels for the provider <select>.
+const PROVIDER_LABELS: Record<ProviderKind, string> = {
+  none: "Free — web search, no AI",
+  anthropic: "Anthropic (Claude)",
+  openai_compatible: "OpenAI-compatible (Ollama, OpenAI, …)",
+};
+
+// --- Advanced price-selector editor ---
+// Result of one selector run, as reported by price_watch/test_selector.
+interface SelectorRun {
+  selector: string;
+  found: boolean;
+  raw: string | null;
+  value?: number | null; // only on the price run
+  error?: string;
+}
+// Reply shape of price_watch/test_selector.
+interface TestSelectorResponse {
+  fetch_ok: boolean;
+  page_title: string;
+  price: SelectorRun;
+  title?: SelectorRun;
+}
+
+// The element-picker bookmarklet. When dropped on a retailer's product
+// page and clicked, it overlays a picker: hovering highlights elements,
+// clicking one computes a reasonably-robust CSS selector for it and
+// copies that selector to the clipboard (falling back to a prompt() the
+// user can copy from). The user then pastes it into the editor's price
+// selector field. This is the only way to get a click-to-pick UX —
+// retailer pages can't be iframed into our panel (X-Frame-Options/CSP),
+// and same-origin policy blocks reaching into a cross-origin tab, so the
+// picker has to run IN the retailer's own page via a bookmarklet.
+//
+// Kept as readable source here; minified into the javascript: URL at
+// render time by _bookmarkletHref(). Self-contained, no external loads
+// (CSP on many sites blocks remote scripts), cleans up after itself.
+const BOOKMARKLET_SOURCE = `(function(){
+  if(window.__pwPickerActive){return;}
+  window.__pwPickerActive=true;
+  var hl=document.createElement('div');
+  hl.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:rgba(25,118,210,0.25);border:2px solid #1976d2;border-radius:3px;transition:all 40ms ease';
+  var tip=document.createElement('div');
+  tip.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:#1976d2;color:#fff;font:12px/1.4 sans-serif;padding:3px 6px;border-radius:4px;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+  document.body.appendChild(hl);document.body.appendChild(tip);
+  function sel(el){
+    if(!el||el.nodeType!==1)return'';
+    if(el.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(el.id))return'#'+el.id;
+    var parts=[],node=el,depth=0;
+    while(node&&node.nodeType===1&&depth<5){
+      var part=node.tagName.toLowerCase();
+      if(node.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(node.id)){parts.unshift('#'+node.id);break;}
+      var cls=(node.getAttribute('class')||'').trim().split(/\\s+/).filter(function(c){return c&&!/^(is-|has-|js-)/.test(c)&&c.length<30;}).slice(0,2);
+      if(cls.length)part+='.'+cls.join('.');
+      var p=node.parentElement;
+      if(p){var sib=Array.prototype.filter.call(p.children,function(c){return c.tagName===node.tagName;});if(sib.length>1){part+=':nth-of-type('+(sib.indexOf(node)+1)+')';}}
+      parts.unshift(part);node=p;depth++;
+    }
+    return parts.join(' > ');
+  }
+  function move(e){
+    var el=e.target;if(!el||el===hl||el===tip)return;
+    var r=el.getBoundingClientRect();
+    hl.style.left=r.left+'px';hl.style.top=r.top+'px';hl.style.width=r.width+'px';hl.style.height=r.height+'px';
+    var s=sel(el);tip.textContent=s;
+    tip.style.left=r.left+'px';tip.style.top=(r.top>24?r.top-24:r.bottom+4)+'px';
+  }
+  function done(){window.removeEventListener('mousemove',move,true);window.removeEventListener('click',click,true);window.removeEventListener('keydown',key,true);hl.remove();tip.remove();window.__pwPickerActive=false;}
+  function click(e){
+    e.preventDefault();e.stopPropagation();
+    var s=sel(e.target);
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(function(){},function(){window.prompt('Copy this selector:',s);});}
+    else{window.prompt('Copy this selector:',s);}
+    done();
+  }
+  function key(e){if(e.key==='Escape'){done();}}
+  window.addEventListener('mousemove',move,true);
+  window.addEventListener('click',click,true);
+  window.addEventListener('keydown',key,true);
+})();`;
 
 // Minimal Connection interface from home-assistant-js-websocket. We
 // can't import the type because we don't depend on that package at
@@ -91,6 +257,107 @@ export class PriceWatchPanel extends LitElement {
   // region are hidden across every card. Persisted to localStorage so
   // the preference survives reloads. Restored in the constructor.
   @state() private _hideNonShipping = false;
+  // Toolbar state. Search is session-only (cleared on reload); sort and
+  // the hide-discontinued toggle are persisted to localStorage so the
+  // user's preferred view sticks across reloads. Restored in constructor.
+  @state() private _search = "";
+  @state() private _sort: SortKey = "name";
+  @state() private _hideDiscontinued = false;
+  // Entry IDs whose refresh_now (price re-check) is in flight. Distinct
+  // from _refreshingEntries, which tracks the slower alternatives search,
+  // so a card can show independent spinners for each action.
+  @state() private _refreshingNow = new Set<string>();
+
+  // --- Live search ("Search & add") modal state ---
+  // Whether the search overlay is open.
+  @state() private _searchOpen = false;
+  // Current query text in the search box.
+  @state() private _searchQuery = "";
+  // True while a price_watch/search WS call is in flight.
+  @state() private _searchLoading = false;
+  // Results from the last completed search (empty until one runs).
+  @state() private _searchResults: SearchResult[] = [];
+  // The engine that produced _searchResults, for the quality caption.
+  @state() private _searchEngine: SearchResponse["engine"] = "none";
+  // True once a search has completed at least once this session — lets
+  // us distinguish "no results" from "haven't searched yet".
+  @state() private _searchRan = false;
+  // User-facing error from the last search (WS error message), or null.
+  @state() private _searchError: string | null = null;
+  // The result the user is confirming in the "Track this" dialog, or
+  // null when the results list is showing. When set, the modal swaps to
+  // the confirm form pre-filled from this result.
+  @state() private _trackTarget: SearchResult | null = null;
+  // Editable confirm-dialog fields, seeded from _trackTarget on pick.
+  @state() private _trackName = "";
+  @state() private _trackUrl = "";
+  @state() private _trackTargetPrice = "";
+  // True while the track_product service call is in flight.
+  @state() private _tracking = false;
+  // Error from the last track_product attempt (e.g. already tracked).
+  @state() private _trackError: string | null = null;
+  // --- AI provider editor modal state ---
+  // Whether the provider settings overlay is open.
+  @state() private _providerOpen = false;
+  // True while the initial get_provider_settings call is in flight.
+  @state() private _providerLoading = false;
+  // True while a set_provider_settings call is in flight.
+  @state() private _providerSaving = false;
+  // Error from the last load/save (WS error message), or null.
+  @state() private _providerError: string | null = null;
+  // True briefly after a successful save (shows the confirmation banner).
+  @state() private _providerSuccess = false;
+  // Whether the OpenAI-compat "Advanced" section is expanded.
+  @state() private _providerAdvancedOpen = false;
+  // The currently selected provider mode in the editor form.
+  @state() private _pProvider: ProviderKind = "none";
+  // Editable form fields, seeded from get_provider_settings on open.
+  // _pApiKey is always blank on load — the backend never returns the key,
+  // and a blank submit means "keep the stored key".
+  @state() private _pApiKey = "";
+  @state() private _pModel = "";
+  @state() private _pBaseUrl = "";
+  @state() private _pInputCost = "";
+  @state() private _pOutputCost = "";
+  @state() private _pMaxHtml = "";
+  @state() private _pForceJson = false;
+  @state() private _pExtraHeaders = "";
+  // Global domain blocklist as edited in the textarea — one host per
+  // line. Seeded from get_provider_settings (joined with newlines) and
+  // split back into a list on save. Applies to every product's
+  // alternatives search, not just one.
+  @state() private _pExcludedDomains = "";
+  // Whether a key is already stored (drives the "leave blank to keep"
+  // placeholder). Never the key itself.
+  @state() private _providerHasKey = false;
+  // Anthropic model choices offered in the dropdown (from the backend so
+  // the panel and HA stay in sync).
+  @state() private _providerModels: string[] = [];
+
+  // --- Advanced price-selector editor modal state ---
+  // Whether the selector editor overlay is open.
+  @state() private _selectorOpen = false;
+  // The product + listing being edited (drives the edit_listing call).
+  private _selProduct: TrackedProduct | null = null;
+  private _selListing: Listing | null = null;
+  // Editable form fields.
+  @state() private _selPriceSelector = "";
+  @state() private _selTitleSelector = "";
+  // True while a price_watch/test_selector call is in flight.
+  @state() private _selTesting = false;
+  // The last test result, or null before the first test.
+  @state() private _selTestResult: TestSelectorResponse | null = null;
+  // Error from the last test (WS error message), or null.
+  @state() private _selTestError: string | null = null;
+  // True while the edit_listing save is in flight.
+  @state() private _selSaving = false;
+  // Error from the last save, or null.
+  @state() private _selSaveError: string | null = null;
+  // True briefly after a successful save (shows the confirmation banner).
+  @state() private _selSaved = false;
+  // Whether the bookmarklet "copy code" fallback block is expanded.
+  @state() private _selBookmarkletOpen = false;
+
   // Stashed connection used for the post-bootstrap call_service
   // sends. Populated by _bootstrap() once the wrapper resolves.
   private _conn: HassConnection | null = null;
@@ -105,18 +372,27 @@ export class PriceWatchPanel extends LitElement {
   private _unsubState?: () => void;
   private _unsubRegistry?: () => void;
 
-  // localStorage key for the "hide non-shipping alternatives" toggle.
+  // localStorage keys for persisted view preferences.
   private static readonly HIDE_NONSHIP_KEY = "price-watch:hide-non-shipping";
+  private static readonly SORT_KEY = "price-watch:sort";
+  private static readonly HIDE_DISCONTINUED_KEY =
+    "price-watch:hide-discontinued";
 
   constructor() {
     super();
-    // Restore the toggle preference. Wrapped in try/catch because
+    // Restore the toggle preferences. Wrapped in try/catch because
     // localStorage can throw in locked-down / private-mode contexts.
     try {
       this._hideNonShipping =
         localStorage.getItem(PriceWatchPanel.HIDE_NONSHIP_KEY) === "1";
+      this._hideDiscontinued =
+        localStorage.getItem(PriceWatchPanel.HIDE_DISCONTINUED_KEY) === "1";
+      const savedSort = localStorage.getItem(PriceWatchPanel.SORT_KEY);
+      if (savedSort && SORT_KEYS.includes(savedSort as SortKey)) {
+        this._sort = savedSort as SortKey;
+      }
     } catch {
-      // Ignore — default (show everything) is a safe fallback.
+      // Ignore — defaults (show everything, sort by name) are safe.
     }
   }
 
@@ -369,6 +645,232 @@ export class PriceWatchPanel extends LitElement {
     }
   };
 
+  /**
+   * Add an alternative as a tracked listing on its product.
+   *
+   * Fires price_watch.add_listing with the alternative's URL plus
+   * retailer/currency hints so the backend doesn't have to re-derive
+   * them. The card has already shown a window.confirm before invoking
+   * this. add_listing mutates entry.options.listings and reloads the
+   * entry; the coordinator re-instantiates with the new listing, sensor
+   * entities are created, entity_registry_updated fires, our
+   * subscription rebuilds the registry, and the new row appears in the
+   * card's Listings section — no explicit state management here.
+   *
+   * On failure (duplicate URL, network, service error) we log to the
+   * console; the integration rejects duplicate URLs, which is the most
+   * likely error and is already guarded against in the card (the add
+   * button is replaced by a ✓ once a matching listing exists).
+   */
+  private _handleAddListing = async (
+    product: TrackedProduct,
+    alt: Alternative
+  ): Promise<void> => {
+    if (!this._conn) return;
+    const url = (alt.url ?? "").trim();
+    if (!url) return;
+    const serviceData: Record<string, unknown> = {
+      entry_id: product.entryId,
+      url,
+    };
+    if (alt.retailer) serviceData.retailer = alt.retailer;
+    if (alt.currency) serviceData.currency = alt.currency;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "add_listing",
+        service_data: serviceData,
+      });
+    } catch (err) {
+      console.error("[price-watch-panel] add_listing failed:", err);
+    }
+  };
+
+  // --- Advanced price-selector editor ---
+
+  /**
+   * Open the advanced selector editor for one listing. Seeds the form
+   * blank (we don't surface the existing custom_parser in the Listing
+   * model, and starting fresh is the common case — the user is here
+   * because the default extractor failed). The URL/retailer come from
+   * the listing so Test and Save target the right page.
+   */
+  private _handleEditListing = (
+    product: TrackedProduct,
+    listing: Listing
+  ): void => {
+    this._selProduct = product;
+    this._selListing = listing;
+    this._selPriceSelector = "";
+    this._selTitleSelector = "";
+    this._selTestResult = null;
+    this._selTestError = null;
+    this._selSaveError = null;
+    this._selSaved = false;
+    this._selBookmarkletOpen = false;
+    this._selectorOpen = true;
+  };
+
+  private _closeSelectorEditor = (): void => {
+    this._selectorOpen = false;
+    this._selProduct = null;
+    this._selListing = null;
+  };
+
+  private _onSelectorBackdropClick = (e: Event): void => {
+    if (e.target === e.currentTarget) this._closeSelectorEditor();
+  };
+
+  private _onSelPriceInput = (e: Event): void => {
+    this._selPriceSelector = (e.target as HTMLInputElement).value;
+  };
+
+  private _onSelTitleInput = (e: Event): void => {
+    this._selTitleSelector = (e.target as HTMLInputElement).value;
+  };
+
+  /**
+   * Run the price (and optional title) selector against the live page
+   * server-side via price_watch/test_selector. The backend fetches with
+   * the same curl_cffi pipeline the poller uses and applies the same
+   * price_clean transform, so the previewed value matches what would be
+   * stored. Title defaults to `h1` when left blank — a custom CSS parser
+   * needs BOTH a title and a price, and most product pages put the name
+   * in an <h1>.
+   */
+  private _runSelectorTest = async (): Promise<void> => {
+    if (!this._conn || !this._selListing) return;
+    const url = (this._selListing.url ?? "").trim();
+    const priceSelector = this._selPriceSelector.trim();
+    if (!url) {
+      this._selTestError = "This listing has no URL to test against.";
+      return;
+    }
+    if (!priceSelector) {
+      this._selTestError = "Enter a price selector first.";
+      return;
+    }
+    this._selTesting = true;
+    this._selTestError = null;
+    this._selTestResult = null;
+    const titleSelector = this._selTitleSelector.trim() || "h1";
+    try {
+      const resp = await this._conn.sendMessagePromise<TestSelectorResponse>({
+        type: "price_watch/test_selector",
+        url,
+        price_selector: priceSelector,
+        title_selector: titleSelector,
+      });
+      this._selTestResult = resp;
+    } catch (err) {
+      this._selTestError =
+        (err as { message?: string })?.message ?? "Test failed.";
+    } finally {
+      this._selTesting = false;
+    }
+  };
+
+  /**
+   * Build the custom_parser config from the form and persist it via
+   * price_watch.edit_listing. The parser is a CSS type with price +
+   * title selectors and the price_clean transform — the same shape the
+   * built-in retailer parsers use. edit_listing reloads the entry, so
+   * the next poll uses the new selector.
+   */
+  private _saveSelector = async (): Promise<void> => {
+    if (!this._conn || !this._selProduct || !this._selListing) return;
+    const priceSelector = this._selPriceSelector.trim();
+    if (!priceSelector) {
+      this._selSaveError = "Enter a price selector first.";
+      return;
+    }
+    const titleSelector = this._selTitleSelector.trim() || "h1";
+    const customParser = {
+      type: "css",
+      selectors: { price: priceSelector, title: titleSelector },
+      transforms: { price: "price_clean" },
+    };
+    this._selSaving = true;
+    this._selSaveError = null;
+    this._selSaved = false;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "edit_listing",
+        service_data: {
+          entry_id: this._selProduct.entryId,
+          listing_id: this._selListing.listingId,
+          custom_parser: customParser,
+        },
+      });
+      this._selSaved = true;
+      // Brief success flash, then close. The entry reloads server-side;
+      // our registry subscription rebuilds the card.
+      window.setTimeout(() => this._closeSelectorEditor(), 1200);
+    } catch (err) {
+      this._selSaveError =
+        (err as { message?: string })?.message ?? "Save failed.";
+    } finally {
+      this._selSaving = false;
+    }
+  };
+
+  /**
+   * Clear the custom parser on this listing, reverting it to the default
+   * JSON-LD + AI extraction pipeline. edit_listing treats an empty
+   * custom_parser as "clear".
+   */
+  private _clearSelector = async (): Promise<void> => {
+    if (!this._conn || !this._selProduct || !this._selListing) return;
+    if (
+      !window.confirm(
+        "Remove the custom price selector and go back to automatic extraction?"
+      )
+    )
+      return;
+    this._selSaving = true;
+    this._selSaveError = null;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "edit_listing",
+        service_data: {
+          entry_id: this._selProduct.entryId,
+          listing_id: this._selListing.listingId,
+          custom_parser: "",
+        },
+      });
+      this._selSaved = true;
+      window.setTimeout(() => this._closeSelectorEditor(), 1200);
+    } catch (err) {
+      this._selSaveError =
+        (err as { message?: string })?.message ?? "Clear failed.";
+    } finally {
+      this._selSaving = false;
+    }
+  };
+
+  /** Build the javascript: href for the draggable picker bookmarklet. */
+  private _bookmarkletHref(): string {
+    // Collapse the readable source to a single javascript: URL. We strip
+    // comment-free source as-is; encodeURIComponent keeps it valid in an
+    // href attribute. Wrapped in void() so clicking the live link (if the
+    // user clicks instead of dragging) is a no-op rather than navigating.
+    return "javascript:" + encodeURIComponent(BOOKMARKLET_SOURCE);
+  }
+
+  private _copyBookmarklet = async (): Promise<void> => {
+    const code = this._bookmarkletHref();
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      this._selBookmarkletOpen = true; // reveal the textarea for manual copy
+    }
+  };
+
   private _handleToggleHideNonShipping = (): void => {
     this._hideNonShipping = !this._hideNonShipping;
     try {
@@ -381,28 +883,1015 @@ export class PriceWatchPanel extends LitElement {
     }
   };
 
+  private _handleToggleHideDiscontinued = (): void => {
+    this._hideDiscontinued = !this._hideDiscontinued;
+    try {
+      localStorage.setItem(
+        PriceWatchPanel.HIDE_DISCONTINUED_KEY,
+        this._hideDiscontinued ? "1" : "0"
+      );
+    } catch {
+      // Non-fatal.
+    }
+  };
+
+  private _handleSearch = (e: Event): void => {
+    this._search = (e.target as HTMLInputElement).value;
+  };
+
+  private _handleSort = (e: Event): void => {
+    const value = (e.target as HTMLSelectElement).value as SortKey;
+    this._sort = value;
+    try {
+      localStorage.setItem(PriceWatchPanel.SORT_KEY, value);
+    } catch {
+      // Non-fatal.
+    }
+  };
+
+  /**
+   * Force an immediate price re-check for one product.
+   *
+   * Fires price_watch.refresh_now. While in flight, the entry sits in
+   * _refreshingNow so the card spins its refresh button. The coordinator
+   * pushes new state when the check completes; our state_changed
+   * subscription updates the card. Independent of the alternatives
+   * search spinner (_refreshingEntries).
+   */
+  private _handleRefreshNow = async (
+    product: TrackedProduct
+  ): Promise<void> => {
+    if (!this._conn) return;
+    if (this._refreshingNow.has(product.entryId)) return;
+    this._refreshingNow = new Set([...this._refreshingNow, product.entryId]);
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "refresh_now",
+        service_data: { entry_id: product.entryId },
+      });
+    } catch (err) {
+      console.error("[price-watch-panel] refresh_now failed:", err);
+    } finally {
+      const next = new Set(this._refreshingNow);
+      next.delete(product.entryId);
+      this._refreshingNow = next;
+    }
+  };
+
+  /**
+   * Set (or clear) the target price for one product inline.
+   *
+   * Fires price_watch.set_target. A null/undefined value clears the
+   * target server-side. The coordinator persists it to options and
+   * re-pushes the price sensor (whose target_price attribute we read),
+   * so the card reflects the change after the state_changed round-trip.
+   */
+  private _handleSetTarget = async (
+    product: TrackedProduct,
+    target: number | null
+  ): Promise<void> => {
+    if (!this._conn) return;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "set_target",
+        service_data:
+          target === null
+            ? { entry_id: product.entryId }
+            : { entry_id: product.entryId, target_price: target },
+      });
+    } catch (err) {
+      console.error("[price-watch-panel] set_target failed:", err);
+    }
+  };
+
+  /**
+   * Pause or resume polling for one product inline.
+   *
+   * Fires price_watch.set_paused. The coordinator persists CONF_PAUSED
+   * and stops/restarts its update loop; the price sensor's `paused`
+   * attribute updates so the card's toggle and badge reflect the new
+   * state after the round-trip.
+   */
+  private _handleSetPaused = async (
+    product: TrackedProduct,
+    paused: boolean
+  ): Promise<void> => {
+    if (!this._conn) return;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "set_paused",
+        service_data: { entry_id: product.entryId, paused },
+      });
+    } catch (err) {
+      console.error("[price-watch-panel] set_paused failed:", err);
+    }
+  };
+
+  /**
+   * Apply the search filter, hide-discontinued filter, and current sort
+   * to the product list. Returns a new array; never mutates _products.
+   *
+   * Search matches title or retailer, case-insensitive. Sorting is
+   * stable-ish (Array.sort) with sensible tiebreaks; products missing
+   * the sort's key sink to the bottom rather than throwing off the order.
+   */
+  private _visibleProducts(): TrackedProduct[] {
+    const q = this._search.trim().toLowerCase();
+    let list = this._products.filter((p) => {
+      if (this._hideDiscontinued && p.discontinued) return false;
+      if (!q) return true;
+      const hay = `${p.title} ${p.retailer ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+    const byName = (a: TrackedProduct, b: TrackedProduct) =>
+      a.title.localeCompare(b.title);
+
+    // Push nulls to the end regardless of sort direction.
+    const nlast = (v: number | null): number =>
+      v === null ? Number.POSITIVE_INFINITY : v;
+
+    list = [...list].sort((a, b) => {
+      switch (this._sort) {
+        case "cheapest":
+          return nlast(a.price) - nlast(b.price) || byName(a, b);
+        case "last_checked": {
+          // Most recently checked first. Missing timestamps sink.
+          const ta = a.lastCheck ? Date.parse(a.lastCheck) : -Infinity;
+          const tb = b.lastCheck ? Date.parse(b.lastCheck) : -Infinity;
+          return tb - ta || byName(a, b);
+        }
+        case "drop": {
+          // Biggest drop from the highest seen price (a "deal" sort):
+          // discount = highest - price, descending. Products without
+          // both numbers get zero discount and sort after real drops.
+          const da =
+            a.highest !== null && a.price !== null ? a.highest - a.price : -1;
+          const db =
+            b.highest !== null && b.price !== null ? b.highest - b.price : -1;
+          return db - da || byName(a, b);
+        }
+        case "below_target": {
+          // Products at/under target first, ordered by how far under.
+          const under = (p: TrackedProduct): number =>
+            p.targetPrice !== null && p.price !== null && p.price <= p.targetPrice
+              ? p.targetPrice - p.price
+              : -1;
+          return under(b) - under(a) || byName(a, b);
+        }
+        case "name":
+        default:
+          return byName(a, b);
+      }
+    });
+    return list;
+  }
+
   private _handleAddProduct = (): void => {
     const url = "/config/integrations/dashboard/add?domain=price_watch";
     window.history.pushState(null, "", url);
     window.dispatchEvent(new CustomEvent("location-changed"));
   };
 
-  private _renderHeader() {
-    const count = this._products.length;
-    const discontinuedCount = this._products.filter((p) => p.discontinued).length;
-    const activeCount = count - discontinuedCount;
+  // --- Live search handlers ---
 
+  private _openSearch = (): void => {
+    this._searchOpen = true;
+    this._trackTarget = null;
+    this._trackError = null;
+  };
+
+  private _closeSearch = (): void => {
+    this._searchOpen = false;
+    this._trackTarget = null;
+    this._searchError = null;
+    this._trackError = null;
+  };
+
+  /** Backdrop click closes; clicks inside the dialog are swallowed. */
+  private _onBackdropClick = (e: Event): void => {
+    if (e.target === e.currentTarget) this._closeSearch();
+  };
+
+  private _handleSearchQueryInput = (e: Event): void => {
+    this._searchQuery = (e.target as HTMLInputElement).value;
+  };
+
+  private _handleSearchKeydown = (e: KeyboardEvent): void => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void this._runSearch();
+    } else if (e.key === "Escape") {
+      this._closeSearch();
+    }
+  };
+
+  /**
+   * Run a live product search via the price_watch/search WS command.
+   *
+   * Unlike the service calls elsewhere, this command RETURNS data in its
+   * reply (ranked results), which we render directly — no entity round-
+   * trip. On a backend error the WS layer rejects with a message we show
+   * inline. The backend auto-selects the engine (AI vs raw DuckDuckGo).
+   */
+  private _runSearch = async (): Promise<void> => {
+    if (!this._conn) return;
+    const q = this._searchQuery.trim();
+    if (!q || this._searchLoading) return;
+
+    this._searchLoading = true;
+    this._searchError = null;
+    this._trackTarget = null;
+    try {
+      const resp = await this._conn.sendMessagePromise<SearchResponse>({
+        type: "price_watch/search",
+        query: q,
+        max_results: SEARCH_MAX_RESULTS,
+      });
+      this._searchResults = resp.results ?? [];
+      this._searchEngine = resp.engine ?? "none";
+      this._searchRan = true;
+    } catch (err: unknown) {
+      // home-assistant-js-websocket rejects with {code, message} on a
+      // send_error; fall back to String() for anything else.
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : String(err);
+      this._searchError = message || "Search failed.";
+      this._searchResults = [];
+      this._searchRan = true;
+      console.error("[price-watch-panel] search failed:", err);
+    } finally {
+      this._searchLoading = false;
+    }
+  };
+
+  /** Open the "Track this" confirm form for a chosen result. */
+  private _pickResult = (result: SearchResult): void => {
+    this._trackTarget = result;
+    this._trackName = result.title;
+    this._trackUrl = result.url;
+    this._trackTargetPrice = "";
+    this._trackError = null;
+  };
+
+  /** Back out of the confirm form to the results list. */
+  private _cancelTrack = (): void => {
+    this._trackTarget = null;
+    this._trackError = null;
+  };
+
+  private _handleTrackNameInput = (e: Event): void => {
+    this._trackName = (e.target as HTMLInputElement).value;
+  };
+  private _handleTrackUrlInput = (e: Event): void => {
+    this._trackUrl = (e.target as HTMLInputElement).value;
+  };
+  private _handleTrackTargetInput = (e: Event): void => {
+    this._trackTargetPrice = (e.target as HTMLInputElement).value;
+  };
+
+  /**
+   * Confirm tracking: fire price_watch.track_product. The backend drives
+   * the config flow's panel_track step to create the product entry. On
+   * success the new entry's entities arrive via our registry
+   * subscription and a card appears; we close the modal. On failure
+   * (e.g. already tracked) we show the error in the dialog.
+   */
+  private _confirmTrack = async (): Promise<void> => {
+    if (!this._conn || this._tracking) return;
+    const url = this._trackUrl.trim();
+    if (!url) {
+      this._trackError = "A URL is required to track a product.";
+      return;
+    }
+    const name = this._trackName.trim();
+    const targetRaw = this._trackTargetPrice.trim();
+    let targetPrice: number | null = null;
+    if (targetRaw !== "") {
+      const parsed = Number(targetRaw);
+      if (Number.isNaN(parsed)) {
+        this._trackError = "Target price must be a number.";
+        return;
+      }
+      targetPrice = parsed;
+    }
+
+    this._tracking = true;
+    this._trackError = null;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "track_product",
+        service_data: {
+          url,
+          ...(name ? { name } : {}),
+          ...(targetPrice !== null ? { target_price: targetPrice } : {}),
+        },
+      });
+      // Success — close the whole modal. The new card shows up when the
+      // entity_registry_updated subscription refreshes.
+      this._closeSearch();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : String(err);
+      this._trackError = message || "Could not add product.";
+      console.error("[price-watch-panel] track_product failed:", err);
+    } finally {
+      this._tracking = false;
+    }
+  };
+
+  // --- AI provider editor handlers ---
+
+  /** Normalize a WS reject ({code, message}) or any throw to a string. */
+  private _wsErrorMessage(err: unknown): string {
+    return err && typeof err === "object" && "message" in err
+      ? String((err as { message: unknown }).message)
+      : String(err);
+  }
+
+  /** Copy a settings snapshot into the editable form fields. */
+  private _applyProviderSettings(s: ProviderSettings): void {
+    this._providerModels = s.anthropic_models ?? [];
+    this._pProvider = s.provider;
+    this._pModel = s.model || this._providerModels[0] || "";
+    this._pBaseUrl = s.base_url ?? "";
+    this._providerHasKey = !!s.has_api_key;
+    this._pApiKey = ""; // never prefilled — blank means "keep stored key"
+    this._pInputCost = String(s.input_cost_per_mtok ?? 0);
+    this._pOutputCost = String(s.output_cost_per_mtok ?? 0);
+    this._pMaxHtml = String(s.max_html_chars ?? 100000);
+    this._pForceJson = !!s.force_json_mode;
+    this._pExtraHeaders = s.extra_headers ?? "";
+    this._pExcludedDomains = (s.excluded_domains ?? []).join("\n");
+  }
+
+  /**
+   * Open the provider editor and load current settings.
+   *
+   * Fetches price_watch/get_provider_settings (which never returns the
+   * raw API key — only has_api_key) and seeds the form. Errors surface
+   * inline in the modal.
+   */
+  private _openProviderEditor = async (): Promise<void> => {
+    this._providerOpen = true;
+    this._providerError = null;
+    this._providerSuccess = false;
+    this._providerAdvancedOpen = false;
+    if (!this._conn) {
+      this._providerError = "Not connected to Home Assistant yet.";
+      return;
+    }
+    this._providerLoading = true;
+    try {
+      const s = await this._conn.sendMessagePromise<ProviderSettings>({
+        type: "price_watch/get_provider_settings",
+      });
+      this._applyProviderSettings(s);
+    } catch (err) {
+      this._providerError =
+        this._wsErrorMessage(err) || "Could not load provider settings.";
+      console.error("[price-watch-panel] get_provider_settings failed:", err);
+    } finally {
+      this._providerLoading = false;
+    }
+  };
+
+  private _closeProviderEditor = (): void => {
+    this._providerOpen = false;
+    this._providerError = null;
+    this._providerSuccess = false;
+  };
+
+  /** Backdrop click closes; clicks inside the dialog are swallowed. */
+  private _onProviderBackdropClick = (e: Event): void => {
+    if (e.target === e.currentTarget) this._closeProviderEditor();
+  };
+
+  private _onProviderChange = (e: Event): void => {
+    this._pProvider = (e.target as HTMLSelectElement).value as ProviderKind;
+    this._providerSuccess = false;
+    this._providerError = null;
+  };
+
+  /**
+   * Validate + persist provider settings via price_watch/set_provider_settings.
+   *
+   * The backend re-validates credentials (same path as HA's config flow)
+   * and, on success, reloads every product entry so coordinators rebuild
+   * their AI provider. We send the API key field ONLY when the user typed
+   * one — a blank field tells the backend to keep the stored key. On a
+   * typed WS error we show the backend's message inline; nothing is saved.
+   */
+  private _saveProvider = async (): Promise<void> => {
+    if (!this._conn || this._providerSaving) return;
+    this._providerSaving = true;
+    this._providerError = null;
+    this._providerSuccess = false;
+
+    const payload: Record<string, unknown> = { provider: this._pProvider };
+    // Blank key = keep existing. Only send a non-empty typed key.
+    const typedKey = this._pApiKey.trim();
+    if (typedKey) payload.api_key = typedKey;
+
+    if (this._pProvider === "anthropic") {
+      payload.model = this._pModel;
+    } else if (this._pProvider === "openai_compatible") {
+      payload.base_url = this._pBaseUrl.trim();
+      payload.model = this._pModel.trim();
+      payload.input_cost_per_mtok = Number(this._pInputCost) || 0;
+      payload.output_cost_per_mtok = Number(this._pOutputCost) || 0;
+      payload.max_html_chars = Number(this._pMaxHtml) || 100000;
+      payload.force_json_mode = this._pForceJson;
+      const headers = this._pExtraHeaders.trim();
+      if (headers) payload.extra_headers = headers;
+    }
+
+    // Global blocklist — independent of the provider, so always sent.
+    // The backend splits on newlines/commas and normalizes each host.
+    payload.excluded_domains = this._pExcludedDomains;
+
+    try {
+      const s = await this._conn.sendMessagePromise<SetProviderResponse>({
+        type: "price_watch/set_provider_settings",
+        ...payload,
+      });
+      this._applyProviderSettings(s);
+      this._providerSuccess = true;
+    } catch (err) {
+      this._providerError =
+        this._wsErrorMessage(err) || "Could not save provider settings.";
+      console.error("[price-watch-panel] set_provider_settings failed:", err);
+    } finally {
+      this._providerSaving = false;
+    }
+  };
+
+  private _renderHeader() {
     return html`
       <header class="panel-header">
         <div class="panel-header__title">
           <h1>Price Watch</h1>
-          <div class="panel-header__counts">
-            ${activeCount} active${discontinuedCount > 0
-              ? html` · ${discontinuedCount} discontinued`
-              : nothing}
-          </div>
         </div>
         <div class="panel-header__actions">
+          <button
+            class="add-button add-button--secondary"
+            @click=${this._openProviderEditor}
+            title="Choose AI provider (Free / Anthropic / OpenAI-compatible)"
+          >
+            ⚙ AI provider
+          </button>
+          <button
+            class="add-button add-button--secondary"
+            @click=${this._openSearch}
+          >
+            🔍 Search &amp; add
+          </button>
+          <button class="add-button" @click=${this._handleAddProduct}>
+            + Add product
+          </button>
+        </div>
+      </header>
+    `;
+  }
+
+  /**
+   * The live-search overlay. Two modes in one dialog: the results list
+   * (default) and the "Track this" confirm form (when _trackTarget set).
+   * Rendered at the panel root so it overlays everything; nothing renders
+   * when closed.
+   */
+  private _renderSearchModal() {
+    if (!this._searchOpen) return null;
+    return html`
+      <div
+        class="modal-backdrop"
+        @click=${this._onBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search and add a product"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>${this._trackTarget ? "Track this product" : "Search & add"}</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeSearch}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          ${this._trackTarget
+            ? this._renderTrackForm()
+            : this._renderSearchBody()}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderSearchBody() {
+    return html`
+      <div class="modal__searchbar">
+        <input
+          type="search"
+          class="modal__searchinput"
+          placeholder="Search for a product to track…"
+          .value=${this._searchQuery}
+          @input=${this._handleSearchQueryInput}
+          @keydown=${this._handleSearchKeydown}
+          aria-label="Product search query"
+          autofocus
+        />
+        <button
+          class="add-button"
+          @click=${this._runSearch}
+          ?disabled=${this._searchLoading || !this._searchQuery.trim()}
+        >
+          ${this._searchLoading ? "Searching…" : "Search"}
+        </button>
+      </div>
+      ${this._renderSearchResults()}
+    `;
+  }
+
+  private _renderSearchResults() {
+    if (this._searchLoading) {
+      return html`<div class="modal__status">Searching the web…</div>`;
+    }
+    if (this._searchError) {
+      return html`
+        <div class="modal__status modal__status--error">
+          ⚠ ${this._searchError}
+        </div>
+      `;
+    }
+    if (!this._searchRan) {
+      return html`
+        <div class="modal__status">
+          Type what you're looking for and press Enter — e.g. a product
+          name, model number, or brand.
+        </div>
+      `;
+    }
+    if (this._searchResults.length === 0) {
+      return html`
+        <div class="modal__status">
+          No results. Try a different or more specific query.
+        </div>
+      `;
+    }
+    return html`
+      <div class="modal__engine">${ENGINE_LABELS[this._searchEngine]}</div>
+      <ul class="results">
+        ${this._searchResults.map((r) => this._renderResultRow(r))}
+      </ul>
+    `;
+  }
+
+  private _renderResultRow(r: SearchResult) {
+    const price =
+      r.price !== null
+        ? `${r.price} ${r.currency}`.trim()
+        : "Price unknown";
+    const ships =
+      r.ships_to_user_region === true
+        ? html`<span class="results__ship results__ship--yes">Ships to you</span>`
+        : r.ships_to_user_region === false
+        ? html`<span class="results__ship results__ship--no">Doesn't ship</span>`
+        : null;
+    return html`
+      <li class="results__row">
+        <div class="results__thumb">
+          ${r.image_url
+            ? html`<img src=${r.image_url} alt="" loading="lazy" />`
+            : html`<span class="results__thumb-ph">🏷️</span>`}
+        </div>
+        <div class="results__info">
+          <div class="results__title" title=${r.title}>${r.title}</div>
+          <div class="results__meta">
+            <span class="results__price">${price}</span>
+            ${r.retailer
+              ? html`<span class="results__retailer">${r.retailer}</span>`
+              : null}
+            ${ships}
+          </div>
+          ${r.notes
+            ? html`<div class="results__notes">${r.notes}</div>`
+            : null}
+        </div>
+        <button class="results__add" @click=${() => this._pickResult(r)}>
+          Track
+        </button>
+      </li>
+    `;
+  }
+
+  private _renderTrackForm() {
+    const r = this._trackTarget;
+    return html`
+      <div class="trackform">
+        ${r && r.price !== null
+          ? html`<div class="trackform__hint">
+              Currently ${r.price} ${r.currency} at
+              ${r.retailer || "this retailer"}.
+            </div>`
+          : null}
+        <label class="trackform__field">
+          <span>Name</span>
+          <input
+            type="text"
+            .value=${this._trackName}
+            @input=${this._handleTrackNameInput}
+            placeholder="Display name"
+          />
+        </label>
+        <label class="trackform__field">
+          <span>URL</span>
+          <input
+            type="url"
+            .value=${this._trackUrl}
+            @input=${this._handleTrackUrlInput}
+            placeholder="https://…"
+          />
+        </label>
+        <label class="trackform__field">
+          <span>Target price <em>(optional)</em></span>
+          <input
+            type="number"
+            step="any"
+            .value=${this._trackTargetPrice}
+            @input=${this._handleTrackTargetInput}
+            placeholder="Alert when at or below…"
+          />
+        </label>
+        ${this._trackError
+          ? html`<div class="modal__status modal__status--error">
+              ⚠ ${this._trackError}
+            </div>`
+          : null}
+        <div class="trackform__actions">
+          <button class="trackform__cancel" @click=${this._cancelTrack}>
+            Back
+          </button>
+          <button
+            class="add-button"
+            @click=${this._confirmTrack}
+            ?disabled=${this._tracking || !this._trackUrl.trim()}
+          >
+            ${this._tracking ? "Adding…" : "Track product"}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * The AI-provider editor overlay. Mirrors HA's options flow: pick Free /
+   * Anthropic / OpenAI-compatible and fill the relevant credentials, then
+   * Save & apply (which validates server-side and reloads products).
+   * Rendered at the panel root; nothing renders when closed.
+   */
+  private _renderProviderModal() {
+    if (!this._providerOpen) return null;
+    return html`
+      <div
+        class="modal-backdrop"
+        @click=${this._onProviderBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI provider settings"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>AI provider</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeProviderEditor}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          ${this._providerLoading
+            ? html`<div class="modal__status">Loading current settings…</div>`
+            : this._renderProviderForm()}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderProviderForm() {
+    return html`
+      <div class="trackform">
+        <label class="trackform__field">
+          <span>Provider</span>
+          <select @change=${this._onProviderChange}>
+            ${(["none", "anthropic", "openai_compatible"] as ProviderKind[]).map(
+              (kind) => html`
+                <option value=${kind} ?selected=${this._pProvider === kind}>
+                  ${PROVIDER_LABELS[kind]}
+                </option>
+              `
+            )}
+          </select>
+        </label>
+
+        ${this._pProvider === "none" ? this._renderNoneInfo() : null}
+        ${this._pProvider === "anthropic"
+          ? this._renderAnthropicFields()
+          : null}
+        ${this._pProvider === "openai_compatible"
+          ? this._renderOpenAIFields()
+          : null}
+
+        ${this._renderExcludedDomains()}
+
+        ${this._providerError
+          ? html`<div class="modal__status modal__status--error">
+              ⚠ ${this._providerError}
+            </div>`
+          : null}
+        ${this._providerSuccess
+          ? html`<div class="modal__status modal__status--ok">
+              ✓ Saved — reloading tracked products to apply the change.
+            </div>`
+          : null}
+
+        <div class="trackform__actions">
+          <button
+            class="trackform__cancel"
+            @click=${this._closeProviderEditor}
+          >
+            Close
+          </button>
+          <button
+            class="add-button"
+            @click=${this._saveProvider}
+            ?disabled=${this._providerSaving}
+          >
+            ${this._providerSaving ? "Saving…" : "Save & apply"}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Global "Excluded sites" editor. One hostname per line; applies to
+   * every product's alternatives search and the live Search & add
+   * results regardless of which AI provider is selected (hence rendered
+   * for all provider modes). Matching is host-suffix based server-side,
+   * so "amazon.de" also drops "www.amazon.de" and any subdomain.
+   */
+  private _renderExcludedDomains() {
+    return html`
+      <label class="trackform__field">
+        <span>Excluded sites</span>
+        <textarea
+          class="provider__textarea"
+          rows="3"
+          placeholder="One site per line, e.g.&#10;amazon.de&#10;alza.cz"
+          .value=${this._pExcludedDomains}
+          @input=${(e: Event) =>
+            (this._pExcludedDomains = (e.target as HTMLTextAreaElement).value)}
+        ></textarea>
+      </label>
+      <div class="trackform__hint">
+        Retailers listed here are dropped from every alternatives search
+        and from Search &amp; add — useful for foreign sites that claim to
+        ship to Iceland but you don't want to see. One hostname per line
+        (e.g. <code>amazon.de</code>); subdomains are matched too.
+      </div>
+    `;
+  }
+
+  private _renderNoneInfo() {
+    return html`
+      <div class="trackform__hint">
+        Free mode uses DuckDuckGo web search with deterministic price
+        extraction — no API key and no per-call cost. AI-powered HTML
+        parsing and richer alternative ranking are disabled.
+      </div>
+    `;
+  }
+
+  private _renderAnthropicFields() {
+    return html`
+      <label class="trackform__field">
+        <span>Model</span>
+        <select
+          @change=${(e: Event) =>
+            (this._pModel = (e.target as HTMLSelectElement).value)}
+        >
+          ${this._providerModels.map(
+            (m) => html`
+              <option value=${m} ?selected=${this._pModel === m}>${m}</option>
+            `
+          )}
+        </select>
+      </label>
+      <label class="trackform__field">
+        <span>
+          API key
+          ${this._providerHasKey
+            ? html`<em>(leave blank to keep current)</em>`
+            : null}
+        </span>
+        <input
+          type="password"
+          autocomplete="off"
+          .value=${this._pApiKey}
+          @input=${(e: Event) =>
+            (this._pApiKey = (e.target as HTMLInputElement).value)}
+          placeholder=${this._providerHasKey
+            ? "•••••• stored — type to replace"
+            : "sk-ant-…"}
+        />
+      </label>
+    `;
+  }
+
+  private _renderOpenAIFields() {
+    return html`
+      <label class="trackform__field">
+        <span>Base URL</span>
+        <input
+          type="url"
+          .value=${this._pBaseUrl}
+          @input=${(e: Event) =>
+            (this._pBaseUrl = (e.target as HTMLInputElement).value)}
+          placeholder="http://192.168.0.92:11434/v1"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>Model</span>
+        <input
+          type="text"
+          .value=${this._pModel}
+          @input=${(e: Event) =>
+            (this._pModel = (e.target as HTMLInputElement).value)}
+          placeholder="qwen2.5:7b"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>API key <em>(optional for local endpoints)</em></span>
+        <input
+          type="password"
+          autocomplete="off"
+          .value=${this._pApiKey}
+          @input=${(e: Event) =>
+            (this._pApiKey = (e.target as HTMLInputElement).value)}
+          placeholder=${this._providerHasKey
+            ? "•••••• stored — type to replace"
+            : "optional"}
+        />
+      </label>
+
+      <button
+        type="button"
+        class="provider__advtoggle"
+        @click=${() => (this._providerAdvancedOpen = !this._providerAdvancedOpen)}
+      >
+        ${this._providerAdvancedOpen ? "▾" : "▸"} Advanced (cost &amp; format)
+      </button>
+      ${this._providerAdvancedOpen ? this._renderOpenAIAdvanced() : null}
+    `;
+  }
+
+  private _renderOpenAIAdvanced() {
+    return html`
+      <label class="trackform__field">
+        <span>Input cost / Mtok (USD)</span>
+        <input
+          type="number"
+          step="any"
+          .value=${this._pInputCost}
+          @input=${(e: Event) =>
+            (this._pInputCost = (e.target as HTMLInputElement).value)}
+          placeholder="0"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>Output cost / Mtok (USD)</span>
+        <input
+          type="number"
+          step="any"
+          .value=${this._pOutputCost}
+          @input=${(e: Event) =>
+            (this._pOutputCost = (e.target as HTMLInputElement).value)}
+          placeholder="0"
+        />
+      </label>
+      <label class="trackform__field">
+        <span>Max HTML chars</span>
+        <input
+          type="number"
+          .value=${this._pMaxHtml}
+          @input=${(e: Event) =>
+            (this._pMaxHtml = (e.target as HTMLInputElement).value)}
+          placeholder="100000"
+        />
+      </label>
+      <label class="ship-toggle provider__check">
+        <input
+          type="checkbox"
+          .checked=${this._pForceJson}
+          @change=${(e: Event) =>
+            (this._pForceJson = (e.target as HTMLInputElement).checked)}
+        />
+        <span>Force JSON response mode</span>
+      </label>
+      <label class="trackform__field">
+        <span>Extra headers <em>(JSON object)</em></span>
+        <textarea
+          class="provider__textarea"
+          rows="3"
+          .value=${this._pExtraHeaders}
+          @input=${(e: Event) =>
+            (this._pExtraHeaders = (e.target as HTMLTextAreaElement).value)}
+          placeholder='{"Authorization": "Bearer …"}'
+        ></textarea>
+      </label>
+    `;
+  }
+
+  /**
+   * At-a-glance counts across ALL tracked products (not affected by the
+   * search box or filters — these are the totals, the toolbar narrows
+   * what's shown below). Clicking a chip is intentionally not wired up
+   * yet; it's a pure status readout.
+   */
+  private _renderSummary() {
+    const products = this._products;
+    const total = products.length;
+    const inStock = products.filter((p) => p.inStock === true).length;
+    const belowTarget = products.filter(
+      (p) =>
+        p.targetPrice !== null &&
+        p.price !== null &&
+        p.price <= p.targetPrice
+    ).length;
+    const discontinued = products.filter((p) => p.discontinued).length;
+
+    const chip = (label: string, value: number, cls: string) => html`
+      <div class="stat ${cls}">
+        <span class="stat__value">${value}</span>
+        <span class="stat__label">${label}</span>
+      </div>
+    `;
+
+    return html`
+      <div class="summary">
+        ${chip("Tracked", total, "stat--total")}
+        ${chip("In stock", inStock, "stat--stock")}
+        ${chip("Below target", belowTarget, "stat--target")}
+        ${chip("Discontinued", discontinued, "stat--disc")}
+      </div>
+    `;
+  }
+
+  /**
+   * Toolbar: search box, sort selector, and the two view toggles
+   * (ships-to-me, hide-discontinued). Sits between the summary bar and
+   * the grid so users can narrow the view without scrolling.
+   */
+  private _renderToolbar() {
+    return html`
+      <div class="toolbar">
+        <div class="toolbar__search">
+          <input
+            type="search"
+            placeholder="Search products or retailers…"
+            .value=${this._search}
+            @input=${this._handleSearch}
+            aria-label="Search products"
+          />
+        </div>
+        <div class="toolbar__controls">
+          <label class="sort-label">
+            <span>Sort</span>
+            <select @change=${this._handleSort} aria-label="Sort products">
+              ${SORT_KEYS.map(
+                (key) => html`
+                  <option value=${key} ?selected=${this._sort === key}>
+                    ${SORT_LABELS[key]}
+                  </option>
+                `
+              )}
+            </select>
+          </label>
           <label
             class="ship-toggle"
             title="Hide alternatives that don't ship to your region"
@@ -414,11 +1903,19 @@ export class PriceWatchPanel extends LitElement {
             />
             <span>Ships to me only</span>
           </label>
-          <button class="add-button" @click=${this._handleAddProduct}>
-            + Add product
-          </button>
+          <label
+            class="ship-toggle"
+            title="Hide products marked discontinued"
+          >
+            <input
+              type="checkbox"
+              .checked=${this._hideDiscontinued}
+              @change=${this._handleToggleHideDiscontinued}
+            />
+            <span>Hide discontinued</span>
+          </label>
         </div>
-      </header>
+      </div>
     `;
   }
 
@@ -453,17 +1950,35 @@ export class PriceWatchPanel extends LitElement {
   }
 
   private _renderGrid() {
+    const visible = this._visibleProducts();
+    if (visible.length === 0) {
+      // Products exist but the search/filters hid them all. Distinct
+      // from the no-products-at-all empty state.
+      return html`
+        <div class="empty">
+          <div class="empty__icon">🔍</div>
+          <h2>No matches</h2>
+          <p>No tracked products match your search or filters.</p>
+        </div>
+      `;
+    }
     return html`
       <div class="grid">
-        ${this._products.map(
+        ${visible.map(
           (p) => html`
             <price-watch-card
               .product=${p}
               .onOpen=${this._handleOpen}
               .onRefreshAlternatives=${this._handleRefreshAlternatives}
               .refreshingAlternatives=${this._refreshingEntries.has(p.entryId)}
+              .onRefreshNow=${this._handleRefreshNow}
+              .refreshingNow=${this._refreshingNow.has(p.entryId)}
+              .onSetTarget=${this._handleSetTarget}
+              .onSetPaused=${this._handleSetPaused}
               .hideNonShipping=${this._hideNonShipping}
               .onRemoveListing=${this._handleRemoveListing}
+              .onAddListing=${this._handleAddListing}
+              .onEditListing=${this._handleEditListing}
             ></price-watch-card>
           `
         )}
@@ -472,17 +1987,239 @@ export class PriceWatchPanel extends LitElement {
   }
 
   render() {
+    const ready = this._connected && this._registry;
+    const hasProducts = this._products.length > 0;
     return html`
       <div class="panel">
         ${this._renderHeader()}
         ${this._registryError
           ? this._renderError()
-          : !this._connected || !this._registry
+          : !ready
           ? this._renderLoading()
-          : this._products.length === 0
+          : !hasProducts
           ? this._renderEmptyState()
-          : this._renderGrid()}
+          : html`
+              ${this._renderSummary()} ${this._renderToolbar()}
+              ${this._renderGrid()}
+            `}
       </div>
+      ${this._renderSearchModal()}
+      ${this._renderProviderModal()}
+      ${this._renderSelectorModal()}
+    `;
+  }
+
+  /**
+   * The advanced price-selector editor overlay. Lets an advanced user
+   * point at a price element via F12 (or the picker bookmarklet), paste
+   * a CSS selector, Test it against the live page server-side, and save
+   * it onto the listing as a custom parser. Rendered at the panel root;
+   * nothing renders when closed.
+   */
+  private _renderSelectorModal() {
+    if (!this._selectorOpen || !this._selListing) return null;
+    const listing = this._selListing;
+    const product = this._selProduct;
+    const url = listing.url ?? "";
+    const test = this._selTestResult;
+    return html`
+      <div
+        class="modal-backdrop"
+        @click=${this._onSelectorBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Advanced price selector"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>Custom price selector</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeSelectorEditor}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="trackform">
+            <p class="sel__intro">
+              For ${listing.retailer || "this listing"}${product
+                ? html` on <strong>${product.title}</strong>`
+                : null}. Use this when the automatic price reader can't
+              find the price. Open the page in your browser, press
+              <kbd>F12</kbd>, right-click the price →
+              <em>Copy → Copy selector</em>, and paste it below — or use
+              the point-and-click picker further down.
+            </p>
+            ${url
+              ? html`<div class="sel__url" title=${url}>${url}</div>`
+              : html`<div class="modal__status modal__status--error">
+                  ⚠ This listing has no URL, so Test won't work.
+                </div>`}
+
+            <label class="trackform__field">
+              <span>Price selector <em>(CSS)</em></span>
+              <input
+                type="text"
+                .value=${this._selPriceSelector}
+                @input=${this._onSelPriceInput}
+                placeholder=".product-price .amount  (or  span#price@content)"
+                spellcheck="false"
+                autocapitalize="off"
+              />
+            </label>
+            <label class="trackform__field">
+              <span>Title selector <em>(optional — defaults to h1)</em></span>
+              <input
+                type="text"
+                .value=${this._selTitleSelector}
+                @input=${this._onSelTitleInput}
+                placeholder="h1"
+                spellcheck="false"
+                autocapitalize="off"
+              />
+            </label>
+
+            <div class="sel__test-row">
+              <button
+                class="sel__test-btn"
+                @click=${this._runSelectorTest}
+                ?disabled=${this._selTesting || !url}
+              >
+                ${this._selTesting ? "Testing…" : "Test on live page"}
+              </button>
+              <span class="sel__hint"
+                >Append <code>@attr</code> to read an attribute, e.g.
+                <code>meta[itemprop=price]@content</code>.</span
+              >
+            </div>
+
+            ${this._selTestError
+              ? html`<div class="modal__status modal__status--error">
+                  ⚠ ${this._selTestError}
+                </div>`
+              : null}
+            ${test ? this._renderSelectorTestResult(test) : null}
+
+            ${this._renderBookmarklet()}
+
+            ${this._selSaveError
+              ? html`<div class="modal__status modal__status--error">
+                  ⚠ ${this._selSaveError}
+                </div>`
+              : null}
+            ${this._selSaved
+              ? html`<div class="modal__status modal__status--ok">
+                  ✓ Saved — the listing will use it on the next check.
+                </div>`
+              : null}
+
+            <div class="trackform__actions sel__actions">
+              <button
+                class="trackform__cancel"
+                @click=${this._clearSelector}
+                ?disabled=${this._selSaving}
+                title="Revert to automatic extraction"
+              >
+                Clear custom parser
+              </button>
+              <button
+                class="add-button"
+                @click=${this._saveSelector}
+                ?disabled=${this._selSaving || !this._selPriceSelector.trim()}
+              >
+                ${this._selSaving ? "Saving…" : "Save selector"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /** Render the result of a test_selector run: price preview + raw text. */
+  private _renderSelectorTestResult(test: TestSelectorResponse) {
+    const price = test.price;
+    const title = test.title;
+    return html`
+      <div class="sel__result">
+        <div class="sel__result-head">
+          Tested${test.page_title
+            ? html` — <span class="sel__page-title">${test.page_title}</span>`
+            : null}
+        </div>
+        <div class="sel__result-row">
+          <span class="sel__result-label">Price</span>
+          ${price.found
+            ? html`<span class="sel__result-ok">
+                  ${price.value !== null && price.value !== undefined
+                    ? html`<strong>${price.value}</strong>`
+                    : html`<em>matched, but not a number</em>`}
+                </span>
+                <code class="sel__raw">${price.raw}</code>`
+            : html`<span class="sel__result-bad"
+                >No match${price.error ? html` — ${price.error}` : null}</span
+              >`}
+        </div>
+        ${title
+          ? html`<div class="sel__result-row">
+              <span class="sel__result-label">Title</span>
+              ${title.found
+                ? html`<code class="sel__raw">${title.raw}</code>`
+                : html`<span class="sel__result-bad">No match</span>`}
+            </div>`
+          : null}
+        ${price.found && (price.value === null || price.value === undefined)
+          ? html`<p class="sel__warn">
+              The element matched but no number could be parsed from it. Try a
+              more specific selector, or append <code>@content</code> /
+              <code>@data-price</code> to read a price attribute.
+            </p>`
+          : null}
+      </div>
+    `;
+  }
+
+  /** Render the point-and-click picker bookmarklet (drag link + copy code). */
+  private _renderBookmarklet() {
+    const href = this._bookmarkletHref();
+    return html`
+      <details
+        class="sel__bm"
+        ?open=${this._selBookmarkletOpen}
+        @toggle=${(e: Event) =>
+          (this._selBookmarkletOpen = (e.target as HTMLDetailsElement).open)}
+      >
+        <summary>Point-and-click picker (bookmarklet)</summary>
+        <div class="sel__bm-body">
+          <p>
+            Drag this button to your bookmarks bar. Then, on the retailer's
+            product page, click the bookmark and click the price — its CSS
+            selector is copied to your clipboard. Paste it above.
+            <kbd>Esc</kbd> cancels.
+          </p>
+          <p>
+            <a class="sel__bm-link" href=${href} @click=${(e: Event) =>
+              e.preventDefault()}
+              >📍 Pick price selector</a
+            >
+          </p>
+          <p class="sel__hint">
+            Can't drag it? Copy the code and make a bookmark whose URL is this:
+          </p>
+          <div class="sel__bm-copy">
+            <button class="sel__test-btn" @click=${this._copyBookmarklet}>
+              Copy bookmarklet code
+            </button>
+          </div>
+          <textarea
+            class="sel__bm-code"
+            readonly
+            rows="3"
+            @click=${(e: Event) => (e.target as HTMLTextAreaElement).select()}
+          >${href}</textarea>
+        </div>
+      </details>
     `;
   }
 
@@ -557,6 +2294,522 @@ export class PriceWatchPanel extends LitElement {
     }
     .add-button:hover {
       filter: brightness(1.1);
+    }
+    .add-button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      filter: none;
+    }
+    .add-button--secondary {
+      background: transparent;
+      color: var(--primary-color, #03a9f4);
+      border: 1px solid var(--primary-color, #03a9f4);
+    }
+
+    /* --- Search & add modal --- */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 48px 16px;
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    .modal {
+      width: 100%;
+      max-width: 560px;
+      background: var(--card-background-color, #fff);
+      border-radius: 16px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 96px);
+      overflow: hidden;
+    }
+    .modal__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--divider-color, #e0e0e0);
+    }
+    .modal__head h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 500;
+    }
+    .modal__close {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: var(--secondary-text-color, #757575);
+      padding: 4px 8px;
+      border-radius: 8px;
+      line-height: 1;
+    }
+    .modal__close:hover {
+      background: var(--divider-color, #e0e0e0);
+    }
+    .modal__searchbar {
+      display: flex;
+      gap: 8px;
+      padding: 16px 20px;
+    }
+    .modal__searchinput {
+      flex: 1;
+      box-sizing: border-box;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      color: var(--primary-text-color, #212121);
+      background: var(--primary-background-color, #fafafa);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      outline: none;
+    }
+    .modal__searchinput:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .modal__status {
+      padding: 8px 20px 20px;
+      color: var(--secondary-text-color, #757575);
+      font-size: 0.9rem;
+    }
+    .modal__status--error {
+      color: var(--error-color, #f44336);
+    }
+    .modal__status--ok {
+      color: var(--success-color, #4caf50);
+    }
+    .modal__engine {
+      padding: 0 20px 8px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .results {
+      list-style: none;
+      margin: 0;
+      padding: 0 12px 16px;
+      overflow-y: auto;
+    }
+    .results__row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 8px;
+      border-radius: 12px;
+    }
+    .results__row:hover {
+      background: var(--primary-background-color, #f5f5f5);
+    }
+    .results__thumb {
+      flex: 0 0 48px;
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--primary-background-color, #f0f0f0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .results__thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .results__thumb-ph {
+      font-size: 22px;
+      opacity: 0.5;
+    }
+    .results__info {
+      flex: 1;
+      min-width: 0;
+    }
+    .results__title {
+      font-size: 0.9rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .results__meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .results__price {
+      font-weight: 600;
+      color: var(--primary-text-color, #212121);
+    }
+    .results__ship {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 999px;
+    }
+    .results__ship--yes {
+      background: rgba(76, 175, 80, 0.16);
+      color: var(--success-color, #4caf50);
+    }
+    .results__ship--no {
+      background: rgba(158, 158, 158, 0.18);
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .results__notes {
+      font-size: 0.76rem;
+      color: var(--secondary-text-color, #9e9e9e);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .results__add {
+      flex: 0 0 auto;
+      padding: 6px 14px;
+      background: var(--primary-color, #03a9f4);
+      color: var(--text-primary-color, #fff);
+      border: none;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .results__add:hover {
+      filter: brightness(1.1);
+    }
+
+    /* --- Track-this confirm form --- */
+    .trackform {
+      padding: 16px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .trackform__hint {
+      font-size: 0.85rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .trackform__field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .trackform__field em {
+      font-style: normal;
+      opacity: 0.7;
+    }
+    .trackform__field input,
+    .trackform__field select,
+    .trackform__field textarea {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: var(--primary-text-color, #212121);
+      background: var(--primary-background-color, #fafafa);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 10px;
+      outline: none;
+    }
+    .trackform__field input:focus,
+    .trackform__field select:focus,
+    .trackform__field textarea:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .provider__textarea {
+      resize: vertical;
+      min-height: 56px;
+    }
+    .provider__advtoggle {
+      align-self: flex-start;
+      background: none;
+      border: none;
+      padding: 2px 0;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--primary-color, #03a9f4);
+      cursor: pointer;
+    }
+    .provider__check {
+      align-self: flex-start;
+    }
+    .trackform__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .trackform__cancel {
+      padding: 8px 16px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .trackform__cancel:hover {
+      background: var(--primary-background-color, #f5f5f5);
+    }
+
+    /* --- Advanced price-selector editor --- */
+    .sel__intro {
+      margin: 0 0 4px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      color: var(--secondary-text-color, #757575);
+    }
+    .sel__intro kbd,
+    .sel__bm-body kbd {
+      font-family: monospace;
+      font-size: 0.78rem;
+      padding: 1px 5px;
+      border: 1px solid var(--divider-color, #d0d0d0);
+      border-radius: 4px;
+      background: var(--primary-background-color, #f5f5f5);
+    }
+    .sel__url {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #757575);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding: 4px 8px;
+      background: var(--primary-background-color, #f5f5f5);
+      border-radius: 6px;
+    }
+    .sel__test-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .sel__test-btn {
+      padding: 7px 14px;
+      background: var(--primary-color, #1976d2);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .sel__test-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .sel__hint {
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .sel__hint code,
+    .sel__result code,
+    .sel__warn code {
+      font-family: monospace;
+      font-size: 0.78rem;
+      background: var(--primary-background-color, #f0f0f0);
+      padding: 0 3px;
+      border-radius: 3px;
+    }
+    .sel__result {
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sel__result-head {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--secondary-text-color, #9e9e9e);
+    }
+    .sel__page-title {
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .sel__result-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+    }
+    .sel__result-label {
+      flex: 0 0 44px;
+      color: var(--secondary-text-color, #757575);
+    }
+    .sel__result-ok strong {
+      font-size: 1.05rem;
+      color: var(--success-color, #2e7d32);
+    }
+    .sel__result-bad {
+      color: var(--error-color, #c62828);
+    }
+    .sel__raw {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--primary-text-color, #212121);
+      word-break: break-all;
+    }
+    .sel__warn {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--secondary-text-color, #757575);
+      line-height: 1.4;
+    }
+    .sel__bm {
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 8px;
+      padding: 0 12px;
+    }
+    .sel__bm summary {
+      cursor: pointer;
+      padding: 10px 0;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .sel__bm-body {
+      padding-bottom: 12px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: var(--secondary-text-color, #757575);
+    }
+    .sel__bm-body p {
+      margin: 0 0 8px;
+    }
+    .sel__bm-link {
+      display: inline-block;
+      padding: 6px 12px;
+      background: var(--primary-background-color, #f0f0f0);
+      border: 1px dashed var(--primary-color, #1976d2);
+      border-radius: 8px;
+      color: var(--primary-color, #1976d2);
+      text-decoration: none;
+      font-weight: 600;
+      cursor: grab;
+    }
+    .sel__bm-code {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: monospace;
+      font-size: 0.7rem;
+      resize: vertical;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 6px;
+      padding: 6px;
+    }
+    .sel__actions {
+      justify-content: space-between;
+    }
+
+    /* --- Summary stat bar --- */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 12px 16px;
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 12px;
+      border-left-width: 4px;
+    }
+    .stat__value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .stat__label {
+      font-size: 0.75rem;
+      color: var(--secondary-text-color, #757575);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stat--total {
+      border-left-color: var(--primary-color, #03a9f4);
+    }
+    .stat--stock {
+      border-left-color: var(--success-color, #4caf50);
+    }
+    .stat--target {
+      border-left-color: var(--warning-color, #ff9800);
+    }
+    .stat--disc {
+      border-left-color: var(--secondary-text-color, #9e9e9e);
+    }
+
+    /* --- Toolbar --- */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .toolbar__search {
+      flex: 1 1 240px;
+      min-width: 180px;
+    }
+    .toolbar__search input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      outline: none;
+    }
+    .toolbar__search input:focus {
+      border-color: var(--primary-color, #03a9f4);
+    }
+    .toolbar__controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .sort-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #757575);
+      white-space: nowrap;
+    }
+    .sort-label select {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+    }
+    .sort-label select:focus {
+      border-color: var(--primary-color, #03a9f4);
     }
 
     .grid {
