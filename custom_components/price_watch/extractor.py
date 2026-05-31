@@ -240,6 +240,28 @@ def find_meta_image(html: str) -> str | None:
     return None
 
 
+def _ci_get(d: dict[str, Any], key: str) -> Any:
+    """Case-insensitive dict lookup for JSON-LD properties.
+
+    Schema.org property names are conventionally lowerCamelCase
+    (``offers``, ``availability``, ``priceCurrency``), but some CMS
+    platforms emit capitalized variants. Wix, for example, renders
+    ``"Offers"`` and ``"Availability"`` — which made the lowercase-only
+    lookup miss an otherwise-valid Product/Offer and report "No JSON-LD
+    found", forcing an AI fallback that Free mode doesn't have.
+
+    Prefer an exact match, then fall back to a case-insensitive scan so
+    those non-standard pages parse without any AI provider.
+    """
+    if key in d:
+        return d[key]
+    lk = key.lower()
+    for k, v in d.items():
+        if isinstance(k, str) and k.lower() == lk:
+            return v
+    return None
+
+
 def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
     """Try to extract from Schema.org Product JSON-LD.
 
@@ -320,14 +342,14 @@ def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
             ):
                 continue
 
-            offers = item.get("offers")
+            offers = _ci_get(item, "offers")
             if isinstance(offers, list) and offers:
                 offers = offers[0]
             if not isinstance(offers, dict):
                 continue
 
             try:
-                price = float(str(offers.get("price", "")).replace(",", "."))
+                price = float(str(_ci_get(offers, "price") or "").replace(",", "."))
             except (ValueError, TypeError):
                 continue
             if price <= 0:
@@ -359,34 +381,35 @@ def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
         chosen = all_candidates[0]
     item, offers = chosen
 
-    availability = offers.get("availability", "")
+    availability = _ci_get(offers, "availability") or ""
     in_stock = "InStock" in str(availability) or "PreOrder" in str(availability)
 
-    image = item.get("image")
+    image = _ci_get(item, "image")
     if isinstance(image, list):
         image = image[0] if image else None
     if isinstance(image, dict):
-        image = image.get("url")
+        # Schema.org ImageObject uses "url"; Wix emits "contentUrl".
+        image = _ci_get(image, "url") or _ci_get(image, "contentUrl")
 
-    inventory = offers.get("inventoryLevel")
+    inventory = _ci_get(offers, "inventoryLevel")
     if isinstance(inventory, dict):
-        inventory = inventory.get("value")
+        inventory = _ci_get(inventory, "value")
     try:
         stock_count = int(inventory) if inventory is not None else None
     except (ValueError, TypeError):
         stock_count = None
 
-    brand = item.get("brand")
-    retailer = brand.get("name") if isinstance(brand, dict) else None
+    brand = _ci_get(item, "brand")
+    retailer = _ci_get(brand, "name") if isinstance(brand, dict) else None
 
     return {
-        "title": item.get("name", ""),
-        "price": float(str(offers.get("price", "")).replace(",", ".")),
-        "currency": offers.get("priceCurrency", ""),
+        "title": _ci_get(item, "name") or "",
+        "price": float(str(_ci_get(offers, "price") or "").replace(",", ".")),
+        "currency": _ci_get(offers, "priceCurrency") or "",
         "in_stock": in_stock,
         "stock_count": stock_count,
         "image_url": image,
-        "sku": item.get("sku") or item.get("mpn"),
+        "sku": _ci_get(item, "sku") or _ci_get(item, "mpn"),
         "retailer": retailer,
     }
 
