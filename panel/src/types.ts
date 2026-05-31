@@ -128,6 +128,12 @@ export interface Listing {
   // (coordinator couldn't fetch bytes — usually a 404 on the source).
   // The row shows a placeholder rather than a broken-image icon.
   imageBroken: boolean;
+  // Whether this listing's retailer ships to the user's region, per the
+  // backend shipping heuristic (same one used for alternatives). null =
+  // no opinion (always kept visible); true = ships; false = confident it
+  // doesn't ship. The panel's "Ships to me only" toggle hides false ones
+  // (but never the primary listing). Mirrors Alternative.shipsToUserRegion.
+  shipsToUserRegion: boolean | null;
   // Entity IDs for this listing's sensors. Used for service-call
   // targeting and cross-references. Always populated with the price
   // entity (the listing wouldn't exist without it); others optional.

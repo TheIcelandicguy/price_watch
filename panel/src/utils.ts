@@ -299,6 +299,12 @@ function buildListing(
     // Filled in below from this listing's photo image entity, if present.
     imageProxyUrl: null,
     imageBroken: false,
+    // Backend shipping heuristic result. Absent/non-boolean → null
+    // (unknown), which the "Ships to me only" filter treats as "keep".
+    shipsToUserRegion:
+      typeof attrs.ships_to_user_region === "boolean"
+        ? attrs.ships_to_user_region
+        : null,
     entityIds: { price: priceEntity },
   };
 

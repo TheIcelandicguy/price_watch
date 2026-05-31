@@ -43,6 +43,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import PriceWatchCoordinator
+from .search.region_heuristic import evaluate_shipping
 
 # Monetary sensors all behave the same (price/lowest/highest/target_diff/price_local)
 MONETARY_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
@@ -311,6 +312,20 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
             ),
             "listing_id": self._listing_id,
         }
+
+        # Per-listing shipping signal, reusing the same heuristic that
+        # decides this for AI alternatives. There's no AI guess for a
+        # user-tracked listing, so we pass ai_guess=None and let the
+        # heuristic speak only when it has ground truth (e.g. Newegg ->
+        # IS = False, a matching country TLD = True). None means "no
+        # opinion" and the panel keeps the listing visible. Lets the
+        # panel's "Ships to me only" toggle filter tracked listings too.
+        attrs["ships_to_user_region"] = evaluate_shipping(
+            url=product_url or "",
+            retailer=result.retailer or "",
+            user_region=self.coordinator.user_region,
+            ai_guess=None,
+        )
 
         # Alternatives are product-level — only attach to the primary
         # listing's price sensor. Showing them on every listing's price

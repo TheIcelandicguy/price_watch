@@ -87,6 +87,10 @@ export class PriceWatchPanel extends LitElement {
   // returns (success or failure). The card uses this to show a
   // spinner on its refresh icon.
   @state() private _refreshingEntries = new Set<string>();
+  // When true, alternatives flagged as not shipping to the user's
+  // region are hidden across every card. Persisted to localStorage so
+  // the preference survives reloads. Restored in the constructor.
+  @state() private _hideNonShipping = false;
   // Stashed connection used for the post-bootstrap call_service
   // sends. Populated by _bootstrap() once the wrapper resolves.
   private _conn: HassConnection | null = null;
@@ -100,6 +104,21 @@ export class PriceWatchPanel extends LitElement {
   // Connection unsubscribers, kept so we can clean up on disconnect.
   private _unsubState?: () => void;
   private _unsubRegistry?: () => void;
+
+  // localStorage key for the "hide non-shipping alternatives" toggle.
+  private static readonly HIDE_NONSHIP_KEY = "price-watch:hide-non-shipping";
+
+  constructor() {
+    super();
+    // Restore the toggle preference. Wrapped in try/catch because
+    // localStorage can throw in locked-down / private-mode contexts.
+    try {
+      this._hideNonShipping =
+        localStorage.getItem(PriceWatchPanel.HIDE_NONSHIP_KEY) === "1";
+    } catch {
+      // Ignore — default (show everything) is a safe fallback.
+    }
+  }
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -350,6 +369,18 @@ export class PriceWatchPanel extends LitElement {
     }
   };
 
+  private _handleToggleHideNonShipping = (): void => {
+    this._hideNonShipping = !this._hideNonShipping;
+    try {
+      localStorage.setItem(
+        PriceWatchPanel.HIDE_NONSHIP_KEY,
+        this._hideNonShipping ? "1" : "0"
+      );
+    } catch {
+      // Non-fatal — the toggle still works for this session.
+    }
+  };
+
   private _handleAddProduct = (): void => {
     const url = "/config/integrations/dashboard/add?domain=price_watch";
     window.history.pushState(null, "", url);
@@ -371,9 +402,22 @@ export class PriceWatchPanel extends LitElement {
               : nothing}
           </div>
         </div>
-        <button class="add-button" @click=${this._handleAddProduct}>
-          + Add product
-        </button>
+        <div class="panel-header__actions">
+          <label
+            class="ship-toggle"
+            title="Hide alternatives that don't ship to your region"
+          >
+            <input
+              type="checkbox"
+              .checked=${this._hideNonShipping}
+              @change=${this._handleToggleHideNonShipping}
+            />
+            <span>Ships to me only</span>
+          </label>
+          <button class="add-button" @click=${this._handleAddProduct}>
+            + Add product
+          </button>
+        </div>
       </header>
     `;
   }
@@ -418,6 +462,7 @@ export class PriceWatchPanel extends LitElement {
               .onOpen=${this._handleOpen}
               .onRefreshAlternatives=${this._handleRefreshAlternatives}
               .refreshingAlternatives=${this._refreshingEntries.has(p.entryId)}
+              .hideNonShipping=${this._hideNonShipping}
               .onRemoveListing=${this._handleRemoveListing}
             ></price-watch-card>
           `
@@ -475,6 +520,28 @@ export class PriceWatchPanel extends LitElement {
       color: var(--secondary-text-color, #757575);
       font-size: 0.875rem;
       margin-top: 4px;
+    }
+
+    .panel-header__actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .ship-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #757575);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .ship-toggle input {
+      cursor: pointer;
+      accent-color: var(--primary-color, #03a9f4);
+      margin: 0;
     }
 
     .add-button {

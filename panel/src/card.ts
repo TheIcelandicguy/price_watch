@@ -32,6 +32,12 @@ export class PriceWatchCard extends LitElement {
   onRefreshAlternatives?: (product: TrackedProduct) => void;
   @property({ type: Boolean, attribute: false })
   refreshingAlternatives = false;
+  // When true, alternatives the backend marked as NOT shipping to the
+  // user's region (shipsToUserRegion === false) are filtered out of the
+  // list. Unknown shipping (null) is always kept — we only hide the ones
+  // we're confident won't ship. Driven by a panel-wide toggle.
+  @property({ type: Boolean, attribute: false })
+  hideNonShipping = false;
   // Optional callback fired when the user clicks "Remove" on a
   // secondary listing's row. The panel owner is responsible for the
   // confirmation dialog (handled in the card via window.confirm) and
@@ -242,9 +248,19 @@ export class PriceWatchCard extends LitElement {
    */
   private renderAlternatives() {
     const { product } = this;
-    const hasAny = product.alternatives.length > 0;
     const hasError = product.alternativesError != null;
     const everFetched = product.alternativesFetchedAt != null;
+
+    // Apply the "hide non-shipping" filter. Only alternatives the
+    // backend is confident won't ship (shipsToUserRegion === false) get
+    // dropped; unknown shipping (null) is always kept. hiddenCount drives
+    // a small note so the user knows the list was trimmed (and isn't
+    // confused by a shorter count than they expected).
+    const visibleAlts = this.hideNonShipping
+      ? product.alternatives.filter((a) => a.shipsToUserRegion !== false)
+      : product.alternatives;
+    const hiddenCount = product.alternatives.length - visibleAlts.length;
+    const hasAny = visibleAlts.length > 0;
 
     // We always render this section, including the un-engaged state
     // (no fetch yet) — without that the refresh button is hidden by
@@ -257,7 +273,7 @@ export class PriceWatchCard extends LitElement {
         <div class="alts__header">
           <span class="alts__title">
             ${hasAny
-              ? html`Alternatives <span class="alts__count">${product.alternatives.length}</span>`
+              ? html`Alternatives <span class="alts__count">${visibleAlts.length}</span>`
               : html`Alternatives`}
           </span>
           <span class="alts__meta">
@@ -282,13 +298,20 @@ export class PriceWatchCard extends LitElement {
           : nothing}
         ${hasAny
           ? html`<ul class="alts__list">
-              ${product.alternatives.map((alt) => this.renderAlternative(alt))}
+              ${visibleAlts.map((alt) => this.renderAlternative(alt))}
             </ul>`
           : !hasError && !this.refreshingAlternatives
           ? html`<p class="alts__empty">
               ${everFetched
-                ? "No alternatives found."
+                ? hiddenCount > 0
+                  ? "All alternatives were hidden (don't ship to your region)."
+                  : "No alternatives found."
                 : "Click refresh to search for alternatives."}
+            </p>`
+          : nothing}
+        ${hasAny && hiddenCount > 0
+          ? html`<p class="alts__hidden-note">
+              ${hiddenCount} hidden (don't ship to your region)
             </p>`
           : nothing}
       </section>
@@ -403,16 +426,34 @@ export class PriceWatchCard extends LitElement {
     const { product } = this;
     if (product.listings.length === 0) return nothing;
 
+    // Apply the "hide non-shipping" filter, same as alternatives. The
+    // primary listing is ALWAYS kept regardless — the card's headline
+    // price/image are built around it, so hiding it would leave a
+    // confusing gap (and you can't remove a product's last listing
+    // anyway). Only secondary listings the heuristic is confident won't
+    // ship (shipsToUserRegion === false) get dropped.
+    const visible = this.hideNonShipping
+      ? product.listings.filter(
+          (l) => l.isPrimary || l.shipsToUserRegion !== false
+        )
+      : product.listings;
+    const hiddenCount = product.listings.length - visible.length;
+
     return html`
       <section class="listings">
         <div class="listings__header">
           <span class="listings__title">
-            Listings <span class="listings__count">${product.listings.length}</span>
+            Listings <span class="listings__count">${visible.length}</span>
           </span>
         </div>
         <ul class="listings__list">
-          ${product.listings.map((l) => this.renderListingRow(l))}
+          ${visible.map((l) => this.renderListingRow(l))}
         </ul>
+        ${hiddenCount > 0
+          ? html`<p class="alts__hidden-note">
+              ${hiddenCount} hidden (don't ship to your region)
+            </p>`
+          : nothing}
       </section>
     `;
   }
@@ -953,6 +994,12 @@ export class PriceWatchCard extends LitElement {
     .alts__empty {
       margin: 4px 0 0;
       font-size: 0.75rem;
+      color: var(--secondary-text-color, #757575);
+      font-style: italic;
+    }
+    .alts__hidden-note {
+      margin: 2px 0 0;
+      font-size: 0.7rem;
       color: var(--secondary-text-color, #757575);
       font-style: italic;
     }
