@@ -1,6 +1,12 @@
 # Search-First Product Tracking — Design Doc
 
-**Status:** Phase 1 + Phase 2 + Phase 3a + Phase 3b SHIPPED 2026-05-28 (in production). Phase 3c/4/5 still pending.
+**Status:** Phases 1–4 SHIPPED + IN PRODUCTION. Phase 1/2/3a/3b shipped 2026-05-28;
+Phase 4 (panel listing rows) + Phase 3c (per-listing images) + the "Ships to me only"
+shipping filter shipped 2026-05-30/31. `async_remove_entry` validated end-to-end
+2026-05-31. Phase 5 (production migrate) happened during Phase 1. Several post-3b
+hotfixes also landed — see **"Post-3b: shipped reality (2026-05-30/31)"** below for the
+authoritative current state; the per-phase sections above it are kept as the historical
+design record.
 
 ### Phase 2 sub-phases (2026-05-28, all shipped same evening as Phase 1)
 
@@ -215,16 +221,75 @@ Phase 4 lands.
 6. After reload, sensors should materialize + first refresh extracts
    price
 
-### Phase 3c/4/5 — still pending
+### Post-3b: shipped reality (2026-05-30/31)
 
-- **Phase 3c:** Per-listing image + button (deferred — panel-driven
-  need, button is naturally product-level since coordinator ticks
-  all listings together)
-- **Phase 4:** Panel UI for displaying listings as rows under each
-  product card. Currently panel only shows primary listing data.
-  Secondary listings are invisible in the current panel (the unique_id
-  parser gracefully ignores listing-prefixed keys).
-- **Phase 5:** Production migrate — already happened during Phase 1
+Everything below shipped AFTER the Phase 3b writeup and is live in production.
+This section is the authoritative "what's actually deployed" record; the
+per-phase design sections above are the historical plan.
+
+**Phase 4 — panel UI for listing rows (commit history through 2026-05-30):**
+- The product card renders a Listings section: each listing is a row with a
+  PRIMARY badge (primary only), sparkline, stock chip, and price; secondaries
+  carry a `×` remove control (primary cannot be removed from the card).
+- Panel code: `panel/src/{types,utils,card,panel}.ts` — `parseUniqueId`,
+  `buildListing`, `renderListings`/`renderListingRow`.
+- The unique_id parser handles both legacy `{entry}_{key}` (primary) and
+  extended `{entry}_{listing}_{key}` (secondary) forms.
+
+**Phase 3c — per-listing images (commit `60e19d9`, 2026-05-31):**
+- Each tracked listing gets its OWN photo entity. `coordinator.py` caches image
+  bytes per `listing_id` (the three product-level scalars became dicts keyed by
+  listing_id: `_listing_image_bytes`, `_listing_image_content_type`,
+  `_listing_cached_image_url`).
+- `image.py` creates one `ListingImage` per listing — primary keeps the legacy
+  unique_id `{entry}_photo`; secondaries use `{entry}_{listing}_photo`.
+- Panel: `Listing.imageProxyUrl` / `imageBroken`; rows render a 32px thumbnail
+  (placeholder when the entity is `unavailable`).
+- The product-level `image_bytes` / `image_content_type` accessors are now
+  back-compat shims over the primary listing's per-listing bytes.
+
+**"Ships to me only" shipping filter (commit `2bd89a7`, 2026-05-31):**
+- Panel-wide header toggle (persisted to `localStorage` under
+  `price-watch:hide-non-shipping`) that hides options the shipping heuristic is
+  confident won't reach the user's region.
+- Applies to BOTH AI alternatives (`shipsToUserRegion === false`) AND tracked
+  listings. For listings, `sensor.py` computes a per-listing `ships_to_user_region`
+  attribute via the same `search/region_heuristic.evaluate_shipping`
+  (ai_guess=None → only speaks on ground truth, e.g. Newegg→IS = won't ship).
+- The PRIMARY listing is never hidden. `null`/unknown is always kept visible.
+  Each section shows "N hidden (don't ship to your region)".
+- Reuses the authoritative `evaluate_shipping` heuristic rather than duplicating
+  shipping logic in TypeScript.
+
+**Post-3b hotfixes (all live):**
+- **configuration_url shell-safety:** `device_info` returns `None` (not `""`)
+  for shell entries with no listing URL — HA's device registry rejects empty
+  string as an invalid URL. Falls back to entry URL → primary listing URL → None.
+- **URL-entry sensor regression fix:** `_ensure_primary_listing` now auto-declares
+  the deterministic primary for "Add by URL" entries (entry.data.url set but
+  options.listings never populated) so sensors materialize on first setup. Shell
+  entries (empty URL + no listings) still fall through to the sentinel path.
+- **ProductGroup → hasVariant JSON-LD fix:** `extractor.try_jsonld()` handles
+  Shopify/Shelly `ProductGroup` schema with nested `hasVariant`.
+- **Alternatives price enrichment:** `search/ai_synthesizer.py` enriches alt
+  prices from JSON-LD.
+- **Orphaned-listing fix:** `remove_listing` (`__init__.py`) now calls
+  `er.async_remove` on entities whose unique_id starts with
+  `{entry_id}_{listing_id}_` — previously the listing was dropped from
+  options+storage but its entities lingered as "unavailable" orphans that the
+  panel rendered as un-dismissable ghost rows. The primary's legacy
+  `{entry_id}_{key}` form never matches the prefix, so the primary is safe.
+
+**`async_remove_entry` — VALIDATED end-to-end (2026-05-31):**
+- Deleting a product config entry cleans up: the per-entry Store file
+  `.storage/price_watch.{entry_id}`, all its entities, and its device, with no
+  orphans. The settings entry is skipped (no URL/listings/storage file).
+- Validated with a throwaway shell entry populated via `add_listing` (real
+  storage file ~1142 B, 10 entities, 1 device), deleted via HA's normal DELETE
+  path: storage gone ~1s, entities 10→0, device 1→0, config entry→0, production
+  untouched.
+
+**Phase 5:** Production migrate already happened during Phase 1.
 
 **Author:** Claude + Davíð (conversation)
 **Estimated effort:** 7–12 hours across 4–5 sessions (Step 6 revised down — see Q6 DECIDED)
@@ -271,16 +336,26 @@ Phase 4 lands.
   - `Z:\custom_components\price_watch.v1-rollback` (deployed code, ready to swap)
   - `G:\price_watch` (independent-drive snapshot)
 
-**Session 3 (next) — TO DO**
-Phase 2-5 work, in some sensible order:
-- Phase 2: Multi-listing sensors per product (currently 1 listing → 1 sensor per entry;
-  Phase 2 needs N listings → N sensors with `sensor.{product_slug}_{retailer_slug}_price`
-  naming for multi-listing products)
-- Phase 3: Config flow rewrite for shell-then-populate add-flow (Q6 decision (c))
-  + add_listing / remove_listing services
-- Phase 4: Panel UI for product cards with listings as rows, current-price-only display
-  with red/green delta indicator (per design note added 2026-05-26)
-- Phase 5: Production migrate (we're already there — Phase 1's work doubled as Phase 5)
+**Session 3 (2026-05-28) — COMPLETE**
+- Phase 2: Multi-listing sensors per product (N listings → N sensors; secondaries
+  use `{entry}_{listing}_{key}` unique_ids, primary keeps legacy `{entry}_{key}`)
+- Phase 3a: add_listing / remove_listing services + per-listing binary_sensors
+- Phase 3b: shell-then-populate config flow (Add by URL / Add by name)
+
+**Session 4+ (2026-05-30/31) — COMPLETE** (see "Post-3b: shipped reality" above)
+- Phase 4: Panel UI — listings as rows under each product card
+- Phase 3c: per-listing image entities + per-listing image byte cache
+- "Ships to me only" shipping filter (panel toggle + per-listing
+  `ships_to_user_region` sensor attribute)
+- Hotfixes: configuration_url shell-safety, URL-entry sensor regression,
+  ProductGroup JSON-LD, orphaned-listing entity cleanup
+- `async_remove_entry` validated end-to-end (storage + entities + device, no orphans)
+
+**Remaining (not blocking):**
+- Corsair/Amazon entry chronically flaps into `setup_retry` (Amazon CAPTCHA);
+  plan: pause it, later add MicroCenter/Pangoly as an alt listing (would also
+  exercise the shipping filter since MicroCenter is US-only)
+- `coordinator.py` split into focused modules (in progress 2026-05-31)
 
 ---
 
