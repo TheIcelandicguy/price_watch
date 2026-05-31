@@ -561,16 +561,11 @@ export class PriceWatchCard extends LitElement {
    * navigate, and stops propagation to also prevent the card's
    * own open-source handler from firing.
    *
-   * Mini-sparkline: 80×24px, rendered only when history has ≥2
-   * points (otherwise the SVG would be empty). The same outlier
-   * filter (MAD) sparklinePath uses applies, so a single bad
-   * fetch doesn't ruin the row.
+   * No per-row sparkline: price history is shown by the single big
+   * chart at the top of the card; a mini-line per row was visually
+   * noisy and was removed.
    */
   private renderListingRow(listing: Listing) {
-    const sparkW = 80;
-    const sparkH = 24;
-    const sparkD = sparklinePath(listing.history, sparkW, sparkH, 2);
-
     const stockChip =
       listing.discontinued
         ? html`<span class="listings__chip listings__chip--warn">disc.</span>`
@@ -600,7 +595,9 @@ export class PriceWatchCard extends LitElement {
       ${thumb}
       <div class="listings__info">
         <span class="listings__row-retailer">
-          ${listing.retailer ?? "Unknown"}
+          <span class="listings__retailer-name"
+            >${listing.retailer ?? "Unknown"}</span
+          >
           ${listing.isPrimary
             ? html`<span class="listings__badge">primary</span>`
             : nothing}
@@ -612,16 +609,6 @@ export class PriceWatchCard extends LitElement {
           </span>
         </span>
       </div>
-      ${sparkD
-        ? html`<svg
-            class="listings__sparkline"
-            viewBox="0 0 ${sparkW} ${sparkH}"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path d=${sparkD} fill="none" stroke="currentColor" stroke-width="1.25" />
-          </svg>`
-        : html`<span class="listings__sparkline listings__sparkline--empty"></span>`}
       <div class="listings__price">
         ${formatPrice(listing.price, listing.currency || null)}
       </div>
@@ -1437,20 +1424,27 @@ export class PriceWatchCard extends LitElement {
       font-size: 0.8rem;
       line-height: 1.3;
       color: var(--primary-text-color, #212121);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .listings__retailer-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
     .listings__badge {
+      flex: 0 0 auto;
       font-size: 0.62rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
       padding: 1px 6px;
       border-radius: 999px;
+      white-space: nowrap;
       background: var(--primary-color, #03a9f4);
       color: var(--text-primary-color, #fff);
     }
@@ -1480,17 +1474,6 @@ export class PriceWatchCard extends LitElement {
     }
     .listings__last-check {
       white-space: nowrap;
-    }
-    .listings__sparkline {
-      flex: 0 0 80px;
-      width: 80px;
-      height: 24px;
-      color: var(--primary-color, #03a9f4);
-    }
-    .listings__sparkline--empty {
-      /* Placeholder takes the same space when history < 2 points
-         so the columns line up across rows. */
-      display: inline-block;
     }
     .listings__price {
       flex: 0 0 auto;

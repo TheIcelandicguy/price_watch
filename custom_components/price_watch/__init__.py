@@ -18,7 +18,13 @@ from homeassistant.helpers.storage import Store
 
 from .config_flow import ENTRY_TYPE_PRODUCT, ENTRY_TYPE_SETTINGS
 from .migration import migrate_entry_v1_to_v2
-from .const import CONF_TARGET_PRICE, DOMAIN, STORAGE_VERSION
+from .const import (
+    CONF_FORCE_DISCONTINUED,
+    CONF_PAUSED,
+    CONF_TARGET_PRICE,
+    DOMAIN,
+    STORAGE_VERSION,
+)
 from .coordinator import PriceWatchCoordinator
 from .extractor import shutdown_persistent_session
 from .panel import async_register_panel
@@ -27,6 +33,30 @@ from .websocket import async_register_websocket_api
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.IMAGE]
+
+# Option keys the running coordinator reads LIVE on every tick (see the
+# "Pause / force-discontinued overrides" note in coordinator.py). When ONLY
+# these change, the coordinator already applies them itself, so the update
+# listener skips the full entry reload. That reload was bouncing the entry
+# and wiping the coordinator's in-memory data — which made a *paused* product
+# go "unavailable" instead of holding its last-known price (contradicting the
+# set_paused service's documented behavior). Skipping it keeps the last price
+# visible and avoids a needless re-fetch on a target-price/discontinued edit.
+_LIVE_OPTION_KEYS = frozenset(
+    {CONF_PAUSED, CONF_FORCE_DISCONTINUED, CONF_TARGET_PRICE}
+)
+
+
+def _reload_signature(entry: ConfigEntry) -> dict[str, Any]:
+    """Options subset whose change requires a structural entry reload.
+
+    Excludes the live-read flags above. Two option sets with the same
+    signature differ only in live flags, so the listener can apply them
+    in place instead of reloading.
+    """
+    return {
+        k: v for k, v in entry.options.items() if k not in _LIVE_OPTION_KEYS
+    }
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -106,6 +136,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Product entry
     coordinator = PriceWatchCoordinator(hass, entry)
+    # Snapshot the reload-significant options so the update listener can tell
+    # a structural change (needs reload) from a live-flag toggle (apply in
+    # place — see _async_update_listener / _LIVE_OPTION_KEYS).
+    coordinator.reload_signature = _reload_signature(entry)
 
     # If this entry was previously marked discontinued, restore that
     # state from the persistent store and skip the initial refresh.
@@ -209,7 +243,25 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload entry when options change."""
+    """Reload the entry when options change.
+
+    EXCEPT when only the live-read flags changed (pause / force-discontinued
+    / target price). The running coordinator already reads those fresh on
+    every tick and the set_* methods update its in-memory state, so a reload
+    is not only unnecessary but harmful: it rebuilds the coordinator with
+    empty data, which made a paused product drop to "unavailable" instead of
+    holding its last-known price. In that case we just push the new state to
+    the entities and leave the coordinator (and its last price) intact.
+    """
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if isinstance(coordinator, PriceWatchCoordinator):
+        new_sig = _reload_signature(entry)
+        if new_sig == getattr(coordinator, "reload_signature", None):
+            # Only live flags toggled — apply in place, no reload.
+            coordinator.reload_signature = new_sig
+            coordinator.async_update_listeners()
+            return
+        coordinator.reload_signature = new_sig
     await hass.config_entries.async_reload(entry.entry_id)
 
 
