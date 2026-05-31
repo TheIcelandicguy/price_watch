@@ -167,24 +167,56 @@ _NON_SHOP_DOMAINS: frozenset[str] = frozenset(
         "dronebotworkshop.com",
         "randomnerdtutorials.com",
         "home-assistant.io",
+        "lastminuteengineers.com",
+        "circuitdigest.com",
+        "electronicshub.org",
+        "allaboutcircuits.com",
+        "makeuseof.com",
+        "howtogeek.com",
+        "wled.ge",
     }
+)
+
+# Subdomain prefixes that signal documentation, community, or editorial
+# content rather than a product listing — none of these ever host a
+# checkout. Catches doc/wiki/forum hosts (kno.wled.ge, docs.espressif.com,
+# community.home-assistant.io) that aren't worth denylisting individually.
+# Conservative: a store never lives at docs./forum./help., so this can't
+# false-flag a real seller's product page.
+_NON_SHOP_SUBDOMAIN_PREFIXES: tuple[str, ...] = (
+    "docs.",
+    "doc.",
+    "kno.",
+    "wiki.",
+    "blog.",
+    "forum.",
+    "forums.",
+    "community.",
+    "help.",
+    "support.",
+    "learn.",
+    "kb.",
 )
 
 
 def _is_non_shop_domain(url: str) -> bool:
     """True if the URL's host is a known non-commerce site (heuristic).
 
-    Suffix match so subdomains (gist.github.com, m.youtube.com,
-    en.wikipedia.org) are caught too. Only ever returns True for the
-    curated denylist above — an unrecognized host returns False (treated
-    as a possible shop), which is the conservative default.
+    Two signals, both conservative:
+      1. Suffix match against the curated denylist, so subdomains
+         (gist.github.com, m.youtube.com, en.wikipedia.org) are caught.
+      2. A documentation/community subdomain prefix (docs., kno., forum.,
+         help., ...) — those hosts never sell a product.
+
+    An unrecognized host returns False (treated as a possible shop),
+    which is the safe default.
     """
     host = _normalize_domain(url)
     if not host:
         return False
-    return any(
-        host == nd or host.endswith("." + nd) for nd in _NON_SHOP_DOMAINS
-    )
+    if any(host == nd or host.endswith("." + nd) for nd in _NON_SHOP_DOMAINS):
+        return True
+    return host.startswith(_NON_SHOP_SUBDOMAIN_PREFIXES)
 
 
 if TYPE_CHECKING:
@@ -584,6 +616,24 @@ class AlternativesMixin:
                 _LOGGER.debug(
                     "%s: dropped %d alternative(s) via domain blocklist (%s)",
                     self.entry.entry_id, dropped, ", ".join(sorted(excluded)),
+                )
+
+        # Drop known non-commerce hosts (code repos, video, social, forums,
+        # tutorial blogs). An "alternative" is meant to be another place to
+        # buy this product, so a GitHub/YouTube/Reddit hit is pure noise —
+        # unlike Free-mode "Search & add" where the user picks manually and
+        # we only flag them. Conservative denylist: an unrecognized host is
+        # treated as a possible shop and kept.
+        if alternatives:
+            before = len(alternatives)
+            alternatives = [
+                alt for alt in alternatives if not _is_non_shop_domain(alt.url)
+            ]
+            dropped = before - len(alternatives)
+            if dropped:
+                _LOGGER.debug(
+                    "%s: dropped %d alternative(s) as non-shop hosts",
+                    self.entry.entry_id, dropped,
                 )
 
         # Persist

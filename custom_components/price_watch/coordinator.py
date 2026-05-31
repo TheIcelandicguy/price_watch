@@ -115,6 +115,14 @@ class PriceWatchCoordinator(
         self._custom_parser: dict[str, Any] | None = self._parse_custom_parser(
             entry.options.get(CONF_CUSTOM_PARSER)
         )
+        # Product-level Wix variant pin for the PRIMARY listing — used when a
+        # single-product entry has no materialized listings[] array (the
+        # from-scratch / panel-track case). Per-listing variant_options on a
+        # listing config still take precedence; this is the primary fallback,
+        # mirroring how _custom_parser works above.
+        self._variant_options: list[str] = [
+            str(v) for v in (entry.options.get("variant_options") or [])
+        ]
         self._target_price: float | None = entry.options.get(
             CONF_TARGET_PRICE, entry.data.get(CONF_TARGET_PRICE)
         )
@@ -768,6 +776,13 @@ class PriceWatchCoordinator(
         if custom_parser is None and listing_id == self._primary_listing_id:
             custom_parser = self._custom_parser
 
+        # Pinned Wix variant (option labels) for this listing, if any. Falls
+        # back to the product-level pin for the primary listing (entries with
+        # no materialized listings[] array).
+        variant_options = config.get("variant_options") or None
+        if variant_options is None and listing_id == self._primary_listing_id:
+            variant_options = self._variant_options or None
+
         if not url:
             raise UpdateFailed(f"Listing {listing_id} has no URL")
 
@@ -785,6 +800,7 @@ class PriceWatchCoordinator(
                 ai_provider=self._ai_provider,
                 custom_parser=custom_parser,
                 previous_hash=previous_hash,
+                variant_options=variant_options,
             )
         except ExtractionError as err:
             if str(err) == "UNCHANGED":
@@ -806,6 +822,7 @@ class PriceWatchCoordinator(
                     ai_provider=self._ai_provider,
                     custom_parser=custom_parser,
                     previous_hash=None,
+                    variant_options=variant_options,
                 )
             else:
                 raise UpdateFailed(f"Extraction failed: {err}") from err

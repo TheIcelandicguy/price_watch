@@ -321,6 +321,48 @@ async def _register_services(hass: HomeAssistant) -> None:
         for coord in _coordinators_for(call):
             await coord.async_set_target(target)
 
+    async def set_variant(call: ServiceCall) -> None:
+        """Pin (or clear) the tracked product-variant for a product.
+
+        Writes product-level `variant_options` on entry.options and reloads
+        the entry so the coordinator re-reads it and re-extracts on the next
+        poll. This is the from-scratch / panel-track counterpart to
+        edit_listing's variant_options field: those entries have no
+        materialized `listings[]` array, so their implicit primary listing
+        can only be steered via this product-level fallback.
+
+        variant_options accepts a list of option labels, a comma-separated
+        string (convenience), or an empty/null value to clear (revert to the
+        page's default offer). Targets a single product by entry_id or
+        device_id.
+        """
+        vo = call.data.get("variant_options")
+        if not vo:
+            variant_options: list[str] = []
+        elif isinstance(vo, list):
+            variant_options = [str(x).strip() for x in vo if str(x).strip()]
+        elif isinstance(vo, str):
+            variant_options = [p.strip() for p in vo.split(",") if p.strip()]
+        else:
+            raise HomeAssistantError(
+                "variant_options must be a list or comma-separated string"
+            )
+
+        coords = _coordinators_for(call)
+        if not coords:
+            raise HomeAssistantError(
+                "set_variant matched no product; pass entry_id or device_id"
+            )
+        for coord in coords:
+            entry = coord.entry
+            new_options = {**entry.options, "variant_options": variant_options}
+            hass.config_entries.async_update_entry(entry, options=new_options)
+            _LOGGER.info(
+                "set_variant: entry %s -> %r; reloading",
+                entry.entry_id, variant_options,
+            )
+            await hass.config_entries.async_reload(entry.entry_id)
+
     async def reset_history(call: ServiceCall) -> None:
         """Wipe price history."""
         for coord in _coordinators_for(call):
@@ -631,6 +673,24 @@ async def _register_services(hass: HomeAssistant) -> None:
                         f"custom_parser is not valid JSON: {err}"
                     ) from err
 
+        # variant_options: present-and-empty clears it (track default);
+        # a list pins those option labels; a comma-separated string is
+        # accepted as a convenience; absent leaves it untouched.
+        if "variant_options" in call.data:
+            vo = call.data.get("variant_options")
+            if not vo:
+                target["variant_options"] = []
+            elif isinstance(vo, list):
+                target["variant_options"] = [str(x).strip() for x in vo if str(x).strip()]
+            elif isinstance(vo, str):
+                target["variant_options"] = [
+                    p.strip() for p in vo.split(",") if p.strip()
+                ]
+            else:
+                raise HomeAssistantError(
+                    "variant_options must be a list or comma-separated string"
+                )
+
         if "currency" in call.data:
             target["currency"] = call.data.get("currency") or ""
         if "retailer" in call.data and call.data.get("retailer"):
@@ -702,6 +762,14 @@ async def _register_services(hass: HomeAssistant) -> None:
             {vol.Optional(CONF_TARGET_PRICE): vol.Any(None, vol.Coerce(float))}
         ),
     )
+    hass.services.async_register(
+        DOMAIN,
+        "set_variant",
+        set_variant,
+        schema=target_schema.extend(
+            {vol.Optional("variant_options"): vol.Any(None, str, list)}
+        ),
+    )
     hass.services.async_register(DOMAIN, "reset_history", reset_history, schema=target_schema)
     hass.services.async_register(
         DOMAIN,
@@ -758,6 +826,7 @@ async def _register_services(hass: HomeAssistant) -> None:
                 vol.Required("entry_id"): str,
                 vol.Required("listing_id"): str,
                 vol.Optional("custom_parser"): vol.Any(None, str, dict),
+                vol.Optional("variant_options"): vol.Any(None, str, list),
                 vol.Optional("currency"): str,
                 vol.Optional("retailer"): str,
                 vol.Optional("request_cookies"): list,

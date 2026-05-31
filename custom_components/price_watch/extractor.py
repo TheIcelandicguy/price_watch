@@ -414,6 +414,158 @@ def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
     }
 
 
+def _coerce_price(value: Any) -> float | None:
+    """Parse a price-ish value to float, tolerating commas. None on junk."""
+    if value is None:
+        return None
+    try:
+        return float(str(value).replace(",", "."))
+    except (ValueError, TypeError):
+        return None
+
+
+def _json_array_after_key(blob: str, key: str) -> Any | None:
+    """Extract and parse the JSON array that follows ``"key":`` in a blob.
+
+    Wix embeds product option/variant data as raw JSON inside a regular
+    ``<script>`` (not ld+json), so the whole page can't be json.loads'd.
+    This locates ``"key":[ ... ]`` and bracket-matches to pull just that
+    array, tracking string/escape state so brackets inside string values
+    don't throw off the depth count. Tries successive occurrences until one
+    parses. Returns the parsed array, or None when absent/unparseable.
+    """
+    marker = '"' + key + '"'
+    pos = 0
+    while True:
+        i = blob.find(marker, pos)
+        if i == -1:
+            return None
+        j = i + len(marker)
+        while j < len(blob) and blob[j] in " \t\r\n":
+            j += 1
+        if j >= len(blob) or blob[j] != ":":
+            pos = i + len(marker)
+            continue
+        j += 1
+        while j < len(blob) and blob[j] in " \t\r\n":
+            j += 1
+        if j >= len(blob) or blob[j] != "[":
+            pos = i + len(marker)
+            continue
+        depth = 0
+        in_str = False
+        esc = False
+        end = -1
+        for k in range(j, len(blob)):
+            c = blob[k]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+                continue
+            if c == '"':
+                in_str = True
+            elif c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+                if depth == 0:
+                    end = k
+                    break
+        if end == -1:
+            return None
+        try:
+            return json.loads(blob[j:end + 1])
+        except (json.JSONDecodeError, ValueError):
+            pos = i + len(marker)
+            continue
+
+
+def try_wix_variant(
+    html: str, variant_options: list[str], url: str | None = None
+) -> dict[str, Any] | None:
+    """Resolve a specific Wix product variant's price by its option labels.
+
+    Wix product pages embed *all* variant combinations as a JSON
+    ``productItems`` array, plus an ``options`` array mapping selection ids
+    to human labels ("1xIR Remote", "5-48V", ...). The page's JSON-LD only
+    exposes ONE default price; the others render only after a client-side
+    option click that a server-side fetch never triggers. Reading the
+    embedded data lets us track a non-default combo (e.g. "with remote")
+    without a headless browser.
+
+    ``variant_options`` are the desired option VALUES (case-insensitive),
+    e.g. ``["1xIR Remote", "5-48V"]``. A productItem matches when its
+    selection labels are a superset of these — options the user didn't pin
+    (like a lone "WLED" firmware) are ignored.
+
+    Returns ``{price, currency, in_stock, matched}`` for the matching
+    variant, or None when the page isn't a Wix variant page or no combo
+    matches (caller then falls back to JSON-LD/AI).
+    """
+    wanted = [
+        str(v).strip().lower() for v in (variant_options or []) if str(v).strip()
+    ]
+    if not wanted:
+        return None
+
+    options = _json_array_after_key(html, "options")
+    items = _json_array_after_key(html, "productItems")
+    if not isinstance(options, list) or not isinstance(items, list) or not items:
+        return None
+
+    # selection id -> human label
+    sel_label: dict[Any, str] = {}
+    for opt in options:
+        if not isinstance(opt, dict):
+            continue
+        for sel in opt.get("selections") or []:
+            if isinstance(sel, dict) and "id" in sel:
+                sel_label[sel["id"]] = str(sel.get("value", ""))
+
+    currency = ""
+    cur_match = re.search(r'"priceCurrency"\s*:\s*"([A-Za-z]{3})"', html)
+    if cur_match:
+        currency = cur_match.group(1).upper()
+
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        labels = {
+            sel_label.get(s, "").strip().lower()
+            for s in (it.get("optionsSelections") or [])
+        }
+        if not all(w in labels for w in wanted):
+            continue
+
+        price = _coerce_price(it.get("price"))
+        compare = _coerce_price(it.get("comparePrice"))
+        has_discount = bool(it.get("hasDiscount"))
+        # Selling price: when on sale it's the LOWER of the two. This is
+        # robust to both standard Wix (comparePrice = higher strikethrough)
+        # and stores that invert the fields (athom.tech lists the sale price
+        # under comparePrice). Otherwise the plain price.
+        if has_discount and price and compare:
+            current = min(price, compare)
+        else:
+            current = price if price else compare
+        if not current or current <= 0:
+            return None
+
+        in_stock = it.get("inStock")
+        return {
+            "price": float(current),
+            "currency": currency,
+            "in_stock": True if in_stock is None else bool(in_stock),
+            "matched": sorted(lbl for lbl in labels if lbl),
+        }
+
+    return None
+
+
 def _normalize_cookies(cookies: Any) -> dict[str, str] | None:
     """Accept cookies as a dict or cookie-header string; return a dict.
 
@@ -631,6 +783,7 @@ async def extract_product(
     ai_provider: AIProvider | None = None,
     custom_parser: dict[str, Any] | None = None,
     previous_hash: str | None = None,
+    variant_options: list[str] | None = None,
 ) -> ExtractionResult:
     """Top-level extraction entry point.
 
@@ -639,8 +792,10 @@ async def extract_product(
        the URL/method/body, allowing fetches against retailer JSON APIs.
        If the parser fails AND an ai_provider is configured, AI extraction
        is tried as a fallback before propagating the error.
-    2. JSON-LD if present (no API cost).
-    3. AI extraction via ai_provider (paid for hosted providers, free for
+    2. Wix variant override (no API cost) when ``variant_options`` is set —
+       reads a specific option combo's price from the page's embedded data.
+    3. JSON-LD if present (no API cost).
+    4. AI extraction via ai_provider (paid for hosted providers, free for
        local).
     """
     if custom_parser:
@@ -786,6 +941,36 @@ async def extract_product(
 
     if previous_hash and previous_hash == content_hash:
         raise ExtractionError("UNCHANGED")
+
+    # Variant override: when the user pinned a specific option combo
+    # (e.g. "With IR Remote / 5-48V"), read that variant's price from the
+    # page's embedded Wix data. The page's JSON-LD only carries the default
+    # combo, so without this we'd always track the cheapest/base config.
+    # Falls through to JSON-LD/AI if the page isn't a Wix variant page or no
+    # combo matches.
+    if variant_options:
+        variant = try_wix_variant(html, variant_options, url=url)
+        if variant and variant.get("price"):
+            base = try_jsonld(html, url=url) or {}
+            return ExtractionResult(
+                title=base.get("title", "") or "",
+                price=variant["price"],
+                currency=variant.get("currency") or base.get("currency", ""),
+                in_stock=variant.get("in_stock", True),
+                stock_count=base.get("stock_count"),
+                image_url=base.get("image_url") or find_meta_image(html),
+                sku=base.get("sku"),
+                retailer=base.get("retailer"),
+                content_hash=content_hash,
+                cost_usd=0.0,
+                method="wix_variant",
+                raw={"variant_options": list(variant_options), **variant},
+            )
+        _LOGGER.warning(
+            "variant_options=%r set but no matching Wix variant found at "
+            "%s; falling back to default extraction",
+            variant_options, url,
+        )
 
     jsonld = try_jsonld(html, url=url)
     if jsonld and jsonld.get("price"):

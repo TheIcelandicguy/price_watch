@@ -73,6 +73,11 @@ class TrackedListing:
     # Custom parser config blob (see parsers.py apply_custom_parser).
     # None means "use AI fallback or JSON-LD".
     custom_parser: dict[str, Any] | None = None
+    # Pinned product-variant option labels for sites that embed all
+    # variant prices in the page (Wix). e.g. ["1xIR Remote", "5-48V"].
+    # When set, the extractor reads THAT combo's price instead of the
+    # page's default offer. Empty list = track the default.
+    variant_options: list[str] = field(default_factory=list)
     # Cookies to send with the request. List of {name, value, domain}
     # dicts in the same shape parsers.py expects.
     request_cookies: list[dict[str, Any]] = field(default_factory=list)
@@ -144,6 +149,7 @@ class TrackedListing:
             "retailer": self.retailer,
             "currency": self.currency,
             "custom_parser": self.custom_parser,
+            "variant_options": list(self.variant_options),
             "request_cookies": list(self.request_cookies),
             "min_price": self.min_price,
             "max_price": self.max_price,
@@ -177,6 +183,7 @@ class TrackedListing:
             retailer=str(data["retailer"]),
             currency=str(data.get("currency", "") or ""),
             custom_parser=data.get("custom_parser"),
+            variant_options=[str(v) for v in (data.get("variant_options") or [])],
             request_cookies=list(data.get("request_cookies") or []),
             min_price=_coerce_optional_float(data.get("min_price")),
             max_price=_coerce_optional_float(data.get("max_price")),

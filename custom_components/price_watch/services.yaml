@@ -40,6 +40,38 @@ set_target:
           min: 0
           step: 0.01
 
+set_variant:
+  name: Set tracked variant
+  description: >
+    Pin the product-variant whose price this product follows, for sites
+    that embed every variant's price in the page (Wix stores like
+    athom.tech). Give the option labels exactly as shown on the page,
+    e.g. "1xIR Remote, 5-48V" (comma-separated) or a YAML list. Empty
+    value reverts to the page's default offer. This is the product-level
+    counterpart to edit_listing's variant_options — use it for products
+    created from search / panel-track that have no materialized listing.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: Target only this product (optional).
+      example: 01KT04D13E97KZDX07NPNR2WSB
+      selector:
+        text:
+    device_id:
+      name: Device
+      description: Target only this product, by HA device.
+      selector:
+        device:
+          integration: price_watch
+    variant_options:
+      name: Variant options
+      description: >
+        Option labels to pin (comma-separated or YAML list). Empty
+        reverts to the default offer.
+      example: 1xIR Remote, 5-48V
+      selector:
+        text:
+
 reset_history:
   name: Reset history
   description: Wipe the price history and lifetime extremes for a tracked product.
@@ -214,6 +246,18 @@ edit_listing:
         the listing to the default JSON-LD + AI pipeline.
       selector:
         object:
+    variant_options:
+      name: Variant options
+      description: >
+        Pin a specific product-variant combo on sites that embed every
+        variant's price in the page (Wix stores like athom.tech). Give the
+        option labels exactly as shown on the page, e.g. "1xIR Remote, 5-48V"
+        (comma-separated) or a YAML list. The tracker then follows THAT
+        combo's price instead of the page's default offer. Empty value
+        reverts to the default.
+      example: 1xIR Remote, 5-48V
+      selector:
+        text:
     currency:
       name: Currency
       description: ISO currency code override (USD, EUR, ISK, …). Optional.
