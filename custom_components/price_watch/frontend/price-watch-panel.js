@@ -1,29 +1,29 @@
-function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPropertyDescriptor(t,r):i;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)n=Reflect.decorate(e,t,r,i);else for(var a=e.length-1;a>=0;a--)(s=e[a])&&(n=(o<3?s(n):o>3?s(t,r,n):s(t,r))||n);return o>3&&n&&Object.defineProperty(t,r,n),n}"function"==typeof SuppressedError&&SuppressedError;const t=globalThis,r=t.ShadowRoot&&(void 0===t.ShadyCSS||t.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,i=Symbol(),s=new WeakMap;let o=class{constructor(e,t,r){if(this._$cssResult$=!0,r!==i)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const t=this.t;if(r&&void 0===e){const r=void 0!==t&&1===t.length;r&&(e=s.get(t)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),r&&s.set(t,e))}return e}toString(){return this.cssText}};const n=(e,...t)=>{const r=1===e.length?e[0]:t.reduce((t,r,i)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(r)+e[i+1],e[0]);return new o(r,e,i)},a=r?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const r of e.cssRules)t+=r.cssText;return(e=>new o("string"==typeof e?e:e+"",void 0,i))(t)})(e):e,{is:l,defineProperty:c,getOwnPropertyDescriptor:d,getOwnPropertyNames:p,getOwnPropertySymbols:h,getPrototypeOf:u}=Object,_=globalThis,g=_.trustedTypes,f=g?g.emptyScript:"",m=_.reactiveElementPolyfillSupport,v=(e,t)=>e,y={toAttribute(e,t){switch(t){case Boolean:e=e?f:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let r=e;switch(t){case Boolean:r=null!==e;break;case Number:r=null===e?null:Number(e);break;case Object:case Array:try{r=JSON.parse(e)}catch(e){r=null}}return r}},b=(e,t)=>!l(e,t),x={attribute:!0,type:String,converter:y,reflect:!1,useDefault:!1,hasChanged:b};Symbol.metadata??=Symbol("metadata"),_.litPropertyMetadata??=new WeakMap;let k=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=x){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const r=Symbol(),i=this.getPropertyDescriptor(e,r,t);void 0!==i&&c(this.prototype,e,i)}}static getPropertyDescriptor(e,t,r){const{get:i,set:s}=d(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:i,set(t){const o=i?.call(this);s?.call(this,t),this.requestUpdate(e,o,r)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??x}static _$Ei(){if(this.hasOwnProperty(v("elementProperties")))return;const e=u(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(v("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(v("properties"))){const e=this.properties,t=[...p(e),...h(e)];for(const r of t)this.createProperty(r,e[r])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,r]of t)this.elementProperties.set(e,r)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const r=this._$Eu(e,t);void 0!==r&&this._$Eh.set(r,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const r=new Set(e.flat(1/0).reverse());for(const e of r)t.unshift(a(e))}else void 0!==e&&t.push(a(e));return t}static _$Eu(e,t){const r=t.attribute;return!1===r?void 0:"string"==typeof r?r:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const r of t.keys())this.hasOwnProperty(r)&&(e.set(r,this[r]),delete this[r]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,i)=>{if(r)e.adoptedStyleSheets=i.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const r of i){const i=document.createElement("style"),s=t.litNonce;void 0!==s&&i.setAttribute("nonce",s),i.textContent=r.cssText,e.appendChild(i)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,r){this._$AK(e,r)}_$ET(e,t){const r=this.constructor.elementProperties.get(e),i=this.constructor._$Eu(e,r);if(void 0!==i&&!0===r.reflect){const s=(void 0!==r.converter?.toAttribute?r.converter:y).toAttribute(t,r.type);this._$Em=e,null==s?this.removeAttribute(i):this.setAttribute(i,s),this._$Em=null}}_$AK(e,t){const r=this.constructor,i=r._$Eh.get(e);if(void 0!==i&&this._$Em!==i){const e=r.getPropertyOptions(i),s="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:y;this._$Em=i;const o=s.fromAttribute(t,e.type);this[i]=o??this._$Ej?.get(i)??o,this._$Em=null}}requestUpdate(e,t,r,i=!1,s){if(void 0!==e){const o=this.constructor;if(!1===i&&(s=this[e]),r??=o.getPropertyOptions(e),!((r.hasChanged??b)(s,t)||r.useDefault&&r.reflect&&s===this._$Ej?.get(e)&&!this.hasAttribute(o._$Eu(e,r))))return;this.C(e,t,r)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:r,reflect:i,wrapped:s},o){r&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,o??t??this[e]),!0!==s||void 0!==o)||(this._$AL.has(e)||(this.hasUpdated||r||(t=void 0),this._$AL.set(e,t)),!0===i&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,r]of e){const{wrapped:e}=r,i=this[t];!0!==e||this._$AL.has(t)||void 0===i||this.C(t,void 0,r,i)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};k.elementStyles=[],k.shadowRootOptions={mode:"open"},k[v("elementProperties")]=new Map,k[v("finalized")]=new Map,m?.({ReactiveElement:k}),(_.reactiveElementVersions??=[]).push("2.1.2");const $=globalThis,w=e=>e,S=$.trustedTypes,E=S?S.createPolicy("lit-html",{createHTML:e=>e}):void 0,A="$lit$",P=`lit$${Math.random().toFixed(9).slice(2)}$`,T="?"+P,C=`<${T}>`,I=document,N=()=>I.createComment(""),R=e=>null===e||"object"!=typeof e&&"function"!=typeof e,z=Array.isArray,O="[ \t\n\f\r]",M=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,L=/-->/g,U=/>/g,H=RegExp(`>|${O}(?:([^\\s"'>=/]+)(${O}*=${O}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),D=/'/g,B=/"/g,j=/^(?:script|style|textarea|title)$/i,K=(e=>(t,...r)=>({_$litType$:e,strings:t,values:r}))(1),F=Symbol.for("lit-noChange"),q=Symbol.for("lit-nothing"),Y=new WeakMap,V=I.createTreeWalker(I,129);function W(e,t){if(!z(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==E?E.createHTML(t):t}const J=(e,t)=>{const r=e.length-1,i=[];let s,o=2===t?"<svg>":3===t?"<math>":"",n=M;for(let t=0;t<r;t++){const r=e[t];let a,l,c=-1,d=0;for(;d<r.length&&(n.lastIndex=d,l=n.exec(r),null!==l);)d=n.lastIndex,n===M?"!--"===l[1]?n=L:void 0!==l[1]?n=U:void 0!==l[2]?(j.test(l[2])&&(s=RegExp("</"+l[2],"g")),n=H):void 0!==l[3]&&(n=H):n===H?">"===l[0]?(n=s??M,c=-1):void 0===l[1]?c=-2:(c=n.lastIndex-l[2].length,a=l[1],n=void 0===l[3]?H:'"'===l[3]?B:D):n===B||n===D?n=H:n===L||n===U?n=M:(n=H,s=void 0);const p=n===H&&e[t+1].startsWith("/>")?" ":"";o+=n===M?r+C:c>=0?(i.push(a),r.slice(0,c)+A+r.slice(c)+P+p):r+P+(-2===c?t:p)}return[W(e,o+(e[r]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),i]};class Q{constructor({strings:e,_$litType$:t},r){let i;this.parts=[];let s=0,o=0;const n=e.length-1,a=this.parts,[l,c]=J(e,t);if(this.el=Q.createElement(l,r),V.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(i=V.nextNode())&&a.length<n;){if(1===i.nodeType){if(i.hasAttributes())for(const e of i.getAttributeNames())if(e.endsWith(A)){const t=c[o++],r=i.getAttribute(e).split(P),n=/([.?@])?(.*)/.exec(t);a.push({type:1,index:s,name:n[2],strings:r,ctor:"."===n[1]?te:"?"===n[1]?re:"@"===n[1]?ie:ee}),i.removeAttribute(e)}else e.startsWith(P)&&(a.push({type:6,index:s}),i.removeAttribute(e));if(j.test(i.tagName)){const e=i.textContent.split(P),t=e.length-1;if(t>0){i.textContent=S?S.emptyScript:"";for(let r=0;r<t;r++)i.append(e[r],N()),V.nextNode(),a.push({type:2,index:++s});i.append(e[t],N())}}}else if(8===i.nodeType)if(i.data===T)a.push({type:2,index:s});else{let e=-1;for(;-1!==(e=i.data.indexOf(P,e+1));)a.push({type:7,index:s}),e+=P.length-1}s++}}static createElement(e,t){const r=I.createElement("template");return r.innerHTML=e,r}}function Z(e,t,r=e,i){if(t===F)return t;let s=void 0!==i?r._$Co?.[i]:r._$Cl;const o=R(t)?void 0:t._$litDirective$;return s?.constructor!==o&&(s?._$AO?.(!1),void 0===o?s=void 0:(s=new o(e),s._$AT(e,r,i)),void 0!==i?(r._$Co??=[])[i]=s:r._$Cl=s),void 0!==s&&(t=Z(e,s._$AS(e,t.values),s,i)),t}class G{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:r}=this._$AD,i=(e?.creationScope??I).importNode(t,!0);V.currentNode=i;let s=V.nextNode(),o=0,n=0,a=r[0];for(;void 0!==a;){if(o===a.index){let t;2===a.type?t=new X(s,s.nextSibling,this,e):1===a.type?t=new a.ctor(s,a.name,a.strings,this,e):6===a.type&&(t=new se(s,this,e)),this._$AV.push(t),a=r[++n]}o!==a?.index&&(s=V.nextNode(),o++)}return V.currentNode=I,i}p(e){let t=0;for(const r of this._$AV)void 0!==r&&(void 0!==r.strings?(r._$AI(e,r,t),t+=r.strings.length-2):r._$AI(e[t])),t++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,r,i){this.type=2,this._$AH=q,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=r,this.options=i,this._$Cv=i?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=Z(this,e,t),R(e)?e===q||null==e||""===e?(this._$AH!==q&&this._$AR(),this._$AH=q):e!==this._$AH&&e!==F&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>z(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==q&&R(this._$AH)?this._$AA.nextSibling.data=e:this.T(I.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:r}=e,i="number"==typeof r?this._$AC(e):(void 0===r.el&&(r.el=Q.createElement(W(r.h,r.h[0]),this.options)),r);if(this._$AH?._$AD===i)this._$AH.p(t);else{const e=new G(i,this),r=e.u(this.options);e.p(t),this.T(r),this._$AH=e}}_$AC(e){let t=Y.get(e.strings);return void 0===t&&Y.set(e.strings,t=new Q(e)),t}k(e){z(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let r,i=0;for(const s of e)i===t.length?t.push(r=new X(this.O(N()),this.O(N()),this,this.options)):r=t[i],r._$AI(s),i++;i<t.length&&(this._$AR(r&&r._$AB.nextSibling,i),t.length=i)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=w(e).nextSibling;w(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}class ee{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,r,i,s){this.type=1,this._$AH=q,this._$AN=void 0,this.element=e,this.name=t,this._$AM=i,this.options=s,r.length>2||""!==r[0]||""!==r[1]?(this._$AH=Array(r.length-1).fill(new String),this.strings=r):this._$AH=q}_$AI(e,t=this,r,i){const s=this.strings;let o=!1;if(void 0===s)e=Z(this,e,t,0),o=!R(e)||e!==this._$AH&&e!==F,o&&(this._$AH=e);else{const i=e;let n,a;for(e=s[0],n=0;n<s.length-1;n++)a=Z(this,i[r+n],t,n),a===F&&(a=this._$AH[n]),o||=!R(a)||a!==this._$AH[n],a===q?e=q:e!==q&&(e+=(a??"")+s[n+1]),this._$AH[n]=a}o&&!i&&this.j(e)}j(e){e===q?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}}class te extends ee{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===q?void 0:e}}class re extends ee{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==q)}}class ie extends ee{constructor(e,t,r,i,s){super(e,t,r,i,s),this.type=5}_$AI(e,t=this){if((e=Z(this,e,t,0)??q)===F)return;const r=this._$AH,i=e===q&&r!==q||e.capture!==r.capture||e.once!==r.once||e.passive!==r.passive,s=e!==q&&(r===q||i);i&&this.element.removeEventListener(this.name,this,r),s&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class se{constructor(e,t,r){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=r}get _$AU(){return this._$AM._$AU}_$AI(e){Z(this,e)}}const oe=$.litHtmlPolyfillSupport;oe?.(Q,X),($.litHtmlVersions??=[]).push("3.3.3");const ne=globalThis;class ae extends k{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,r)=>{const i=r?.renderBefore??t;let s=i._$litPart$;if(void 0===s){const e=r?.renderBefore??null;i._$litPart$=s=new X(t.insertBefore(N(),e),e,void 0,r??{})}return s._$AI(e),s})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return F}}ae._$litElement$=!0,ae.finalized=!0,ne.litElementHydrateSupport?.({LitElement:ae});const le=ne.litElementPolyfillSupport;le?.({LitElement:ae}),(ne.litElementVersions??=[]).push("4.2.2");const ce={attribute:!0,type:String,converter:y,reflect:!1,hasChanged:b},de=(e=ce,t,r)=>{const{kind:i,metadata:s}=r;let o=globalThis.litPropertyMetadata.get(s);if(void 0===o&&globalThis.litPropertyMetadata.set(s,o=new Map),"setter"===i&&((e=Object.create(e)).wrapped=!0),o.set(r.name,e),"accessor"===i){const{name:i}=r;return{set(r){const s=t.get.call(this);t.set.call(this,r),this.requestUpdate(i,s,e,!0,r)},init(t){return void 0!==t&&this.C(i,void 0,e,t),t}}}if("setter"===i){const{name:i}=r;return function(r){const s=this[i];t.call(this,r),this.requestUpdate(i,s,e,!0,r)}}throw Error("Unsupported decorator location: "+i)};function pe(e){return(t,r)=>"object"==typeof r?de(e,t,r):((e,t,r)=>{const i=t.hasOwnProperty(r);return t.constructor.createProperty(r,e),i?Object.getOwnPropertyDescriptor(t,r):void 0})(e,t,r)}function he(e){return pe({...e,state:!0,attribute:!1})}function ue(e){if(null==e||"unknown"===e||"unavailable"===e)return null;const t=Number(e);return Number.isFinite(t)?t:null}function _e(e){return null==e||"unknown"===e||"unavailable"===e?null:"on"===e||"true"===e||"off"!==e&&"false"!==e&&null}function ge(e,t,r="en"){if(null==e)return"—";if(!t)return e.toLocaleString(r);try{return new Intl.NumberFormat(r,{style:"currency",currency:t,maximumFractionDigits:2}).format(e)}catch{return`${e.toLocaleString(r,{maximumFractionDigits:2})} ${t}`}}function fe(e,t="en"){if(!e)return"never";const r=new Date(e).getTime();if(Number.isNaN(r))return e;const i=Date.now()-r,s=Math.round(i/1e3),o=Math.abs(s),n=new Intl.RelativeTimeFormat(t,{numeric:"auto"});return o<60?n.format(-s,"second"):o<3600?n.format(-Math.round(s/60),"minute"):o<86400?n.format(-Math.round(s/3600),"hour"):o<2592e3?n.format(-Math.round(s/86400),"day"):n.format(-Math.round(s/2592e3),"month")}function me(e){if(!Array.isArray(e))return[];const t=[];for(const r of e)if(null!=r&&"object"==typeof r&&"price"in r&&"ts"in r){const e=r,i="number"==typeof e.price?e.price:null;if(null==i)continue;t.push({ts:String(e.ts??""),price:i,currency:String(e.currency??""),in_stock:!1!==e.in_stock})}return t}function ve(e){if(!Array.isArray(e))return[];const t=[];for(const r of e){if(!r||"object"!=typeof r)continue;const e=r,i="string"==typeof e.title?e.title:"",s="string"==typeof e.url?e.url:"";i&&s&&t.push({title:i,url:s,price:"number"==typeof e.price?e.price:null,currency:"string"==typeof e.currency?e.currency:"",retailer:"string"==typeof e.retailer?e.retailer:"",imageUrl:"string"==typeof e.image_url&&e.image_url?e.image_url:null,confidence:"number"==typeof e.confidence?Math.max(0,Math.min(1,e.confidence)):0,notes:"string"==typeof e.notes?e.notes:"",shipsToUserRegion:"boolean"==typeof e.ships_to_user_region?e.ships_to_user_region:null})}return t.sort((e,t)=>{if(t.confidence!==e.confidence)return t.confidence-e.confidence;return(e.price??Number.POSITIVE_INFINITY)-(t.price??Number.POSITIVE_INFINITY)}),t}function ye(e){const t=e.indexOf("_");if(t<0)return null;const r=e.slice(0,t),i=e.slice(t+1),s=/^(l_[0-9a-z]+)_(.+)$/.exec(i);return s?{entryId:r,listingId:s[1],key:s[2]}:{entryId:r,listingId:null,key:i}}function be(e,t,r,i){const s=t.get("price");if(!s)return null;const o=e.states[s];if(!o)return null;const n=o.attributes,a={listingId:r,isPrimary:i,retailer:"string"==typeof n.retailer?n.retailer:null,url:"string"==typeof n.product_url?n.product_url:null,price:ue(o.state),currency:"string"==typeof n.unit_of_measurement?n.unit_of_measurement:"string"==typeof n.currency?n.currency:"",inStock:null,discontinued:!0===n.discontinued,stockCount:"number"==typeof n.stock_count?n.stock_count:null,lastCheck:"string"==typeof n.last_check?n.last_check:null,history:me(n.price_history),imageProxyUrl:null,imageBroken:!1,shipsToUserRegion:"boolean"==typeof n.ships_to_user_region?n.ships_to_user_region:null,entityIds:{price:s}},l=t.get("photo");if(l){const t=e.states[l];if(t)if("unavailable"===t.state||"unknown"===t.state)a.imageBroken=!0;else{const e=t.attributes.entity_picture;"string"==typeof e&&e.length>0&&(a.imageProxyUrl=e)}}const c=t.get("in_stock");if(c){const t=e.states[c];t&&(a.inStock=_e(t.state),a.entityIds.inStock=c)}const d=t.get("discontinued");if(d){const t=e.states[d];if(t){const e=_e(t.state);null!=e&&(a.discontinued=e),a.entityIds.discontinued=d}}return a}function xe(e,t=5){if(e.length<2)return e;const r=e.map(e=>e.price),i=ke(r),s=r.map(e=>Math.abs(e-i)),o=ke(s);return 0===o?e:e.filter(e=>Math.abs(e.price-i)<=t*o)}function ke(e){const t=[...e].sort((e,t)=>e-t),r=Math.floor(t.length/2);return t.length%2==0?(t[r-1]+t[r])/2:t[r]}class $e extends ae{constructor(){super(...arguments),this.refreshingAlternatives=!1,this.hideNonShipping=!1,this.refreshingNow=!1,this.handleRefresh=e=>{e.stopPropagation(),this.refreshingAlternatives||this.onRefreshAlternatives?.(this.product)},this.handleRefreshNow=e=>{e.stopPropagation(),this.refreshingNow||this.onRefreshNow?.(this.product)},this.handleTogglePaused=e=>{e.stopPropagation(),this.onSetPaused?.(this.product,!this.product.paused)},this.handleTargetCommit=e=>{e.stopPropagation();const t=e.target,r=t.value.trim(),i=""===r?null:Number(r);if(null!==i&&Number.isNaN(i))return void(t.value=null!=this.product.targetPrice?String(this.product.targetPrice):"");i!==this.product.targetPrice&&this.onSetTarget?.(this.product,i)},this.handleTargetKeydown=e=>{e.stopPropagation(),"Enter"===e.key&&e.target.blur()}}get headlinePrice(){const{product:e}=this;return null!=e.priceLocal&&e.localCurrency?{value:e.priceLocal,currency:e.localCurrency}:e.discontinued&&null!=e.lastKnownPrice?{value:e.lastKnownPrice,currency:e.lastKnownCurrency??e.currency}:{value:e.price,currency:e.currency||null}}get sourcePriceLine(){const{product:e}=this;return null!=e.priceLocal&&e.localCurrency?e.currency===e.localCurrency?q:ge(e.price,e.currency):q}get priceDelta(){const{product:e}=this;if(null==e.price)return null;const t=e.price;for(let r=e.history.length-1;r>=0;r--){const i=e.history[r].price;if(i!==t)return{amount:Math.abs(t-i),direction:t>i?"up":"down"}}return null}renderDelta(){const e=this.priceDelta;if(null==e)return q;const t="up"===e.direction?"↑":"↓",r="up"===e.direction?"delta delta--up":"delta delta--down";return K`<span class=${r}>${t} ${ge(e.amount,null)}</span>`}renderImage(){const{product:e}=this,t=e.imageProxyUrl??(e.imageBroken?null:e.imageUrl);return t?K`<img
+function e(e,t,r,i){var s,o=arguments.length,a=o<3?t:null===i?i=Object.getOwnPropertyDescriptor(t,r):i;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)a=Reflect.decorate(e,t,r,i);else for(var n=e.length-1;n>=0;n--)(s=e[n])&&(a=(o<3?s(a):o>3?s(t,r,a):s(t,r))||a);return o>3&&a&&Object.defineProperty(t,r,a),a}"function"==typeof SuppressedError&&SuppressedError;const t=globalThis,r=t.ShadowRoot&&(void 0===t.ShadyCSS||t.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,i=Symbol(),s=new WeakMap;let o=class{constructor(e,t,r){if(this._$cssResult$=!0,r!==i)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const t=this.t;if(r&&void 0===e){const r=void 0!==t&&1===t.length;r&&(e=s.get(t)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),r&&s.set(t,e))}return e}toString(){return this.cssText}};const a=(e,...t)=>{const r=1===e.length?e[0]:t.reduce((t,r,i)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(r)+e[i+1],e[0]);return new o(r,e,i)},n=r?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const r of e.cssRules)t+=r.cssText;return(e=>new o("string"==typeof e?e:e+"",void 0,i))(t)})(e):e,{is:l,defineProperty:c,getOwnPropertyDescriptor:d,getOwnPropertyNames:p,getOwnPropertySymbols:h,getPrototypeOf:_}=Object,u=globalThis,g=u.trustedTypes,v=g?g.emptyScript:"",f=u.reactiveElementPolyfillSupport,m=(e,t)=>e,y={toAttribute(e,t){switch(t){case Boolean:e=e?v:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let r=e;switch(t){case Boolean:r=null!==e;break;case Number:r=null===e?null:Number(e);break;case Object:case Array:try{r=JSON.parse(e)}catch(e){r=null}}return r}},b=(e,t)=>!l(e,t),x={attribute:!0,type:String,converter:y,reflect:!1,useDefault:!1,hasChanged:b};Symbol.metadata??=Symbol("metadata"),u.litPropertyMetadata??=new WeakMap;let k=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=x){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const r=Symbol(),i=this.getPropertyDescriptor(e,r,t);void 0!==i&&c(this.prototype,e,i)}}static getPropertyDescriptor(e,t,r){const{get:i,set:s}=d(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:i,set(t){const o=i?.call(this);s?.call(this,t),this.requestUpdate(e,o,r)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??x}static _$Ei(){if(this.hasOwnProperty(m("elementProperties")))return;const e=_(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(m("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(m("properties"))){const e=this.properties,t=[...p(e),...h(e)];for(const r of t)this.createProperty(r,e[r])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,r]of t)this.elementProperties.set(e,r)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const r=this._$Eu(e,t);void 0!==r&&this._$Eh.set(r,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const r=new Set(e.flat(1/0).reverse());for(const e of r)t.unshift(n(e))}else void 0!==e&&t.push(n(e));return t}static _$Eu(e,t){const r=t.attribute;return!1===r?void 0:"string"==typeof r?r:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const r of t.keys())this.hasOwnProperty(r)&&(e.set(r,this[r]),delete this[r]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,i)=>{if(r)e.adoptedStyleSheets=i.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const r of i){const i=document.createElement("style"),s=t.litNonce;void 0!==s&&i.setAttribute("nonce",s),i.textContent=r.cssText,e.appendChild(i)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,r){this._$AK(e,r)}_$ET(e,t){const r=this.constructor.elementProperties.get(e),i=this.constructor._$Eu(e,r);if(void 0!==i&&!0===r.reflect){const s=(void 0!==r.converter?.toAttribute?r.converter:y).toAttribute(t,r.type);this._$Em=e,null==s?this.removeAttribute(i):this.setAttribute(i,s),this._$Em=null}}_$AK(e,t){const r=this.constructor,i=r._$Eh.get(e);if(void 0!==i&&this._$Em!==i){const e=r.getPropertyOptions(i),s="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:y;this._$Em=i;const o=s.fromAttribute(t,e.type);this[i]=o??this._$Ej?.get(i)??o,this._$Em=null}}requestUpdate(e,t,r,i=!1,s){if(void 0!==e){const o=this.constructor;if(!1===i&&(s=this[e]),r??=o.getPropertyOptions(e),!((r.hasChanged??b)(s,t)||r.useDefault&&r.reflect&&s===this._$Ej?.get(e)&&!this.hasAttribute(o._$Eu(e,r))))return;this.C(e,t,r)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:r,reflect:i,wrapped:s},o){r&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,o??t??this[e]),!0!==s||void 0!==o)||(this._$AL.has(e)||(this.hasUpdated||r||(t=void 0),this._$AL.set(e,t)),!0===i&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,r]of e){const{wrapped:e}=r,i=this[t];!0!==e||this._$AL.has(t)||void 0===i||this.C(t,void 0,r,i)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};k.elementStyles=[],k.shadowRootOptions={mode:"open"},k[m("elementProperties")]=new Map,k[m("finalized")]=new Map,f?.({ReactiveElement:k}),(u.reactiveElementVersions??=[]).push("2.1.2");const $=globalThis,w=e=>e,S=$.trustedTypes,E=S?S.createPolicy("lit-html",{createHTML:e=>e}):void 0,A="$lit$",P=`lit$${Math.random().toFixed(9).slice(2)}$`,T="?"+P,C=`<${T}>`,I=document,N=()=>I.createComment(""),R=e=>null===e||"object"!=typeof e&&"function"!=typeof e,L=Array.isArray,z="[ \t\n\f\r]",O=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,M=/-->/g,U=/>/g,H=RegExp(`>|${z}(?:([^\\s"'>=/]+)(${z}*=${z}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),D=/'/g,B=/"/g,j=/^(?:script|style|textarea|title)$/i,V=(e=>(t,...r)=>({_$litType$:e,strings:t,values:r}))(1),F=Symbol.for("lit-noChange"),K=Symbol.for("lit-nothing"),q=new WeakMap,Y=I.createTreeWalker(I,129);function G(e,t){if(!L(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==E?E.createHTML(t):t}const W=(e,t)=>{const r=e.length-1,i=[];let s,o=2===t?"<svg>":3===t?"<math>":"",a=O;for(let t=0;t<r;t++){const r=e[t];let n,l,c=-1,d=0;for(;d<r.length&&(a.lastIndex=d,l=a.exec(r),null!==l);)d=a.lastIndex,a===O?"!--"===l[1]?a=M:void 0!==l[1]?a=U:void 0!==l[2]?(j.test(l[2])&&(s=RegExp("</"+l[2],"g")),a=H):void 0!==l[3]&&(a=H):a===H?">"===l[0]?(a=s??O,c=-1):void 0===l[1]?c=-2:(c=a.lastIndex-l[2].length,n=l[1],a=void 0===l[3]?H:'"'===l[3]?B:D):a===B||a===D?a=H:a===M||a===U?a=O:(a=H,s=void 0);const p=a===H&&e[t+1].startsWith("/>")?" ":"";o+=a===O?r+C:c>=0?(i.push(n),r.slice(0,c)+A+r.slice(c)+P+p):r+P+(-2===c?t:p)}return[G(e,o+(e[r]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),i]};class J{constructor({strings:e,_$litType$:t},r){let i;this.parts=[];let s=0,o=0;const a=e.length-1,n=this.parts,[l,c]=W(e,t);if(this.el=J.createElement(l,r),Y.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(i=Y.nextNode())&&n.length<a;){if(1===i.nodeType){if(i.hasAttributes())for(const e of i.getAttributeNames())if(e.endsWith(A)){const t=c[o++],r=i.getAttribute(e).split(P),a=/([.?@])?(.*)/.exec(t);n.push({type:1,index:s,name:a[2],strings:r,ctor:"."===a[1]?te:"?"===a[1]?re:"@"===a[1]?ie:ee}),i.removeAttribute(e)}else e.startsWith(P)&&(n.push({type:6,index:s}),i.removeAttribute(e));if(j.test(i.tagName)){const e=i.textContent.split(P),t=e.length-1;if(t>0){i.textContent=S?S.emptyScript:"";for(let r=0;r<t;r++)i.append(e[r],N()),Y.nextNode(),n.push({type:2,index:++s});i.append(e[t],N())}}}else if(8===i.nodeType)if(i.data===T)n.push({type:2,index:s});else{let e=-1;for(;-1!==(e=i.data.indexOf(P,e+1));)n.push({type:7,index:s}),e+=P.length-1}s++}}static createElement(e,t){const r=I.createElement("template");return r.innerHTML=e,r}}function Q(e,t,r=e,i){if(t===F)return t;let s=void 0!==i?r._$Co?.[i]:r._$Cl;const o=R(t)?void 0:t._$litDirective$;return s?.constructor!==o&&(s?._$AO?.(!1),void 0===o?s=void 0:(s=new o(e),s._$AT(e,r,i)),void 0!==i?(r._$Co??=[])[i]=s:r._$Cl=s),void 0!==s&&(t=Q(e,s._$AS(e,t.values),s,i)),t}class Z{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:r}=this._$AD,i=(e?.creationScope??I).importNode(t,!0);Y.currentNode=i;let s=Y.nextNode(),o=0,a=0,n=r[0];for(;void 0!==n;){if(o===n.index){let t;2===n.type?t=new X(s,s.nextSibling,this,e):1===n.type?t=new n.ctor(s,n.name,n.strings,this,e):6===n.type&&(t=new se(s,this,e)),this._$AV.push(t),n=r[++a]}o!==n?.index&&(s=Y.nextNode(),o++)}return Y.currentNode=I,i}p(e){let t=0;for(const r of this._$AV)void 0!==r&&(void 0!==r.strings?(r._$AI(e,r,t),t+=r.strings.length-2):r._$AI(e[t])),t++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,r,i){this.type=2,this._$AH=K,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=r,this.options=i,this._$Cv=i?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=Q(this,e,t),R(e)?e===K||null==e||""===e?(this._$AH!==K&&this._$AR(),this._$AH=K):e!==this._$AH&&e!==F&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>L(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==K&&R(this._$AH)?this._$AA.nextSibling.data=e:this.T(I.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:r}=e,i="number"==typeof r?this._$AC(e):(void 0===r.el&&(r.el=J.createElement(G(r.h,r.h[0]),this.options)),r);if(this._$AH?._$AD===i)this._$AH.p(t);else{const e=new Z(i,this),r=e.u(this.options);e.p(t),this.T(r),this._$AH=e}}_$AC(e){let t=q.get(e.strings);return void 0===t&&q.set(e.strings,t=new J(e)),t}k(e){L(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let r,i=0;for(const s of e)i===t.length?t.push(r=new X(this.O(N()),this.O(N()),this,this.options)):r=t[i],r._$AI(s),i++;i<t.length&&(this._$AR(r&&r._$AB.nextSibling,i),t.length=i)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=w(e).nextSibling;w(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}class ee{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,r,i,s){this.type=1,this._$AH=K,this._$AN=void 0,this.element=e,this.name=t,this._$AM=i,this.options=s,r.length>2||""!==r[0]||""!==r[1]?(this._$AH=Array(r.length-1).fill(new String),this.strings=r):this._$AH=K}_$AI(e,t=this,r,i){const s=this.strings;let o=!1;if(void 0===s)e=Q(this,e,t,0),o=!R(e)||e!==this._$AH&&e!==F,o&&(this._$AH=e);else{const i=e;let a,n;for(e=s[0],a=0;a<s.length-1;a++)n=Q(this,i[r+a],t,a),n===F&&(n=this._$AH[a]),o||=!R(n)||n!==this._$AH[a],n===K?e=K:e!==K&&(e+=(n??"")+s[a+1]),this._$AH[a]=n}o&&!i&&this.j(e)}j(e){e===K?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}}class te extends ee{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===K?void 0:e}}class re extends ee{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==K)}}class ie extends ee{constructor(e,t,r,i,s){super(e,t,r,i,s),this.type=5}_$AI(e,t=this){if((e=Q(this,e,t,0)??K)===F)return;const r=this._$AH,i=e===K&&r!==K||e.capture!==r.capture||e.once!==r.once||e.passive!==r.passive,s=e!==K&&(r===K||i);i&&this.element.removeEventListener(this.name,this,r),s&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class se{constructor(e,t,r){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=r}get _$AU(){return this._$AM._$AU}_$AI(e){Q(this,e)}}const oe=$.litHtmlPolyfillSupport;oe?.(J,X),($.litHtmlVersions??=[]).push("3.3.3");const ae=globalThis;class ne extends k{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,r)=>{const i=r?.renderBefore??t;let s=i._$litPart$;if(void 0===s){const e=r?.renderBefore??null;i._$litPart$=s=new X(t.insertBefore(N(),e),e,void 0,r??{})}return s._$AI(e),s})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return F}}ne._$litElement$=!0,ne.finalized=!0,ae.litElementHydrateSupport?.({LitElement:ne});const le=ae.litElementPolyfillSupport;le?.({LitElement:ne}),(ae.litElementVersions??=[]).push("4.2.2");const ce={attribute:!0,type:String,converter:y,reflect:!1,hasChanged:b},de=(e=ce,t,r)=>{const{kind:i,metadata:s}=r;let o=globalThis.litPropertyMetadata.get(s);if(void 0===o&&globalThis.litPropertyMetadata.set(s,o=new Map),"setter"===i&&((e=Object.create(e)).wrapped=!0),o.set(r.name,e),"accessor"===i){const{name:i}=r;return{set(r){const s=t.get.call(this);t.set.call(this,r),this.requestUpdate(i,s,e,!0,r)},init(t){return void 0!==t&&this.C(i,void 0,e,t),t}}}if("setter"===i){const{name:i}=r;return function(r){const s=this[i];t.call(this,r),this.requestUpdate(i,s,e,!0,r)}}throw Error("Unsupported decorator location: "+i)};function pe(e){return(t,r)=>"object"==typeof r?de(e,t,r):((e,t,r)=>{const i=t.hasOwnProperty(r);return t.constructor.createProperty(r,e),i?Object.getOwnPropertyDescriptor(t,r):void 0})(e,t,r)}function he(e){return pe({...e,state:!0,attribute:!1})}function _e(e){if(null==e||"unknown"===e||"unavailable"===e)return null;const t=Number(e);return Number.isFinite(t)?t:null}function ue(e){return null==e||"unknown"===e||"unavailable"===e?null:"on"===e||"true"===e||"off"!==e&&"false"!==e&&null}function ge(e,t,r="en"){if(null==e)return"—";if(!t)return e.toLocaleString(r);try{return new Intl.NumberFormat(r,{style:"currency",currency:t,maximumFractionDigits:2}).format(e)}catch{return`${e.toLocaleString(r,{maximumFractionDigits:2})} ${t}`}}function ve(e,t="en"){if(!e)return"never";const r=new Date(e).getTime();if(Number.isNaN(r))return e;const i=Date.now()-r,s=Math.round(i/1e3),o=Math.abs(s),a=new Intl.RelativeTimeFormat(t,{numeric:"auto"});return o<60?a.format(-s,"second"):o<3600?a.format(-Math.round(s/60),"minute"):o<86400?a.format(-Math.round(s/3600),"hour"):o<2592e3?a.format(-Math.round(s/86400),"day"):a.format(-Math.round(s/2592e3),"month")}function fe(e){if(!Array.isArray(e))return[];const t=[];for(const r of e)if(null!=r&&"object"==typeof r&&"price"in r&&"ts"in r){const e=r,i="number"==typeof e.price?e.price:null;if(null==i)continue;t.push({ts:String(e.ts??""),price:i,currency:String(e.currency??""),in_stock:!1!==e.in_stock})}return t}function me(e){if(!Array.isArray(e))return[];const t=[];for(const r of e){if(!r||"object"!=typeof r)continue;const e=r,i="string"==typeof e.title?e.title:"",s="string"==typeof e.url?e.url:"";i&&s&&t.push({title:i,url:s,price:"number"==typeof e.price?e.price:null,currency:"string"==typeof e.currency?e.currency:"",retailer:"string"==typeof e.retailer?e.retailer:"",imageUrl:"string"==typeof e.image_url&&e.image_url?e.image_url:null,confidence:"number"==typeof e.confidence?Math.max(0,Math.min(1,e.confidence)):0,notes:"string"==typeof e.notes?e.notes:"",shipsToUserRegion:"boolean"==typeof e.ships_to_user_region?e.ships_to_user_region:null})}return t.sort((e,t)=>{if(t.confidence!==e.confidence)return t.confidence-e.confidence;return(e.price??Number.POSITIVE_INFINITY)-(t.price??Number.POSITIVE_INFINITY)}),t}function ye(e){const t=e.indexOf("_");if(t<0)return null;const r=e.slice(0,t),i=e.slice(t+1),s=/^(l_[0-9a-z]+)_(.+)$/.exec(i);return s?{entryId:r,listingId:s[1],key:s[2]}:{entryId:r,listingId:null,key:i}}function be(e,t,r,i){const s=t.get("price");if(!s)return null;const o=e.states[s];if(!o)return null;const a=o.attributes,n={listingId:r,isPrimary:i,retailer:"string"==typeof a.retailer?a.retailer:null,url:"string"==typeof a.product_url?a.product_url:null,price:_e(o.state),currency:"string"==typeof a.unit_of_measurement?a.unit_of_measurement:"string"==typeof a.currency?a.currency:"",inStock:null,discontinued:!0===a.discontinued,stockCount:"number"==typeof a.stock_count?a.stock_count:null,lastCheck:"string"==typeof a.last_check?a.last_check:null,history:fe(a.price_history),imageProxyUrl:null,imageBroken:!1,shipsToUserRegion:"boolean"==typeof a.ships_to_user_region?a.ships_to_user_region:null,entityIds:{price:s}},l=t.get("photo");if(l){const t=e.states[l];if(t)if("unavailable"===t.state||"unknown"===t.state)n.imageBroken=!0;else{const e=t.attributes.entity_picture;"string"==typeof e&&e.length>0&&(n.imageProxyUrl=e)}}const c=t.get("in_stock");if(c){const t=e.states[c];t&&(n.inStock=ue(t.state),n.entityIds.inStock=c)}const d=t.get("discontinued");if(d){const t=e.states[d];if(t){const e=ue(t.state);null!=e&&(n.discontinued=e),n.entityIds.discontinued=d}}return n}function xe(e,t=5){if(e.length<2)return e;const r=e.map(e=>e.price),i=ke(r),s=r.map(e=>Math.abs(e-i)),o=ke(s);return 0===o?e:e.filter(e=>Math.abs(e.price-i)<=t*o)}function ke(e){const t=[...e].sort((e,t)=>e-t),r=Math.floor(t.length/2);return t.length%2==0?(t[r-1]+t[r])/2:t[r]}class $e extends ne{constructor(){super(...arguments),this.refreshingAlternatives=!1,this.hideNonShipping=!1,this.refreshingNow=!1,this.handleRefresh=e=>{e.stopPropagation(),this.refreshingAlternatives||this.onRefreshAlternatives?.(this.product)},this.handleRefreshNow=e=>{e.stopPropagation(),this.refreshingNow||this.onRefreshNow?.(this.product)},this.handleTogglePaused=e=>{e.stopPropagation(),this.onSetPaused?.(this.product,!this.product.paused)},this.handleTargetCommit=e=>{e.stopPropagation();const t=e.target,r=t.value.trim(),i=""===r?null:Number(r);if(null!==i&&Number.isNaN(i))return void(t.value=null!=this.product.targetPrice?String(this.product.targetPrice):"");i!==this.product.targetPrice&&this.onSetTarget?.(this.product,i)},this.handleTargetKeydown=e=>{e.stopPropagation(),"Enter"===e.key&&e.target.blur()}}get headlinePrice(){const{product:e}=this;return null!=e.priceLocal&&e.localCurrency?{value:e.priceLocal,currency:e.localCurrency}:e.discontinued&&null!=e.lastKnownPrice?{value:e.lastKnownPrice,currency:e.lastKnownCurrency??e.currency}:{value:e.price,currency:e.currency||null}}get sourcePriceLine(){const{product:e}=this;return null!=e.priceLocal&&e.localCurrency?e.currency===e.localCurrency?K:ge(e.price,e.currency):K}get priceDelta(){const{product:e}=this;if(null==e.price)return null;const t=e.price;for(let r=e.history.length-1;r>=0;r--){const i=e.history[r].price;if(i!==t)return{amount:Math.abs(t-i),direction:t>i?"up":"down"}}return null}renderDelta(){const e=this.priceDelta;if(null==e)return K;const t="up"===e.direction?"↑":"↓",r="up"===e.direction?"delta delta--up":"delta delta--down";return V`<span class=${r}>${t} ${ge(e.amount,null)}</span>`}renderImage(){const{product:e}=this,t=e.imageProxyUrl??(e.imageBroken?null:e.imageUrl);return t?V`<img
       class="image"
       src=${t}
       alt=${e.title}
       loading="lazy"
-    />`:K`<div class="image image--placeholder" role="img" aria-label="No image">
+    />`:V`<div class="image image--placeholder" role="img" aria-label="No image">
         <ha-icon icon="mdi:tag-search"></ha-icon>
-      </div>`}renderSparkline(){const{product:e}=this;if(e.history.length<2)return q;const t=function(e,t,r,i=2){if(e.length<2)return"";const s=e.length>=4?xe(e):e;if(s.length<2)return"";const o=s.map(e=>e.price),n=Math.min(...o),a=Math.max(...o)-n||1,l=r-2*i,c=t/(s.length-1);let d="";return s.forEach((e,t)=>{const s=t*c,o=r-i-(e.price-n)/a*l;d+=0===t?`M ${s.toFixed(2)} ${o.toFixed(2)}`:` L ${s.toFixed(2)} ${o.toFixed(2)}`}),d}(e.history,280,48);return t?K`<svg
+      </div>`}renderSparkline(){const{product:e}=this;if(e.history.length<2)return K;const t=function(e,t,r,i=2){if(e.length<2)return"";const s=e.length>=4?xe(e):e;if(s.length<2)return"";const o=s.map(e=>e.price),a=Math.min(...o),n=Math.max(...o)-a||1,l=r-2*i,c=t/(s.length-1);let d="";return s.forEach((e,t)=>{const s=t*c,o=r-i-(e.price-a)/n*l;d+=0===t?`M ${s.toFixed(2)} ${o.toFixed(2)}`:` L ${s.toFixed(2)} ${o.toFixed(2)}`}),d}(e.history,280,48);return t?V`<svg
       class="sparkline"
       viewBox="0 0 ${280} ${48}"
       preserveAspectRatio="none"
       aria-hidden="true"
     >
       <path d=${t} fill="none" stroke="currentColor" stroke-width="1.5" />
-    </svg>`:q}renderStatusChips(){const{product:e}=this,t=[];return e.paused&&t.push(K`<span class="chip chip--paused" title="Polling paused">
+    </svg>`:K}renderStatusChips(){const{product:e}=this,t=[];return e.paused&&t.push(V`<span class="chip chip--paused" title="Polling paused">
         Paused
-      </span>`),e.discontinued?t.push(K`<span class="chip chip--warn" title=${e.discontinuedReason??""}>
+      </span>`),e.discontinued?t.push(V`<span class="chip chip--warn" title=${e.discontinuedReason??""}>
         Discontinued
-      </span>`):!1===e.inStock?t.push(K`<span class="chip chip--warn">Out of stock</span>`):!0===e.inStock&&t.push(K`<span class="chip chip--ok">In stock</span>`),null!=e.stockCount&&e.stockCount>0&&t.push(K`<span class="chip">${e.stockCount} units</span>`),e.retailer&&t.push(K`<span class="chip chip--retailer">${e.retailer}</span>`),t.length?K`<div class="chips">${t}</div>`:q}get cleanedExtremes(){const{product:e}=this;if(e.history.length>=4){const t=xe(e.history);if(t.length>=2){const e=t.map(e=>e.price);return{low:Math.min(...e),high:Math.max(...e)}}}return{low:e.lowest,high:e.highest}}renderAlternatives(){const{product:e}=this,t=null!=e.alternativesError,r=null!=e.alternativesFetchedAt,i=this.hideNonShipping?e.alternatives.filter(e=>!1!==e.shipsToUserRegion):e.alternatives,s=e.alternatives.length-i.length,o=i.length>0;return K`
+      </span>`):!1===e.inStock?t.push(V`<span class="chip chip--warn">Out of stock</span>`):!0===e.inStock&&t.push(V`<span class="chip chip--ok">In stock</span>`),null!=e.stockCount&&e.stockCount>0&&t.push(V`<span class="chip">${e.stockCount} units</span>`),e.retailer&&t.push(V`<span class="chip chip--retailer">${e.retailer}</span>`),t.length?V`<div class="chips">${t}</div>`:K}get cleanedExtremes(){const{product:e}=this;if(e.history.length>=4){const t=xe(e.history);if(t.length>=2){const e=t.map(e=>e.price);return{low:Math.min(...e),high:Math.max(...e)}}}return{low:e.lowest,high:e.highest}}renderAlternatives(){const{product:e}=this,t=null!=e.alternativesError,r=null!=e.alternativesFetchedAt,i=this.hideNonShipping?e.alternatives.filter(e=>!1!==e.shipsToUserRegion):e.alternatives,s=e.alternatives.length-i.length,o=i.length>0;return V`
       <section class="alts">
         <div class="alts__header">
           <span class="alts__title">
-            ${o?K`Alternatives <span class="alts__count">${i.length}</span>`:K`Alternatives`}
+            ${o?V`Alternatives <span class="alts__count">${i.length}</span>`:V`Alternatives`}
           </span>
           <span class="alts__meta">
-            ${r?fe(e.alternativesFetchedAt):""}
+            ${r?ve(e.alternativesFetchedAt):""}
           </span>
           <button
             class="alts__refresh"
@@ -39,17 +39,17 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
             ></ha-icon>
           </button>
         </div>
-        ${t?K`<p class="alts__error">${e.alternativesError}</p>`:q}
-        ${o?K`<ul class="alts__list">
+        ${t?V`<p class="alts__error">${e.alternativesError}</p>`:K}
+        ${o?V`<ul class="alts__list">
               ${i.map(e=>this.renderAlternative(e))}
-            </ul>`:t||this.refreshingAlternatives?q:K`<p class="alts__empty">
+            </ul>`:t||this.refreshingAlternatives?K:V`<p class="alts__empty">
               ${r?s>0?"All alternatives were hidden (don't ship to your region).":"No alternatives found.":"Click refresh to search for alternatives."}
             </p>`}
-        ${o&&s>0?K`<p class="alts__hidden-note">
+        ${o&&s>0?V`<p class="alts__hidden-note">
               ${s} hidden (don't ship to your region)
-            </p>`:q}
+            </p>`:K}
       </section>
-    `}get listingUrls(){const e=e=>(e??"").trim().replace(/\/+$/,"").toLowerCase(),t=new Set;for(const r of this.product.listings){const i=e(r.url);i&&t.add(i)}return t}renderAlternative(e){const{product:t}=this;let r=null,i="alts__price";null!=e.price&&null!=t.price&&e.currency===t.currency&&(r=e.price-t.price,r<0?i="alts__price alts__price--cheaper":r>0&&(i="alts__price alts__price--pricier"));const s=(e.url??"").trim().replace(/\/+$/,"").toLowerCase(),o=""!==s&&this.listingUrls.has(s);return K`
+    `}get listingUrls(){const e=e=>(e??"").trim().replace(/\/+$/,"").toLowerCase(),t=new Set;for(const r of this.product.listings){const i=e(r.url);i&&t.add(i)}return t}renderAlternative(e){const{product:t}=this;let r=null,i="alts__price";null!=e.price&&null!=t.price&&e.currency===t.currency&&(r=e.price-t.price,r<0?i="alts__price alts__price--cheaper":r>0&&(i="alts__price alts__price--pricier"));const s=(e.url??"").trim().replace(/\/+$/,"").toLowerCase(),o=""!==s&&this.listingUrls.has(s);return V`
       <li class="alts__row">
         <a
           class="alts__link"
@@ -62,27 +62,27 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           <div class="alts__info">
             <span class="alts__row-title">${e.title}</span>
             <span class="alts__row-meta">
-              ${e.retailer?K`<span>${e.retailer}</span>`:q}
-              ${e.confidence>0?K`<span class="alts__confidence" title="Match confidence">
+              ${e.retailer?V`<span>${e.retailer}</span>`:K}
+              ${e.confidence>0?V`<span class="alts__confidence" title="Match confidence">
                     ${Math.round(100*e.confidence)}%
-                  </span>`:q}
-              ${!0===e.shipsToUserRegion?K`<span class="alts__ships alts__ships--yes" title="Likely ships to your region">
+                  </span>`:K}
+              ${!0===e.shipsToUserRegion?V`<span class="alts__ships alts__ships--yes" title="Likely ships to your region">
                     ✓ ships
-                  </span>`:!1===e.shipsToUserRegion?K`<span class="alts__ships alts__ships--no" title="Likely does not ship to your region">
+                  </span>`:!1===e.shipsToUserRegion?V`<span class="alts__ships alts__ships--no" title="Likely does not ship to your region">
                     ✗ no ship
-                  </span>`:q}
+                  </span>`:K}
             </span>
           </div>
           <div class=${i}>
-            ${null!=e.price?ge(e.price,e.currency):K`<span class="alts__price-unknown">—</span>`}
+            ${null!=e.price?ge(e.price,e.currency):V`<span class="alts__price-unknown">—</span>`}
           </div>
         </a>
-        ${this.onAddListing?o?K`<span
+        ${this.onAddListing?o?V`<span
                 class="alts__add alts__add--done"
                 title="Already tracked as a listing"
                 aria-label="Already a listing"
                 >✓</span
-              >`:K`<button
+              >`:V`<button
                 class="alts__add"
                 type="button"
                 @click=${t=>this.handleAddListing(t,e)}
@@ -90,12 +90,12 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
                 title="Track this as a listing"
               >
                 +
-              </button>`:q}
+              </button>`:K}
       </li>
-    `}handleAddListing(e,t){e.stopPropagation(),e.preventDefault();const r=t.retailer?`Track the ${t.retailer} listing for ${this.product.title}?`:`Track this alternative as a listing on ${this.product.title}?`;window.confirm(r)&&this.onAddListing?.(this.product,t)}renderStatRow(){const{product:e}=this,t=[];if(null!=e.targetPrice){const r=null!=e.targetDiff&&e.targetDiff<=0?"stat__value stat__value--good":"stat__value";t.push(K`<div class="stat">
+    `}handleAddListing(e,t){e.stopPropagation(),e.preventDefault();const r=t.retailer?`Track the ${t.retailer} listing for ${this.product.title}?`:`Track this alternative as a listing on ${this.product.title}?`;window.confirm(r)&&this.onAddListing?.(this.product,t)}renderStatRow(){const{product:e}=this,t=[];if(null!=e.targetPrice){const r=null!=e.targetDiff&&e.targetDiff<=0?"stat__value stat__value--good":"stat__value";t.push(V`<div class="stat">
         <span class="stat__label">Target</span>
         <span class=${r}>${ge(e.targetPrice,e.currency)}</span>
-      </div>`)}return t.length?K`<div class="stats">${t}</div>`:q}renderListings(){const{product:e}=this;if(0===e.listings.length)return q;const t=this.hideNonShipping?e.listings.filter(e=>e.isPrimary||!1!==e.shipsToUserRegion):e.listings,r=e.listings.length-t.length;return K`
+      </div>`)}return t.length?V`<div class="stats">${t}</div>`:K}renderListings(){const{product:e}=this;if(0===e.listings.length)return K;const t=this.hideNonShipping?e.listings.filter(e=>e.isPrimary||!1!==e.shipsToUserRegion):e.listings,r=e.listings.length-t.length;return V`
       <section class="listings">
         <div class="listings__header">
           <span class="listings__title">
@@ -105,40 +105,40 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
         <ul class="listings__list">
           ${t.map(e=>this.renderListingRow(e))}
         </ul>
-        ${r>0?K`<p class="alts__hidden-note">
+        ${r>0?V`<p class="alts__hidden-note">
               ${r} hidden (don't ship to your region)
-            </p>`:q}
+            </p>`:K}
       </section>
-    `}renderListingRow(e){const t=e.discontinued?K`<span class="listings__chip listings__chip--warn">disc.</span>`:!1===e.inStock?K`<span class="listings__chip listings__chip--warn">out</span>`:!0===e.inStock?K`<span class="listings__chip listings__chip--ok">in stock</span>`:q,r=e.imageProxyUrl?K`<img
+    `}renderListingRow(e){const t=e.discontinued?V`<span class="listings__chip listings__chip--warn">disc.</span>`:!1===e.inStock?V`<span class="listings__chip listings__chip--warn">out</span>`:!0===e.inStock?V`<span class="listings__chip listings__chip--ok">in stock</span>`:K,r=e.imageProxyUrl?V`<img
           class="listings__thumb"
           src=${e.imageProxyUrl}
           alt=""
           loading="lazy"
-        />`:K`<span
+        />`:V`<span
           class="listings__thumb listings__thumb--placeholder"
           aria-hidden="true"
-        ></span>`,i=K`
+        ></span>`,i=V`
       ${r}
       <div class="listings__info">
         <span class="listings__row-retailer">
           <span class="listings__retailer-name"
             >${e.retailer??"Unknown"}</span
           >
-          ${e.isPrimary?K`<span class="listings__badge">primary</span>`:q}
+          ${e.isPrimary?V`<span class="listings__badge">primary</span>`:K}
         </span>
         <span class="listings__row-meta">
           ${t}
           <span class="listings__last-check">
-            ${fe(e.lastCheck)}
+            ${ve(e.lastCheck)}
           </span>
         </span>
       </div>
       <div class="listings__price">
         ${ge(e.price,e.currency||null)}
       </div>
-    `;return K`
+    `;return V`
       <li class="listings__row">
-        ${e.url?K`<a
+        ${e.url?V`<a
               class="listings__link"
               href=${e.url}
               target="_blank"
@@ -147,9 +147,18 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
               title=${e.retailer??e.url}
             >
               ${i}
-            </a>`:K`<div class="listings__link listings__link--noUrl">${i}</div>`}
+            </a>`:V`<div class="listings__link listings__link--noUrl">${i}</div>`}
         <div class="listings__actions">
-          ${this.onEditListing?K`<button
+          ${this.onEditVariant?V`<button
+                class="listings__edit"
+                type="button"
+                @click=${t=>this.handleEditVariant(t,e)}
+                aria-label=${`Choose variant for ${e.retailer??"listing"}`}
+                title="Track a specific product variant (e.g. with remote)"
+              >
+                ⚙
+              </button>`:K}
+          ${this.onEditListing?V`<button
                 class="listings__edit"
                 type="button"
                 @click=${t=>this.handleEditListing(t,e)}
@@ -157,8 +166,8 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
                 title="Advanced: set a custom price selector"
               >
                 ✎
-              </button>`:q}
-          ${e.isPrimary?q:K`<button
+              </button>`:K}
+          ${e.isPrimary?K:V`<button
                 class="listings__remove"
                 type="button"
                 @click=${t=>this.handleRemoveListing(t,e)}
@@ -169,9 +178,9 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
               </button>`}
         </div>
       </li>
-    `}handleEditListing(e,t){e.stopPropagation(),e.preventDefault(),this.onEditListing?.(this.product,t)}handleRemoveListing(e,t){if(e.stopPropagation(),e.preventDefault(),t.isPrimary)return;const r=t.retailer?`Remove the ${t.retailer} listing from ${this.product.title}?`:`Remove this listing from ${this.product.title}?`;window.confirm(r)&&this.onRemoveListing?.(this.product,t)}renderActions(){if(!this.onRefreshNow&&!this.onSetTarget&&!this.onSetPaused)return q;const{product:e}=this;return K`
+    `}handleEditListing(e,t){e.stopPropagation(),e.preventDefault(),this.onEditListing?.(this.product,t)}handleEditVariant(e,t){e.stopPropagation(),e.preventDefault(),this.onEditVariant?.(this.product,t)}handleRemoveListing(e,t){if(e.stopPropagation(),e.preventDefault(),t.isPrimary)return;const r=t.retailer?`Remove the ${t.retailer} listing from ${this.product.title}?`:`Remove this listing from ${this.product.title}?`;window.confirm(r)&&this.onRemoveListing?.(this.product,t)}renderActions(){if(!this.onRefreshNow&&!this.onSetTarget&&!this.onSetPaused)return K;const{product:e}=this;return V`
       <div class="actions" @click=${e=>e.stopPropagation()}>
-        ${this.onSetTarget?K`<label class="actions__target" title="Notify when price drops to or below this">
+        ${this.onSetTarget?V`<label class="actions__target" title="Notify when price drops to or below this">
               <span class="actions__target-label">Target</span>
               <input
                 class="actions__target-input"
@@ -185,9 +194,9 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
                 @keydown=${this.handleTargetKeydown}
                 @click=${e=>e.stopPropagation()}
               />
-            </label>`:q}
+            </label>`:K}
         <div class="actions__spacer"></div>
-        ${this.onSetPaused?K`<button
+        ${this.onSetPaused?V`<button
               class="actions__btn"
               type="button"
               @click=${this.handleTogglePaused}
@@ -195,8 +204,8 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
               title=${e.paused?"Resume polling":"Pause polling"}
             >
               <ha-icon icon=${e.paused?"mdi:play":"mdi:pause"}></ha-icon>
-            </button>`:q}
-        ${this.onRefreshNow?K`<button
+            </button>`:K}
+        ${this.onRefreshNow?V`<button
               class="actions__btn"
               type="button"
               ?disabled=${this.refreshingNow}
@@ -208,9 +217,9 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
                 icon=${this.refreshingNow?"mdi:loading":"mdi:refresh"}
                 class=${this.refreshingNow?"actions__btn-spin":""}
               ></ha-icon>
-            </button>`:q}
+            </button>`:K}
       </div>
-    `}handleClick(e){e.target.closest("a")||this.onOpen?.(this.product)}render(){const{product:e}=this,{value:t,currency:r}=this.headlinePrice,i=this.sourcePriceLine;return K`
+    `}handleClick(e){e.target.closest("a")||this.onOpen?.(this.product)}render(){const{product:e}=this,{value:t,currency:r}=this.headlinePrice,i=this.sourcePriceLine;return V`
       <article
         class="card ${e.discontinued?"card--faded":""}"
         @click=${this.handleClick}
@@ -227,7 +236,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
 
           <div class="price-block">
             <div class="price">${ge(t,r)}</div>
-            ${i===q?this.renderDelta():K`<div class="price-sub">${i} ${this.renderDelta()}</div>`}
+            ${i===K?this.renderDelta():V`<div class="price-sub">${i} ${this.renderDelta()}</div>`}
           </div>
 
           ${this.renderSparkline()}
@@ -235,21 +244,21 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           ${this.renderListings()}
           ${this.renderAlternatives()}
 
-          ${e.discontinued&&e.discontinuedReason?K`<p class="discontinued-reason">${e.discontinuedReason}</p>`:q}
+          ${e.discontinued&&e.discontinuedReason?V`<p class="discontinued-reason">${e.discontinuedReason}</p>`:K}
 
           ${this.renderActions()}
 
           <footer class="footer">
             <span class="last-check">
-              Last check: ${fe(e.lastCheck)}
+              Last check: ${ve(e.lastCheck)}
             </span>
-            ${e.url?K`<a class="link" href=${e.url} target="_blank" rel="noopener">
+            ${e.url?V`<a class="link" href=${e.url} target="_blank" rel="noopener">
                   Open at retailer ↗
-                </a>`:q}
+                </a>`:K}
           </footer>
         </div>
       </article>
-    `}}$e.styles=n`
+    `}}$e.styles=a`
     :host {
       display: block;
     }
@@ -925,7 +934,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
       outline: 2px solid var(--primary-color, #1976d2);
       outline-offset: 1px;
     }
-  `,e([pe({attribute:!1})],$e.prototype,"product",void 0),e([pe({attribute:!1})],$e.prototype,"onOpen",void 0),e([pe({attribute:!1})],$e.prototype,"onRefreshAlternatives",void 0),e([pe({type:Boolean,attribute:!1})],$e.prototype,"refreshingAlternatives",void 0),e([pe({type:Boolean,attribute:!1})],$e.prototype,"hideNonShipping",void 0),e([pe({attribute:!1})],$e.prototype,"onRemoveListing",void 0),e([pe({attribute:!1})],$e.prototype,"onAddListing",void 0),e([pe({attribute:!1})],$e.prototype,"onEditListing",void 0),e([pe({attribute:!1})],$e.prototype,"onRefreshNow",void 0),e([pe({type:Boolean,attribute:!1})],$e.prototype,"refreshingNow",void 0),e([pe({attribute:!1})],$e.prototype,"onSetTarget",void 0),e([pe({attribute:!1})],$e.prototype,"onSetPaused",void 0),customElements.get("price-watch-card")||customElements.define("price-watch-card",$e);const we=["name","drop","cheapest","last_checked","below_target"],Se={name:"Name (A–Z)",drop:"Biggest drop",cheapest:"Cheapest",last_checked:"Last checked",below_target:"Below target"},Ee={anthropic_native:"AI web search",ai_synthesizer:"AI + web search",duckduckgo:"Web results (no AI)",none:""},Ae={none:"Free — web search, no AI",anthropic:"Anthropic (Claude)",openai_compatible:"OpenAI-compatible (Ollama, OpenAI, …)"};class PriceWatchPanel extends ae{constructor(){super(),this._products=[],this._registry=null,this._registryError=null,this._connected=!1,this._refreshingEntries=new Set,this._hideNonShipping=!1,this._search="",this._sort="name",this._hideDiscontinued=!1,this._refreshingNow=new Set,this._searchOpen=!1,this._searchQuery="",this._searchLoading=!1,this._searchResults=[],this._searchEngine="none",this._searchRan=!1,this._searchError=null,this._hideNonShops=!1,this._trackTarget=null,this._trackName="",this._trackUrl="",this._trackTargetPrice="",this._tracking=!1,this._trackError=null,this._providerOpen=!1,this._providerLoading=!1,this._providerSaving=!1,this._providerError=null,this._providerSuccess=!1,this._providerAdvancedOpen=!1,this._pProvider="none",this._pApiKey="",this._pModel="",this._pBaseUrl="",this._pInputCost="",this._pOutputCost="",this._pMaxHtml="",this._pForceJson=!1,this._pExtraHeaders="",this._pExcludedDomains="",this._providerHasKey=!1,this._providerModels=[],this._selectorOpen=!1,this._selProduct=null,this._selListing=null,this._selPriceSelector="",this._selTitleSelector="",this._selTesting=!1,this._selTestResult=null,this._selTestError=null,this._selSaving=!1,this._selSaveError=null,this._selSaved=!1,this._selBookmarkletOpen=!1,this._conn=null,this._states={},this._handleOpen=e=>{e.url&&window.open(e.url,"_blank","noopener,noreferrer")},this._handleRefreshAlternatives=async e=>{if(this._conn&&!this._refreshingEntries.has(e.entryId)){this._refreshingEntries=new Set([...this._refreshingEntries,e.entryId]);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"find_alternatives",service_data:{entry_id:e.entryId}})}catch(e){console.error("[price-watch-panel] find_alternatives failed:",e)}finally{const t=new Set(this._refreshingEntries);t.delete(e.entryId),this._refreshingEntries=t}}},this._handleRemoveListing=async(e,t)=>{if(this._conn)if(t.isPrimary)console.warn("[price-watch-panel] refusing to remove primary listing",t.listingId);else try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"remove_listing",service_data:{entry_id:e.entryId,listing_id:t.listingId}})}catch(e){console.error("[price-watch-panel] remove_listing failed:",e)}},this._handleAddListing=async(e,t)=>{if(!this._conn)return;const r=(t.url??"").trim();if(!r)return;const i={entry_id:e.entryId,url:r};t.retailer&&(i.retailer=t.retailer),t.currency&&(i.currency=t.currency);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"add_listing",service_data:i})}catch(e){console.error("[price-watch-panel] add_listing failed:",e)}},this._handleEditListing=(e,t)=>{this._selProduct=e,this._selListing=t,this._selPriceSelector="",this._selTitleSelector="",this._selTestResult=null,this._selTestError=null,this._selSaveError=null,this._selSaved=!1,this._selBookmarkletOpen=!1,this._selectorOpen=!0},this._closeSelectorEditor=()=>{this._selectorOpen=!1,this._selProduct=null,this._selListing=null},this._onSelectorBackdropClick=e=>{e.target===e.currentTarget&&this._closeSelectorEditor()},this._onSelPriceInput=e=>{this._selPriceSelector=e.target.value},this._onSelTitleInput=e=>{this._selTitleSelector=e.target.value},this._runSelectorTest=async()=>{if(!this._conn||!this._selListing)return;const e=(this._selListing.url??"").trim(),t=this._selPriceSelector.trim();if(!e)return void(this._selTestError="This listing has no URL to test against.");if(!t)return void(this._selTestError="Enter a price selector first.");this._selTesting=!0,this._selTestError=null,this._selTestResult=null;const r=this._selTitleSelector.trim()||"h1";try{const i=await this._conn.sendMessagePromise({type:"price_watch/test_selector",url:e,price_selector:t,title_selector:r});this._selTestResult=i}catch(e){this._selTestError=e?.message??"Test failed."}finally{this._selTesting=!1}},this._saveSelector=async()=>{if(!this._conn||!this._selProduct||!this._selListing)return;const e=this._selPriceSelector.trim();if(!e)return void(this._selSaveError="Enter a price selector first.");const t={type:"css",selectors:{price:e,title:this._selTitleSelector.trim()||"h1"},transforms:{price:"price_clean"}};this._selSaving=!0,this._selSaveError=null,this._selSaved=!1;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._selProduct.entryId,listing_id:this._selListing.listingId,custom_parser:t}}),this._selSaved=!0,window.setTimeout(()=>this._closeSelectorEditor(),1200)}catch(e){this._selSaveError=e?.message??"Save failed."}finally{this._selSaving=!1}},this._clearSelector=async()=>{if(this._conn&&this._selProduct&&this._selListing&&window.confirm("Remove the custom price selector and go back to automatic extraction?")){this._selSaving=!0,this._selSaveError=null;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._selProduct.entryId,listing_id:this._selListing.listingId,custom_parser:""}}),this._selSaved=!0,window.setTimeout(()=>this._closeSelectorEditor(),1200)}catch(e){this._selSaveError=e?.message??"Clear failed."}finally{this._selSaving=!1}}},this._copyBookmarklet=async()=>{const e=this._bookmarkletHref();try{await navigator.clipboard.writeText(e)}catch{this._selBookmarkletOpen=!0}},this._handleToggleHideNonShipping=()=>{this._hideNonShipping=!this._hideNonShipping;try{localStorage.setItem(PriceWatchPanel.HIDE_NONSHIP_KEY,this._hideNonShipping?"1":"0")}catch{}},this._handleToggleHideDiscontinued=()=>{this._hideDiscontinued=!this._hideDiscontinued;try{localStorage.setItem(PriceWatchPanel.HIDE_DISCONTINUED_KEY,this._hideDiscontinued?"1":"0")}catch{}},this._handleSearch=e=>{this._search=e.target.value},this._handleSort=e=>{const t=e.target.value;this._sort=t;try{localStorage.setItem(PriceWatchPanel.SORT_KEY,t)}catch{}},this._handleRefreshNow=async e=>{if(this._conn&&!this._refreshingNow.has(e.entryId)){this._refreshingNow=new Set([...this._refreshingNow,e.entryId]);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"refresh_now",service_data:{entry_id:e.entryId}})}catch(e){console.error("[price-watch-panel] refresh_now failed:",e)}finally{const t=new Set(this._refreshingNow);t.delete(e.entryId),this._refreshingNow=t}}},this._handleSetTarget=async(e,t)=>{if(this._conn)try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"set_target",service_data:null===t?{entry_id:e.entryId}:{entry_id:e.entryId,target_price:t}})}catch(e){console.error("[price-watch-panel] set_target failed:",e)}},this._handleSetPaused=async(e,t)=>{if(this._conn)try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"set_paused",service_data:{entry_id:e.entryId,paused:t}})}catch(e){console.error("[price-watch-panel] set_paused failed:",e)}},this._handleAddProduct=()=>{window.history.pushState(null,"","/config/integrations/dashboard/add?domain=price_watch"),window.dispatchEvent(new CustomEvent("location-changed"))},this._openSearch=()=>{this._searchOpen=!0,this._trackTarget=null,this._trackError=null},this._closeSearch=()=>{this._searchOpen=!1,this._trackTarget=null,this._searchError=null,this._trackError=null},this._onBackdropClick=e=>{e.target===e.currentTarget&&this._closeSearch()},this._handleSearchQueryInput=e=>{this._searchQuery=e.target.value},this._handleSearchKeydown=e=>{"Enter"===e.key?(e.preventDefault(),this._runSearch()):"Escape"===e.key&&this._closeSearch()},this._runSearch=async()=>{if(!this._conn)return;const e=this._searchQuery.trim();if(e&&!this._searchLoading){this._searchLoading=!0,this._searchError=null,this._trackTarget=null;try{const t=await this._conn.sendMessagePromise({type:"price_watch/search",query:e,max_results:8});this._searchResults=t.results??[],this._searchEngine=t.engine??"none",this._searchRan=!0}catch(e){const t=String(e&&"object"==typeof e&&"message"in e?e.message:e);this._searchError=t||"Search failed.",this._searchResults=[],this._searchRan=!0,console.error("[price-watch-panel] search failed:",e)}finally{this._searchLoading=!1}}},this._pickResult=e=>{this._trackTarget=e,this._trackName=e.title,this._trackUrl=e.url,this._trackTargetPrice="",this._trackError=null},this._cancelTrack=()=>{this._trackTarget=null,this._trackError=null},this._handleTrackNameInput=e=>{this._trackName=e.target.value},this._handleTrackUrlInput=e=>{this._trackUrl=e.target.value},this._handleTrackTargetInput=e=>{this._trackTargetPrice=e.target.value},this._confirmTrack=async()=>{if(!this._conn||this._tracking)return;const e=this._trackUrl.trim();if(!e)return void(this._trackError="A URL is required to track a product.");const t=this._trackName.trim(),r=this._trackTargetPrice.trim();let i=null;if(""!==r){const e=Number(r);if(Number.isNaN(e))return void(this._trackError="Target price must be a number.");i=e}this._tracking=!0,this._trackError=null;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"track_product",service_data:{url:e,...t?{name:t}:{},...null!==i?{target_price:i}:{}}}),this._closeSearch()}catch(e){const t=String(e&&"object"==typeof e&&"message"in e?e.message:e);this._trackError=t||"Could not add product.",console.error("[price-watch-panel] track_product failed:",e)}finally{this._tracking=!1}},this._openProviderEditor=async()=>{if(this._providerOpen=!0,this._providerError=null,this._providerSuccess=!1,this._providerAdvancedOpen=!1,this._conn){this._providerLoading=!0;try{const e=await this._conn.sendMessagePromise({type:"price_watch/get_provider_settings"});this._applyProviderSettings(e)}catch(e){this._providerError=this._wsErrorMessage(e)||"Could not load provider settings.",console.error("[price-watch-panel] get_provider_settings failed:",e)}finally{this._providerLoading=!1}}else this._providerError="Not connected to Home Assistant yet."},this._closeProviderEditor=()=>{this._providerOpen=!1,this._providerError=null,this._providerSuccess=!1},this._onProviderBackdropClick=e=>{e.target===e.currentTarget&&this._closeProviderEditor()},this._onProviderChange=e=>{this._pProvider=e.target.value,this._providerSuccess=!1,this._providerError=null},this._saveProvider=async()=>{if(!this._conn||this._providerSaving)return;this._providerSaving=!0,this._providerError=null,this._providerSuccess=!1;const e={provider:this._pProvider},t=this._pApiKey.trim();if(t&&(e.api_key=t),"anthropic"===this._pProvider)e.model=this._pModel;else if("openai_compatible"===this._pProvider){e.base_url=this._pBaseUrl.trim(),e.model=this._pModel.trim(),e.input_cost_per_mtok=Number(this._pInputCost)||0,e.output_cost_per_mtok=Number(this._pOutputCost)||0,e.max_html_chars=Number(this._pMaxHtml)||1e5,e.force_json_mode=this._pForceJson;const t=this._pExtraHeaders.trim();t&&(e.extra_headers=t)}e.excluded_domains=this._pExcludedDomains;try{const t=await this._conn.sendMessagePromise({type:"price_watch/set_provider_settings",...e});this._applyProviderSettings(t),this._providerSuccess=!0}catch(e){this._providerError=this._wsErrorMessage(e)||"Could not save provider settings.",console.error("[price-watch-panel] set_provider_settings failed:",e)}finally{this._providerSaving=!1}},this._handleHideNonShopsToggle=e=>{this._hideNonShops=e.target.checked;try{localStorage.setItem(PriceWatchPanel.HIDE_NONSHOPS_KEY,this._hideNonShops?"1":"0")}catch{}};try{this._hideNonShipping="1"===localStorage.getItem(PriceWatchPanel.HIDE_NONSHIP_KEY),this._hideDiscontinued="1"===localStorage.getItem(PriceWatchPanel.HIDE_DISCONTINUED_KEY),this._hideNonShops="1"===localStorage.getItem(PriceWatchPanel.HIDE_NONSHOPS_KEY);const e=localStorage.getItem(PriceWatchPanel.SORT_KEY);e&&we.includes(e)&&(this._sort=e)}catch{}}connectedCallback(){super.connectedCallback(),this._bootstrap()}disconnectedCallback(){super.disconnectedCallback(),this._unsubState?.(),this._unsubRegistry?.(),this._unsubState=void 0,this._unsubRegistry=void 0}async _bootstrap(){const e=window.hassConnection;if(!e)return void(this._registryError="Home Assistant WebSocket connection not available on this page. Try reloading.");let t;try{const r=await e;t=r.conn,this._conn=t,this._connected=!0}catch(e){const t=e instanceof Error?e.message:String(e);return void(this._registryError=`Could not open HA connection: ${t}`)}try{await this._fetchRegistry(t),await this._fetchInitialStates(t),this._unsubState=await t.subscribeEvents(e=>this._onStateChanged(e),"state_changed"),this._unsubRegistry=await t.subscribeEvents(()=>{this._fetchRegistry(t).then(()=>this._fetchInitialStates(t))},"entity_registry_updated")}catch(e){const t=e instanceof Error?e.message:String(e);this._registryError=`Setup failed after connection: ${t}`,console.error("[price-watch-panel]",e)}}async _fetchRegistry(e){const t=await e.sendMessagePromise({type:"config/entity_registry/list"}),r=new Map;for(const e of t)"price_watch"===e.platform&&r.set(e.unique_id,e.entity_id);this._registry={byUniqueId:r},this._registryError=null,this._rebuildProducts()}async _fetchInitialStates(e){if(!this._registry)return;const t=new Set(this._registry.byUniqueId.values()),r=await e.sendMessagePromise({type:"get_states"}),i={};for(const e of r)t.has(e.entity_id)&&(i[e.entity_id]=e);this._states=i,this._rebuildProducts()}_onStateChanged(e){const{entity_id:t,new_state:r}=e.data;if(!this._registry)return;new Set(this._registry.byUniqueId.values()).has(t)&&(null===r?delete this._states[t]:this._states={...this._states,[t]:r},this._rebuildProducts())}_rebuildProducts(){if(!this._registry)return void(this._products=[]);const e={states:this._states};this._products=function(e,t){const r=new Map;for(const[e,i]of t.byUniqueId){const t=ye(e);if(!t)continue;let s=r.get(t.entryId);if(s||(s={legacy:new Map,listings:new Map},r.set(t.entryId,s)),null===t.listingId)s.legacy.set(t.key,i);else{let e=s.listings.get(t.listingId);e||(e=new Map,s.listings.set(t.listingId,e)),e.set(t.key,i)}}const i=[];for(const[t,s]of r){const r=s.legacy,o=r.get("price");if(!o)continue;const n=e.states[o];if(!n)continue;const a=n.attributes,l={entryId:t,title:String(a.title??a.friendly_name??"Unknown product"),url:String(a.product_url??""),retailer:"string"==typeof a.retailer?a.retailer:null,imageUrl:"string"==typeof a.image_url?a.image_url:null,imageProxyUrl:null,imageBroken:!1,price:ue(n.state),currency:"string"==typeof a.unit_of_measurement?a.unit_of_measurement:"string"==typeof a.currency?a.currency:"",priceLocal:null,localCurrency:null,lowest:null,highest:null,targetDiff:null,targetPrice:"number"==typeof a.target_price?a.target_price:null,paused:!0===a.paused,inStock:null,stockCount:"number"==typeof a.stock_count?a.stock_count:null,discontinued:!0===a.discontinued,discontinuedReason:"string"==typeof a.discontinued_reason?a.discontinued_reason:null,discontinuedAt:"string"==typeof a.discontinued_at?a.discontinued_at:null,lastKnownPrice:"number"==typeof a.last_known_price?a.last_known_price:null,lastKnownCurrency:"string"==typeof a.last_known_currency?a.last_known_currency:null,lastCheck:"string"==typeof a.last_check?a.last_check:null,history:me(a.price_history),alternatives:ve(a.alternatives),alternativesFetchedAt:"string"==typeof a.alternatives_fetched_at?a.alternatives_fetched_at:null,alternativesError:"string"==typeof a.alternatives_error&&a.alternatives_error?a.alternatives_error:null,entityIds:{price:o},listings:[]},c=[["price_local",e=>{l.priceLocal=ue(e.state),l.localCurrency="string"==typeof e.attributes.unit_of_measurement?e.attributes.unit_of_measurement:null,l.entityIds.priceLocal=e.entity_id}],["lowest",e=>{l.lowest=ue(e.state),l.entityIds.lowest=e.entity_id}],["highest",e=>{l.highest=ue(e.state),l.entityIds.highest=e.entity_id}],["target_diff",e=>{l.targetDiff=ue(e.state),l.entityIds.targetDiff=e.entity_id}],["stock_count",e=>{l.stockCount=ue(e.state),l.entityIds.stockCount=e.entity_id}],["in_stock",e=>{l.inStock=_e(e.state),l.entityIds.inStock=e.entity_id}],["discontinued",e=>{const t=_e(e.state);null!=t&&(l.discontinued=t),l.entityIds.discontinued=e.entity_id}],["photo",e=>{if("unavailable"===e.state||"unknown"===e.state)return void(l.imageBroken=!0);const t=e.attributes.entity_picture;"string"==typeof t&&t.length>0&&(l.imageProxyUrl=t)}]];for(const[t,i]of c){const s=r.get(t);if(!s)continue;const o=e.states[s];o&&i(o)}const d="string"==typeof a.listing_id&&a.listing_id?a.listing_id:`l_${t.slice(-12).toLowerCase()}`,p=be(e,s.legacy,d,!0);p&&l.listings.push(p);for(const[t,r]of s.listings){const i=be(e,r,t,!1);i&&l.listings.push(i)}i.push(l)}return i.sort((e,t)=>e.discontinued!==t.discontinued?e.discontinued?1:-1:e.title.localeCompare(t.title)),i}(e,this._registry)}_bookmarkletHref(){return"javascript:"+encodeURIComponent("(function(){\n  if(window.__pwPickerActive){return;}\n  window.__pwPickerActive=true;\n  var hl=document.createElement('div');\n  hl.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:rgba(25,118,210,0.25);border:2px solid #1976d2;border-radius:3px;transition:all 40ms ease';\n  var tip=document.createElement('div');\n  tip.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:#1976d2;color:#fff;font:12px/1.4 sans-serif;padding:3px 6px;border-radius:4px;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';\n  document.body.appendChild(hl);document.body.appendChild(tip);\n  function sel(el){\n    if(!el||el.nodeType!==1)return'';\n    if(el.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(el.id))return'#'+el.id;\n    var parts=[],node=el,depth=0;\n    while(node&&node.nodeType===1&&depth<5){\n      var part=node.tagName.toLowerCase();\n      if(node.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(node.id)){parts.unshift('#'+node.id);break;}\n      var cls=(node.getAttribute('class')||'').trim().split(/\\s+/).filter(function(c){return c&&!/^(is-|has-|js-)/.test(c)&&c.length<30;}).slice(0,2);\n      if(cls.length)part+='.'+cls.join('.');\n      var p=node.parentElement;\n      if(p){var sib=Array.prototype.filter.call(p.children,function(c){return c.tagName===node.tagName;});if(sib.length>1){part+=':nth-of-type('+(sib.indexOf(node)+1)+')';}}\n      parts.unshift(part);node=p;depth++;\n    }\n    return parts.join(' > ');\n  }\n  function move(e){\n    var el=e.target;if(!el||el===hl||el===tip)return;\n    var r=el.getBoundingClientRect();\n    hl.style.left=r.left+'px';hl.style.top=r.top+'px';hl.style.width=r.width+'px';hl.style.height=r.height+'px';\n    var s=sel(el);tip.textContent=s;\n    tip.style.left=r.left+'px';tip.style.top=(r.top>24?r.top-24:r.bottom+4)+'px';\n  }\n  function done(){window.removeEventListener('mousemove',move,true);window.removeEventListener('click',click,true);window.removeEventListener('keydown',key,true);hl.remove();tip.remove();window.__pwPickerActive=false;}\n  function click(e){\n    e.preventDefault();e.stopPropagation();\n    var s=sel(e.target);\n    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(function(){},function(){window.prompt('Copy this selector:',s);});}\n    else{window.prompt('Copy this selector:',s);}\n    done();\n  }\n  function key(e){if(e.key==='Escape'){done();}}\n  window.addEventListener('mousemove',move,true);\n  window.addEventListener('click',click,true);\n  window.addEventListener('keydown',key,true);\n})();")}_visibleProducts(){const e=this._search.trim().toLowerCase();let t=this._products.filter(t=>{if(this._hideDiscontinued&&t.discontinued)return!1;if(!e)return!0;return`${t.title} ${t.retailer??""}`.toLowerCase().includes(e)});const r=(e,t)=>e.title.localeCompare(t.title),i=e=>null===e?Number.POSITIVE_INFINITY:e;return t=[...t].sort((e,t)=>{switch(this._sort){case"cheapest":return i(e.price)-i(t.price)||r(e,t);case"last_checked":{const i=e.lastCheck?Date.parse(e.lastCheck):-1/0;return(t.lastCheck?Date.parse(t.lastCheck):-1/0)-i||r(e,t)}case"drop":{const i=null!==e.highest&&null!==e.price?e.highest-e.price:-1;return(null!==t.highest&&null!==t.price?t.highest-t.price:-1)-i||r(e,t)}case"below_target":{const i=e=>null!==e.targetPrice&&null!==e.price&&e.price<=e.targetPrice?e.targetPrice-e.price:-1;return i(t)-i(e)||r(e,t)}default:return r(e,t)}}),t}_wsErrorMessage(e){return String(e&&"object"==typeof e&&"message"in e?e.message:e)}_applyProviderSettings(e){this._providerModels=e.anthropic_models??[],this._pProvider=e.provider,this._pModel=e.model||this._providerModels[0]||"",this._pBaseUrl=e.base_url??"",this._providerHasKey=!!e.has_api_key,this._pApiKey="",this._pInputCost=String(e.input_cost_per_mtok??0),this._pOutputCost=String(e.output_cost_per_mtok??0),this._pMaxHtml=String(e.max_html_chars??1e5),this._pForceJson=!!e.force_json_mode,this._pExtraHeaders=e.extra_headers??"",this._pExcludedDomains=(e.excluded_domains??[]).join("\n")}_renderHeader(){return K`
+  `,e([pe({attribute:!1})],$e.prototype,"product",void 0),e([pe({attribute:!1})],$e.prototype,"onOpen",void 0),e([pe({attribute:!1})],$e.prototype,"onRefreshAlternatives",void 0),e([pe({type:Boolean,attribute:!1})],$e.prototype,"refreshingAlternatives",void 0),e([pe({type:Boolean,attribute:!1})],$e.prototype,"hideNonShipping",void 0),e([pe({attribute:!1})],$e.prototype,"onRemoveListing",void 0),e([pe({attribute:!1})],$e.prototype,"onAddListing",void 0),e([pe({attribute:!1})],$e.prototype,"onEditListing",void 0),e([pe({attribute:!1})],$e.prototype,"onEditVariant",void 0),e([pe({attribute:!1})],$e.prototype,"onRefreshNow",void 0),e([pe({type:Boolean,attribute:!1})],$e.prototype,"refreshingNow",void 0),e([pe({attribute:!1})],$e.prototype,"onSetTarget",void 0),e([pe({attribute:!1})],$e.prototype,"onSetPaused",void 0),customElements.get("price-watch-card")||customElements.define("price-watch-card",$e);const we=["name","drop","cheapest","last_checked","below_target"],Se={name:"Name (A–Z)",drop:"Biggest drop",cheapest:"Cheapest",last_checked:"Last checked",below_target:"Below target"},Ee={anthropic_native:"AI web search",ai_synthesizer:"AI + web search",duckduckgo:"Web results (no AI)",none:""},Ae={none:"Free — web search, no AI",anthropic:"Anthropic (Claude)",openai_compatible:"OpenAI-compatible (Ollama, OpenAI, …)"};class PriceWatchPanel extends ne{constructor(){super(),this._products=[],this._registry=null,this._registryError=null,this._connected=!1,this._refreshingEntries=new Set,this._hideNonShipping=!1,this._search="",this._sort="name",this._hideDiscontinued=!1,this._refreshingNow=new Set,this._searchOpen=!1,this._searchQuery="",this._searchLoading=!1,this._searchResults=[],this._searchEngine="none",this._searchRan=!1,this._searchError=null,this._hideNonShops=!1,this._trackTarget=null,this._trackName="",this._trackUrl="",this._trackTargetPrice="",this._tracking=!1,this._trackError=null,this._providerOpen=!1,this._providerLoading=!1,this._providerSaving=!1,this._providerError=null,this._providerSuccess=!1,this._providerAdvancedOpen=!1,this._pProvider="none",this._pApiKey="",this._pModel="",this._pBaseUrl="",this._pInputCost="",this._pOutputCost="",this._pMaxHtml="",this._pForceJson=!1,this._pExtraHeaders="",this._pExcludedDomains="",this._providerHasKey=!1,this._providerModels=[],this._selectorOpen=!1,this._selProduct=null,this._selListing=null,this._selPriceSelector="",this._selTitleSelector="",this._selTesting=!1,this._selTestResult=null,this._selTestError=null,this._selSaving=!1,this._selSaveError=null,this._selSaved=!1,this._selBookmarkletOpen=!1,this._variantOpen=!1,this._varProduct=null,this._varListing=null,this._varLoading=!1,this._varError=null,this._varGroups=null,this._varCombos=[],this._varSelection=[],this._varSupported=!0,this._varSaving=!1,this._varSaveError=null,this._varSaved=!1,this._conn=null,this._states={},this._handleOpen=e=>{e.url&&window.open(e.url,"_blank","noopener,noreferrer")},this._handleRefreshAlternatives=async e=>{if(this._conn&&!this._refreshingEntries.has(e.entryId)){this._refreshingEntries=new Set([...this._refreshingEntries,e.entryId]);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"find_alternatives",service_data:{entry_id:e.entryId}})}catch(e){console.error("[price-watch-panel] find_alternatives failed:",e)}finally{const t=new Set(this._refreshingEntries);t.delete(e.entryId),this._refreshingEntries=t}}},this._handleRemoveListing=async(e,t)=>{if(this._conn)if(t.isPrimary)console.warn("[price-watch-panel] refusing to remove primary listing",t.listingId);else try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"remove_listing",service_data:{entry_id:e.entryId,listing_id:t.listingId}})}catch(e){console.error("[price-watch-panel] remove_listing failed:",e)}},this._handleAddListing=async(e,t)=>{if(!this._conn)return;const r=(t.url??"").trim();if(!r)return;const i={entry_id:e.entryId,url:r};t.retailer&&(i.retailer=t.retailer),t.currency&&(i.currency=t.currency);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"add_listing",service_data:i})}catch(e){console.error("[price-watch-panel] add_listing failed:",e)}},this._handleEditListing=(e,t)=>{this._selProduct=e,this._selListing=t,this._selPriceSelector="",this._selTitleSelector="",this._selTestResult=null,this._selTestError=null,this._selSaveError=null,this._selSaved=!1,this._selBookmarkletOpen=!1,this._selectorOpen=!0},this._closeSelectorEditor=()=>{this._selectorOpen=!1,this._selProduct=null,this._selListing=null},this._onSelectorBackdropClick=e=>{e.target===e.currentTarget&&this._closeSelectorEditor()},this._onSelPriceInput=e=>{this._selPriceSelector=e.target.value},this._onSelTitleInput=e=>{this._selTitleSelector=e.target.value},this._runSelectorTest=async()=>{if(!this._conn||!this._selListing)return;const e=(this._selListing.url??"").trim(),t=this._selPriceSelector.trim();if(!e)return void(this._selTestError="This listing has no URL to test against.");if(!t)return void(this._selTestError="Enter a price selector first.");this._selTesting=!0,this._selTestError=null,this._selTestResult=null;const r=this._selTitleSelector.trim()||"h1";try{const i=await this._conn.sendMessagePromise({type:"price_watch/test_selector",url:e,price_selector:t,title_selector:r});this._selTestResult=i}catch(e){this._selTestError=e?.message??"Test failed."}finally{this._selTesting=!1}},this._saveSelector=async()=>{if(!this._conn||!this._selProduct||!this._selListing)return;const e=this._selPriceSelector.trim();if(!e)return void(this._selSaveError="Enter a price selector first.");const t={type:"css",selectors:{price:e,title:this._selTitleSelector.trim()||"h1"},transforms:{price:"price_clean"}};this._selSaving=!0,this._selSaveError=null,this._selSaved=!1;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._selProduct.entryId,listing_id:this._selListing.listingId,custom_parser:t}}),this._selSaved=!0,window.setTimeout(()=>this._closeSelectorEditor(),1200)}catch(e){this._selSaveError=e?.message??"Save failed."}finally{this._selSaving=!1}},this._clearSelector=async()=>{if(this._conn&&this._selProduct&&this._selListing&&window.confirm("Remove the custom price selector and go back to automatic extraction?")){this._selSaving=!0,this._selSaveError=null;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._selProduct.entryId,listing_id:this._selListing.listingId,custom_parser:""}}),this._selSaved=!0,window.setTimeout(()=>this._closeSelectorEditor(),1200)}catch(e){this._selSaveError=e?.message??"Clear failed."}finally{this._selSaving=!1}}},this._handleEditVariant=(e,t)=>{this._varProduct=e,this._varListing=t,this._varError=null,this._varGroups=null,this._varCombos=[],this._varSelection=[],this._varSupported=!0,this._varSaveError=null,this._varSaved=!1,this._variantOpen=!0,this._loadVariants()},this._closeVariantPicker=()=>{this._variantOpen=!1,this._varProduct=null,this._varListing=null,this._varGroups=null,this._varCombos=[],this._varSelection=[]},this._onVariantBackdropClick=e=>{e.target===e.currentTarget&&this._closeVariantPicker()},this._loadVariants=async()=>{if(this._conn&&this._varProduct&&this._varListing){this._varLoading=!0,this._varError=null;try{const e={type:"price_watch/list_variants",entry_id:this._varProduct.entryId};this._varListing.isPrimary||(e.listing_id=this._varListing.listingId);const t=await this._conn.sendMessagePromise(e);if(this._varSupported=!!t.supported,!t.supported)return this._varGroups=null,this._varCombos=[],void(this._varSelection=[]);const r=t.options??[];this._varGroups=r,this._varCombos=t.variants??[];const i=(t.current??[]).map(e=>e.toLowerCase());this._varSelection=r.map(e=>{const t=e.choices.find(e=>i.includes(e.toLowerCase()));return t??""})}catch(e){this._varError=e?.message??"Could not read variants."}finally{this._varLoading=!1}}},this._onVariantSelect=(e,t)=>{const r=[...this._varSelection];r[e]=t,this._varSelection=r},this._saveVariant=async()=>{if(!this._conn||!this._varProduct||!this._varListing)return;const e=this._varSelection.filter(e=>!!e);if(0!==e.length){this._varSaving=!0,this._varSaveError=null,this._varSaved=!1;try{const t=this._varListing.isPrimary?{type:"call_service",domain:"price_watch",service:"set_variant",service_data:{entry_id:this._varProduct.entryId,variant_options:e}}:{type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._varProduct.entryId,listing_id:this._varListing.listingId,variant_options:e}};await this._conn.sendMessagePromise(t),this._varSaved=!0,window.setTimeout(()=>this._closeVariantPicker(),1200)}catch(e){this._varSaveError=e?.message??"Save failed."}finally{this._varSaving=!1}}else this._varSaveError="Pick an option in each group first."},this._clearVariant=async()=>{if(this._conn&&this._varProduct&&this._varListing&&window.confirm("Stop following a specific variant and go back to the default price?")){this._varSaving=!0,this._varSaveError=null;try{const e=this._varListing.isPrimary?{type:"call_service",domain:"price_watch",service:"set_variant",service_data:{entry_id:this._varProduct.entryId,variant_options:[]}}:{type:"call_service",domain:"price_watch",service:"edit_listing",service_data:{entry_id:this._varProduct.entryId,listing_id:this._varListing.listingId,variant_options:[]}};await this._conn.sendMessagePromise(e),this._varSaved=!0,window.setTimeout(()=>this._closeVariantPicker(),1200)}catch(e){this._varSaveError=e?.message??"Clear failed."}finally{this._varSaving=!1}}},this._copyBookmarklet=async()=>{const e=this._bookmarkletHref();try{await navigator.clipboard.writeText(e)}catch{this._selBookmarkletOpen=!0}},this._handleToggleHideNonShipping=()=>{this._hideNonShipping=!this._hideNonShipping;try{localStorage.setItem(PriceWatchPanel.HIDE_NONSHIP_KEY,this._hideNonShipping?"1":"0")}catch{}},this._handleToggleHideDiscontinued=()=>{this._hideDiscontinued=!this._hideDiscontinued;try{localStorage.setItem(PriceWatchPanel.HIDE_DISCONTINUED_KEY,this._hideDiscontinued?"1":"0")}catch{}},this._handleSearch=e=>{this._search=e.target.value},this._handleSort=e=>{const t=e.target.value;this._sort=t;try{localStorage.setItem(PriceWatchPanel.SORT_KEY,t)}catch{}},this._handleRefreshNow=async e=>{if(this._conn&&!this._refreshingNow.has(e.entryId)){this._refreshingNow=new Set([...this._refreshingNow,e.entryId]);try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"refresh_now",service_data:{entry_id:e.entryId}})}catch(e){console.error("[price-watch-panel] refresh_now failed:",e)}finally{const t=new Set(this._refreshingNow);t.delete(e.entryId),this._refreshingNow=t}}},this._handleSetTarget=async(e,t)=>{if(this._conn)try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"set_target",service_data:null===t?{entry_id:e.entryId}:{entry_id:e.entryId,target_price:t}})}catch(e){console.error("[price-watch-panel] set_target failed:",e)}},this._handleSetPaused=async(e,t)=>{if(this._conn)try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"set_paused",service_data:{entry_id:e.entryId,paused:t}})}catch(e){console.error("[price-watch-panel] set_paused failed:",e)}},this._handleAddProduct=()=>{window.history.pushState(null,"","/config/integrations/dashboard/add?domain=price_watch"),window.dispatchEvent(new CustomEvent("location-changed"))},this._openSearch=()=>{this._searchOpen=!0,this._trackTarget=null,this._trackError=null},this._closeSearch=()=>{this._searchOpen=!1,this._trackTarget=null,this._searchError=null,this._trackError=null},this._onBackdropClick=e=>{e.target===e.currentTarget&&this._closeSearch()},this._handleSearchQueryInput=e=>{this._searchQuery=e.target.value},this._handleSearchKeydown=e=>{"Enter"===e.key?(e.preventDefault(),this._runSearch()):"Escape"===e.key&&this._closeSearch()},this._runSearch=async()=>{if(!this._conn)return;const e=this._searchQuery.trim();if(e&&!this._searchLoading){this._searchLoading=!0,this._searchError=null,this._trackTarget=null;try{const t=await this._conn.sendMessagePromise({type:"price_watch/search",query:e,max_results:8});this._searchResults=t.results??[],this._searchEngine=t.engine??"none",this._searchRan=!0}catch(e){const t=String(e&&"object"==typeof e&&"message"in e?e.message:e);this._searchError=t||"Search failed.",this._searchResults=[],this._searchRan=!0,console.error("[price-watch-panel] search failed:",e)}finally{this._searchLoading=!1}}},this._pickResult=e=>{this._trackTarget=e,this._trackName=e.title,this._trackUrl=e.url,this._trackTargetPrice="",this._trackError=null},this._cancelTrack=()=>{this._trackTarget=null,this._trackError=null},this._handleTrackNameInput=e=>{this._trackName=e.target.value},this._handleTrackUrlInput=e=>{this._trackUrl=e.target.value},this._handleTrackTargetInput=e=>{this._trackTargetPrice=e.target.value},this._confirmTrack=async()=>{if(!this._conn||this._tracking)return;const e=this._trackUrl.trim();if(!e)return void(this._trackError="A URL is required to track a product.");const t=this._trackName.trim(),r=this._trackTargetPrice.trim();let i=null;if(""!==r){const e=Number(r);if(Number.isNaN(e))return void(this._trackError="Target price must be a number.");i=e}this._tracking=!0,this._trackError=null;try{await this._conn.sendMessagePromise({type:"call_service",domain:"price_watch",service:"track_product",service_data:{url:e,...t?{name:t}:{},...null!==i?{target_price:i}:{}}}),this._closeSearch()}catch(e){const t=String(e&&"object"==typeof e&&"message"in e?e.message:e);this._trackError=t||"Could not add product.",console.error("[price-watch-panel] track_product failed:",e)}finally{this._tracking=!1}},this._openProviderEditor=async()=>{if(this._providerOpen=!0,this._providerError=null,this._providerSuccess=!1,this._providerAdvancedOpen=!1,this._conn){this._providerLoading=!0;try{const e=await this._conn.sendMessagePromise({type:"price_watch/get_provider_settings"});this._applyProviderSettings(e)}catch(e){this._providerError=this._wsErrorMessage(e)||"Could not load provider settings.",console.error("[price-watch-panel] get_provider_settings failed:",e)}finally{this._providerLoading=!1}}else this._providerError="Not connected to Home Assistant yet."},this._closeProviderEditor=()=>{this._providerOpen=!1,this._providerError=null,this._providerSuccess=!1},this._onProviderBackdropClick=e=>{e.target===e.currentTarget&&this._closeProviderEditor()},this._onProviderChange=e=>{this._pProvider=e.target.value,this._providerSuccess=!1,this._providerError=null},this._saveProvider=async()=>{if(!this._conn||this._providerSaving)return;this._providerSaving=!0,this._providerError=null,this._providerSuccess=!1;const e={provider:this._pProvider},t=this._pApiKey.trim();if(t&&(e.api_key=t),"anthropic"===this._pProvider)e.model=this._pModel;else if("openai_compatible"===this._pProvider){e.base_url=this._pBaseUrl.trim(),e.model=this._pModel.trim(),e.input_cost_per_mtok=Number(this._pInputCost)||0,e.output_cost_per_mtok=Number(this._pOutputCost)||0,e.max_html_chars=Number(this._pMaxHtml)||1e5,e.force_json_mode=this._pForceJson;const t=this._pExtraHeaders.trim();t&&(e.extra_headers=t)}e.excluded_domains=this._pExcludedDomains;try{const t=await this._conn.sendMessagePromise({type:"price_watch/set_provider_settings",...e});this._applyProviderSettings(t),this._providerSuccess=!0}catch(e){this._providerError=this._wsErrorMessage(e)||"Could not save provider settings.",console.error("[price-watch-panel] set_provider_settings failed:",e)}finally{this._providerSaving=!1}},this._handleHideNonShopsToggle=e=>{this._hideNonShops=e.target.checked;try{localStorage.setItem(PriceWatchPanel.HIDE_NONSHOPS_KEY,this._hideNonShops?"1":"0")}catch{}};try{this._hideNonShipping="1"===localStorage.getItem(PriceWatchPanel.HIDE_NONSHIP_KEY),this._hideDiscontinued="1"===localStorage.getItem(PriceWatchPanel.HIDE_DISCONTINUED_KEY),this._hideNonShops="1"===localStorage.getItem(PriceWatchPanel.HIDE_NONSHOPS_KEY);const e=localStorage.getItem(PriceWatchPanel.SORT_KEY);e&&we.includes(e)&&(this._sort=e)}catch{}}connectedCallback(){super.connectedCallback(),this._bootstrap()}disconnectedCallback(){super.disconnectedCallback(),this._unsubState?.(),this._unsubRegistry?.(),this._unsubState=void 0,this._unsubRegistry=void 0}async _bootstrap(){const e=window.hassConnection;if(!e)return void(this._registryError="Home Assistant WebSocket connection not available on this page. Try reloading.");let t;try{const r=await e;t=r.conn,this._conn=t,this._connected=!0}catch(e){const t=e instanceof Error?e.message:String(e);return void(this._registryError=`Could not open HA connection: ${t}`)}try{await this._fetchRegistry(t),await this._fetchInitialStates(t),this._unsubState=await t.subscribeEvents(e=>this._onStateChanged(e),"state_changed"),this._unsubRegistry=await t.subscribeEvents(()=>{this._fetchRegistry(t).then(()=>this._fetchInitialStates(t))},"entity_registry_updated")}catch(e){const t=e instanceof Error?e.message:String(e);this._registryError=`Setup failed after connection: ${t}`,console.error("[price-watch-panel]",e)}}async _fetchRegistry(e){const t=await e.sendMessagePromise({type:"config/entity_registry/list"}),r=new Map;for(const e of t)"price_watch"===e.platform&&r.set(e.unique_id,e.entity_id);this._registry={byUniqueId:r},this._registryError=null,this._rebuildProducts()}async _fetchInitialStates(e){if(!this._registry)return;const t=new Set(this._registry.byUniqueId.values()),r=await e.sendMessagePromise({type:"get_states"}),i={};for(const e of r)t.has(e.entity_id)&&(i[e.entity_id]=e);this._states=i,this._rebuildProducts()}_onStateChanged(e){const{entity_id:t,new_state:r}=e.data;if(!this._registry)return;new Set(this._registry.byUniqueId.values()).has(t)&&(null===r?delete this._states[t]:this._states={...this._states,[t]:r},this._rebuildProducts())}_rebuildProducts(){if(!this._registry)return void(this._products=[]);const e={states:this._states};this._products=function(e,t){const r=new Map;for(const[e,i]of t.byUniqueId){const t=ye(e);if(!t)continue;let s=r.get(t.entryId);if(s||(s={legacy:new Map,listings:new Map},r.set(t.entryId,s)),null===t.listingId)s.legacy.set(t.key,i);else{let e=s.listings.get(t.listingId);e||(e=new Map,s.listings.set(t.listingId,e)),e.set(t.key,i)}}const i=[];for(const[t,s]of r){const r=s.legacy,o=r.get("price");if(!o)continue;const a=e.states[o];if(!a)continue;const n=a.attributes,l={entryId:t,title:String(n.title??n.friendly_name??"Unknown product"),url:String(n.product_url??""),retailer:"string"==typeof n.retailer?n.retailer:null,imageUrl:"string"==typeof n.image_url?n.image_url:null,imageProxyUrl:null,imageBroken:!1,price:_e(a.state),currency:"string"==typeof n.unit_of_measurement?n.unit_of_measurement:"string"==typeof n.currency?n.currency:"",priceLocal:null,localCurrency:null,lowest:null,highest:null,targetDiff:null,targetPrice:"number"==typeof n.target_price?n.target_price:null,paused:!0===n.paused,inStock:null,stockCount:"number"==typeof n.stock_count?n.stock_count:null,discontinued:!0===n.discontinued,discontinuedReason:"string"==typeof n.discontinued_reason?n.discontinued_reason:null,discontinuedAt:"string"==typeof n.discontinued_at?n.discontinued_at:null,lastKnownPrice:"number"==typeof n.last_known_price?n.last_known_price:null,lastKnownCurrency:"string"==typeof n.last_known_currency?n.last_known_currency:null,lastCheck:"string"==typeof n.last_check?n.last_check:null,history:fe(n.price_history),alternatives:me(n.alternatives),alternativesFetchedAt:"string"==typeof n.alternatives_fetched_at?n.alternatives_fetched_at:null,alternativesError:"string"==typeof n.alternatives_error&&n.alternatives_error?n.alternatives_error:null,entityIds:{price:o},listings:[]},c=[["price_local",e=>{l.priceLocal=_e(e.state),l.localCurrency="string"==typeof e.attributes.unit_of_measurement?e.attributes.unit_of_measurement:null,l.entityIds.priceLocal=e.entity_id}],["lowest",e=>{l.lowest=_e(e.state),l.entityIds.lowest=e.entity_id}],["highest",e=>{l.highest=_e(e.state),l.entityIds.highest=e.entity_id}],["target_diff",e=>{l.targetDiff=_e(e.state),l.entityIds.targetDiff=e.entity_id}],["stock_count",e=>{l.stockCount=_e(e.state),l.entityIds.stockCount=e.entity_id}],["in_stock",e=>{l.inStock=ue(e.state),l.entityIds.inStock=e.entity_id}],["discontinued",e=>{const t=ue(e.state);null!=t&&(l.discontinued=t),l.entityIds.discontinued=e.entity_id}],["photo",e=>{if("unavailable"===e.state||"unknown"===e.state)return void(l.imageBroken=!0);const t=e.attributes.entity_picture;"string"==typeof t&&t.length>0&&(l.imageProxyUrl=t)}]];for(const[t,i]of c){const s=r.get(t);if(!s)continue;const o=e.states[s];o&&i(o)}const d="string"==typeof n.listing_id&&n.listing_id?n.listing_id:`l_${t.slice(-12).toLowerCase()}`,p=be(e,s.legacy,d,!0);p&&l.listings.push(p);for(const[t,r]of s.listings){const i=be(e,r,t,!1);i&&l.listings.push(i)}i.push(l)}return i.sort((e,t)=>e.discontinued!==t.discontinued?e.discontinued?1:-1:e.title.localeCompare(t.title)),i}(e,this._registry)}_matchedCombo(){if(!this._varGroups||0===this._varGroups.length)return null;if(this._varSelection.some(e=>!e))return null;const e=this._varSelection.map(e=>e.toLowerCase());return this._varCombos.find(t=>{const r=t.labels.map(e=>e.toLowerCase());return e.every(e=>r.includes(e))})??null}_bookmarkletHref(){return"javascript:"+encodeURIComponent("(function(){\n  if(window.__pwPickerActive){return;}\n  window.__pwPickerActive=true;\n  var hl=document.createElement('div');\n  hl.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:rgba(25,118,210,0.25);border:2px solid #1976d2;border-radius:3px;transition:all 40ms ease';\n  var tip=document.createElement('div');\n  tip.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:#1976d2;color:#fff;font:12px/1.4 sans-serif;padding:3px 6px;border-radius:4px;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';\n  document.body.appendChild(hl);document.body.appendChild(tip);\n  function sel(el){\n    if(!el||el.nodeType!==1)return'';\n    if(el.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(el.id))return'#'+el.id;\n    var parts=[],node=el,depth=0;\n    while(node&&node.nodeType===1&&depth<5){\n      var part=node.tagName.toLowerCase();\n      if(node.id&&/^[A-Za-z][-_A-Za-z0-9]*$/.test(node.id)){parts.unshift('#'+node.id);break;}\n      var cls=(node.getAttribute('class')||'').trim().split(/\\s+/).filter(function(c){return c&&!/^(is-|has-|js-)/.test(c)&&c.length<30;}).slice(0,2);\n      if(cls.length)part+='.'+cls.join('.');\n      var p=node.parentElement;\n      if(p){var sib=Array.prototype.filter.call(p.children,function(c){return c.tagName===node.tagName;});if(sib.length>1){part+=':nth-of-type('+(sib.indexOf(node)+1)+')';}}\n      parts.unshift(part);node=p;depth++;\n    }\n    return parts.join(' > ');\n  }\n  function move(e){\n    var el=e.target;if(!el||el===hl||el===tip)return;\n    var r=el.getBoundingClientRect();\n    hl.style.left=r.left+'px';hl.style.top=r.top+'px';hl.style.width=r.width+'px';hl.style.height=r.height+'px';\n    var s=sel(el);tip.textContent=s;\n    tip.style.left=r.left+'px';tip.style.top=(r.top>24?r.top-24:r.bottom+4)+'px';\n  }\n  function done(){window.removeEventListener('mousemove',move,true);window.removeEventListener('click',click,true);window.removeEventListener('keydown',key,true);hl.remove();tip.remove();window.__pwPickerActive=false;}\n  function click(e){\n    e.preventDefault();e.stopPropagation();\n    var s=sel(e.target);\n    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(function(){},function(){window.prompt('Copy this selector:',s);});}\n    else{window.prompt('Copy this selector:',s);}\n    done();\n  }\n  function key(e){if(e.key==='Escape'){done();}}\n  window.addEventListener('mousemove',move,true);\n  window.addEventListener('click',click,true);\n  window.addEventListener('keydown',key,true);\n})();")}_visibleProducts(){const e=this._search.trim().toLowerCase();let t=this._products.filter(t=>{if(this._hideDiscontinued&&t.discontinued)return!1;if(!e)return!0;return`${t.title} ${t.retailer??""}`.toLowerCase().includes(e)});const r=(e,t)=>e.title.localeCompare(t.title),i=e=>null===e?Number.POSITIVE_INFINITY:e;return t=[...t].sort((e,t)=>{switch(this._sort){case"cheapest":return i(e.price)-i(t.price)||r(e,t);case"last_checked":{const i=e.lastCheck?Date.parse(e.lastCheck):-1/0;return(t.lastCheck?Date.parse(t.lastCheck):-1/0)-i||r(e,t)}case"drop":{const i=null!==e.highest&&null!==e.price?e.highest-e.price:-1;return(null!==t.highest&&null!==t.price?t.highest-t.price:-1)-i||r(e,t)}case"below_target":{const i=e=>null!==e.targetPrice&&null!==e.price&&e.price<=e.targetPrice?e.targetPrice-e.price:-1;return i(t)-i(e)||r(e,t)}default:return r(e,t)}}),t}_wsErrorMessage(e){return String(e&&"object"==typeof e&&"message"in e?e.message:e)}_applyProviderSettings(e){this._providerModels=e.anthropic_models??[],this._pProvider=e.provider,this._pModel=e.model||this._providerModels[0]||"",this._pBaseUrl=e.base_url??"",this._providerHasKey=!!e.has_api_key,this._pApiKey="",this._pInputCost=String(e.input_cost_per_mtok??0),this._pOutputCost=String(e.output_cost_per_mtok??0),this._pMaxHtml=String(e.max_html_chars??1e5),this._pForceJson=!!e.force_json_mode,this._pExtraHeaders=e.extra_headers??"",this._pExcludedDomains=(e.excluded_domains??[]).join("\n")}_renderHeader(){return V`
       <header class="panel-header">
         <div class="panel-header__title">
           <h1>Price Watch</h1>
@@ -949,7 +958,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           </button>
         </div>
       </header>
-    `}_renderSearchModal(){return this._searchOpen?K`
+    `}_renderSearchModal(){return this._searchOpen?V`
       <div
         class="modal-backdrop"
         @click=${this._onBackdropClick}
@@ -971,7 +980,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           ${this._trackTarget?this._renderTrackForm():this._renderSearchBody()}
         </div>
       </div>
-    `:null}_renderSearchBody(){return K`
+    `:null}_renderSearchBody(){return V`
       <div class="modal__searchbar">
         <input
           type="search"
@@ -992,23 +1001,23 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
         </button>
       </div>
       ${this._renderSearchResults()}
-    `}_renderSearchResults(){if(this._searchLoading)return K`<div class="modal__status">Searching the web…</div>`;if(this._searchError)return K`
+    `}_renderSearchResults(){if(this._searchLoading)return V`<div class="modal__status">Searching the web…</div>`;if(this._searchError)return V`
         <div class="modal__status modal__status--error">
           ⚠ ${this._searchError}
         </div>
-      `;if(!this._searchRan)return K`
+      `;if(!this._searchRan)return V`
         <div class="modal__status">
           Type what you're looking for and press Enter — e.g. a product
           name, model number, or brand.
         </div>
-      `;if(0===this._searchResults.length)return K`
+      `;if(0===this._searchResults.length)return V`
         <div class="modal__status">
           No results. Try a different or more specific query.
         </div>
-      `;const e=this._searchResults.filter(e=>e.likely_non_shop).length,t=this._hideNonShops?this._searchResults.filter(e=>!e.likely_non_shop):this._searchResults;return K`
+      `;const e=this._searchResults.filter(e=>e.likely_non_shop).length,t=this._hideNonShops?this._searchResults.filter(e=>!e.likely_non_shop):this._searchResults;return V`
       <div class="results-bar">
         <div class="modal__engine">${Ee[this._searchEngine]}</div>
-        ${e>0?K`<label
+        ${e>0?V`<label
               class="results-bar__toggle"
               title="Hide GitHub, YouTube, wikis, forums and other non-store results"
             >
@@ -1020,36 +1029,36 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
               Hide non-stores (${e})
             </label>`:null}
       </div>
-      ${0===t.length?K`<div class="modal__status">
+      ${0===t.length?V`<div class="modal__status">
             All ${this._searchResults.length} results were non-stores and are
             hidden. Untick "Hide non-stores" to see them.
-          </div>`:K`<ul class="results">
+          </div>`:V`<ul class="results">
             ${t.map(e=>this._renderResultRow(e))}
           </ul>`}
-    `}_renderResultRow(e){const t=null!==e.price?`${e.price} ${e.currency}`.trim():"Price unknown",r=!0===e.ships_to_user_region?K`<span class="results__ship results__ship--yes">Ships to you</span>`:!1===e.ships_to_user_region?K`<span class="results__ship results__ship--no">Doesn't ship</span>`:null,i=e.likely_non_shop?K`<span class="results__kind results__kind--info"
+    `}_renderResultRow(e){const t=null!==e.price?`${e.price} ${e.currency}`.trim():"Price unknown",r=!0===e.ships_to_user_region?V`<span class="results__ship results__ship--yes">Ships to you</span>`:!1===e.ships_to_user_region?V`<span class="results__ship results__ship--no">Doesn't ship</span>`:null,i=e.likely_non_shop?V`<span class="results__kind results__kind--info"
           >not a store?</span
-        >`:null;return K`
+        >`:null;return V`
       <li class="results__row ${e.likely_non_shop?"results__row--muted":""}">
         <div class="results__thumb">
-          ${e.image_url?K`<img src=${e.image_url} alt="" loading="lazy" />`:K`<span class="results__thumb-ph">🏷️</span>`}
+          ${e.image_url?V`<img src=${e.image_url} alt="" loading="lazy" />`:V`<span class="results__thumb-ph">🏷️</span>`}
         </div>
         <div class="results__info">
           <div class="results__title" title=${e.title}>${e.title}</div>
           <div class="results__meta">
             <span class="results__price">${t}</span>
-            ${e.retailer?K`<span class="results__retailer">${e.retailer}</span>`:null}
+            ${e.retailer?V`<span class="results__retailer">${e.retailer}</span>`:null}
             ${i}
             ${r}
           </div>
-          ${e.notes?K`<div class="results__notes">${e.notes}</div>`:null}
+          ${e.notes?V`<div class="results__notes">${e.notes}</div>`:null}
         </div>
         <button class="results__add" @click=${()=>this._pickResult(e)}>
           Track
         </button>
       </li>
-    `}_renderTrackForm(){const e=this._trackTarget;return K`
+    `}_renderTrackForm(){const e=this._trackTarget;return V`
       <div class="trackform">
-        ${e&&null!==e.price?K`<div class="trackform__hint">
+        ${e&&null!==e.price?V`<div class="trackform__hint">
               Currently ${e.price} ${e.currency} at
               ${e.retailer||"this retailer"}.
             </div>`:null}
@@ -1081,7 +1090,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
             placeholder="Alert when at or below…"
           />
         </label>
-        ${this._trackError?K`<div class="modal__status modal__status--error">
+        ${this._trackError?V`<div class="modal__status modal__status--error">
               ⚠ ${this._trackError}
             </div>`:null}
         <div class="trackform__actions">
@@ -1097,7 +1106,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           </button>
         </div>
       </div>
-    `}_renderProviderModal(){return this._providerOpen?K`
+    `}_renderProviderModal(){return this._providerOpen?V`
       <div
         class="modal-backdrop"
         @click=${this._onProviderBackdropClick}
@@ -1116,15 +1125,15 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
               ✕
             </button>
           </div>
-          ${this._providerLoading?K`<div class="modal__status">Loading current settings…</div>`:this._renderProviderForm()}
+          ${this._providerLoading?V`<div class="modal__status">Loading current settings…</div>`:this._renderProviderForm()}
         </div>
       </div>
-    `:null}_renderProviderForm(){return K`
+    `:null}_renderProviderForm(){return V`
       <div class="trackform">
         <label class="trackform__field">
           <span>Provider</span>
           <select @change=${this._onProviderChange}>
-            ${["none","anthropic","openai_compatible"].map(e=>K`
+            ${["none","anthropic","openai_compatible"].map(e=>V`
                 <option value=${e} ?selected=${this._pProvider===e}>
                   ${Ae[e]}
                 </option>
@@ -1138,10 +1147,10 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
 
         ${this._renderExcludedDomains()}
 
-        ${this._providerError?K`<div class="modal__status modal__status--error">
+        ${this._providerError?V`<div class="modal__status modal__status--error">
               ⚠ ${this._providerError}
             </div>`:null}
-        ${this._providerSuccess?K`<div class="modal__status modal__status--ok">
+        ${this._providerSuccess?V`<div class="modal__status modal__status--ok">
               ✓ Saved — reloading tracked products to apply the change.
             </div>`:null}
 
@@ -1161,7 +1170,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           </button>
         </div>
       </div>
-    `}_renderExcludedDomains(){return K`
+    `}_renderExcludedDomains(){return V`
       <label class="trackform__field">
         <span>Excluded sites</span>
         <textarea
@@ -1178,19 +1187,19 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
         ship to Iceland but you don't want to see. One hostname per line
         (e.g. <code>amazon.de</code>); subdomains are matched too.
       </div>
-    `}_renderNoneInfo(){return K`
+    `}_renderNoneInfo(){return V`
       <div class="trackform__hint">
         Free mode uses DuckDuckGo web search with deterministic price
         extraction — no API key and no per-call cost. AI-powered HTML
         parsing and richer alternative ranking are disabled.
       </div>
-    `}_renderAnthropicFields(){return K`
+    `}_renderAnthropicFields(){return V`
       <label class="trackform__field">
         <span>Model</span>
         <select
           @change=${e=>this._pModel=e.target.value}
         >
-          ${this._providerModels.map(e=>K`
+          ${this._providerModels.map(e=>V`
               <option value=${e} ?selected=${this._pModel===e}>${e}</option>
             `)}
         </select>
@@ -1198,7 +1207,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
       <label class="trackform__field">
         <span>
           API key
-          ${this._providerHasKey?K`<em>(leave blank to keep current)</em>`:null}
+          ${this._providerHasKey?V`<em>(leave blank to keep current)</em>`:null}
         </span>
         <input
           type="password"
@@ -1208,7 +1217,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           placeholder=${this._providerHasKey?"•••••• stored — type to replace":"sk-ant-…"}
         />
       </label>
-    `}_renderOpenAIFields(){return K`
+    `}_renderOpenAIFields(){return V`
       <label class="trackform__field">
         <span>Base URL</span>
         <input
@@ -1246,7 +1255,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
         ${this._providerAdvancedOpen?"▾":"▸"} Advanced (cost &amp; format)
       </button>
       ${this._providerAdvancedOpen?this._renderOpenAIAdvanced():null}
-    `}_renderOpenAIAdvanced(){return K`
+    `}_renderOpenAIAdvanced(){return V`
       <label class="trackform__field">
         <span>Input cost / Mtok (USD)</span>
         <input
@@ -1294,19 +1303,19 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           placeholder='{"Authorization": "Bearer …"}'
         ></textarea>
       </label>
-    `}_renderSummary(){const e=this._products,t=e.length,r=e.filter(e=>!0===e.inStock).length,i=e.filter(e=>null!==e.targetPrice&&null!==e.price&&e.price<=e.targetPrice).length,s=e.filter(e=>e.discontinued).length,o=(e,t,r)=>K`
+    `}_renderSummary(){const e=this._products,t=e.length,r=e.filter(e=>!0===e.inStock).length,i=e.filter(e=>null!==e.targetPrice&&null!==e.price&&e.price<=e.targetPrice).length,s=e.filter(e=>e.discontinued).length,o=(e,t,r)=>V`
       <div class="stat ${r}">
         <span class="stat__value">${t}</span>
         <span class="stat__label">${e}</span>
       </div>
-    `;return K`
+    `;return V`
       <div class="summary">
         ${o("Tracked",t,"stat--total")}
         ${o("In stock",r,"stat--stock")}
         ${o("Below target",i,"stat--target")}
         ${o("Discontinued",s,"stat--disc")}
       </div>
-    `}_renderToolbar(){return K`
+    `}_renderToolbar(){return V`
       <div class="toolbar">
         <div class="toolbar__search">
           <input
@@ -1321,7 +1330,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           <label class="sort-label">
             <span>Sort</span>
             <select @change=${this._handleSort} aria-label="Sort products">
-              ${we.map(e=>K`
+              ${we.map(e=>V`
                   <option value=${e} ?selected=${this._sort===e}>
                     ${Se[e]}
                   </option>
@@ -1352,7 +1361,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           </label>
         </div>
       </div>
-    `}_renderEmptyState(){return K`
+    `}_renderEmptyState(){return V`
       <div class="empty">
         <div class="empty__icon">🏷️</div>
         <h2>No products tracked yet</h2>
@@ -1361,24 +1370,24 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           + Add product
         </button>
       </div>
-    `}_renderError(){return K`
+    `}_renderError(){return V`
       <div class="error">
         <div class="error__icon">⚠</div>
         <p>${this._registryError}</p>
       </div>
-    `}_renderLoading(){return K`
+    `}_renderLoading(){return V`
       <div class="loading">
         <p>Loading tracked products…</p>
       </div>
-    `}_renderGrid(){const e=this._visibleProducts();return 0===e.length?K`
+    `}_renderGrid(){const e=this._visibleProducts();return 0===e.length?V`
         <div class="empty">
           <div class="empty__icon">🔍</div>
           <h2>No matches</h2>
           <p>No tracked products match your search or filters.</p>
         </div>
-      `:K`
+      `:V`
       <div class="grid">
-        ${e.map(e=>K`
+        ${e.map(e=>V`
             <price-watch-card
               .product=${e}
               .onOpen=${this._handleOpen}
@@ -1392,13 +1401,14 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
               .onRemoveListing=${this._handleRemoveListing}
               .onAddListing=${this._handleAddListing}
               .onEditListing=${this._handleEditListing}
+              .onEditVariant=${this._handleEditVariant}
             ></price-watch-card>
           `)}
       </div>
-    `}render(){const e=this._connected&&this._registry,t=this._products.length>0;return K`
+    `}render(){const e=this._connected&&this._registry,t=this._products.length>0;return V`
       <div class="panel">
         ${this._renderHeader()}
-        ${this._registryError?this._renderError():e?t?K`
+        ${this._registryError?this._renderError():e?t?V`
               ${this._renderSummary()} ${this._renderToolbar()}
               ${this._renderGrid()}
             `:this._renderEmptyState():this._renderLoading()}
@@ -1406,7 +1416,108 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
       ${this._renderSearchModal()}
       ${this._renderProviderModal()}
       ${this._renderSelectorModal()}
-    `}_renderSelectorModal(){if(!this._selectorOpen||!this._selListing)return null;const e=this._selListing,t=this._selProduct,r=e.url??"",i=this._selTestResult;return K`
+      ${this._renderVariantModal()}
+    `}_renderVariantModal(){if(!this._variantOpen||!this._varListing)return null;const e=this._varListing,t=this._varProduct,r=this._varGroups,i=this._matchedCombo(),s=this._varSelection.some(e=>!e);return V`
+      <div
+        class="modal-backdrop"
+        @click=${this._onVariantBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose product variant"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>Choose variant</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeVariantPicker}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="trackform">
+            <p class="sel__intro">
+              For ${e.retailer||"this listing"}${t?V` on <strong>${t.title}</strong>`:null}. Pick the exact combination you want to track — the
+              price below updates to match, and the tracker follows it from
+              the next check on.
+            </p>
+
+            ${this._varLoading?V`<div class="modal__status">Reading variants…</div>`:null}
+            ${this._varError?V`<div class="modal__status modal__status--error">
+                  ⚠ ${this._varError}
+                </div>`:null}
+            ${this._varLoading||this._varError||this._varSupported?null:V`<div class="modal__status">
+                  This page doesn't expose selectable variants, so there's
+                  nothing to pin — it already tracks its only price.
+                </div>`}
+
+            ${r&&this._varSupported?V`
+                  <div class="var__groups">
+                    ${r.map((e,t)=>V`
+                        <label class="trackform__field">
+                          <span>${e.title}</span>
+                          <select
+                            class="var__select"
+                            .value=${this._varSelection[t]??""}
+                            @change=${e=>this._onVariantSelect(t,e.target.value)}
+                          >
+                            <option value="" ?selected=${!this._varSelection[t]}>
+                              — choose —
+                            </option>
+                            ${e.choices.map(e=>V`<option
+                                value=${e}
+                                ?selected=${this._varSelection[t]===e}
+                              >
+                                ${e}
+                              </option>`)}
+                          </select>
+                        </label>
+                      `)}
+                  </div>
+
+                  <div class="var__preview">
+                    ${i?V`<span class="var__price"
+                            >${this._formatVariantPrice(i)}</span
+                          >
+                          ${i.in_stock?null:V`<span class="var__oos"
+                                >out of stock</span
+                              >`}`:s?V`<span class="var__hint"
+                          >Pick an option in each group to see the price.</span
+                        >`:V`<span class="var__hint var__hint--warn"
+                          >That combination isn't available on the page.</span
+                        >`}
+                  </div>
+                `:null}
+
+            ${this._varSaveError?V`<div class="modal__status modal__status--error">
+                  ⚠ ${this._varSaveError}
+                </div>`:null}
+            ${this._varSaved?V`<div class="modal__status modal__status--ok">
+                  ✓ Saved — tracking this variant from the next check.
+                </div>`:null}
+
+            <div class="trackform__actions sel__actions">
+              <button
+                class="trackform__cancel"
+                @click=${this._clearVariant}
+                ?disabled=${this._varSaving||!this._varSupported}
+                title="Revert to the page's default price"
+              >
+                Track default again
+              </button>
+              <button
+                class="add-button"
+                @click=${this._saveVariant}
+                ?disabled=${this._varSaving||!this._varSupported||s||!i}
+              >
+                ${this._varSaving?"Saving…":"Track this variant"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `}_formatVariantPrice(e){const t=e.currency||"";try{if(t)return new Intl.NumberFormat(void 0,{style:"currency",currency:t}).format(e.price)}catch{}return t?`${e.price} ${t}`:`${e.price}`}_renderSelectorModal(){if(!this._selectorOpen||!this._selListing)return null;const e=this._selListing,t=this._selProduct,r=e.url??"",i=this._selTestResult;return V`
       <div
         class="modal-backdrop"
         @click=${this._onSelectorBackdropClick}
@@ -1427,13 +1538,13 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           </div>
           <div class="trackform">
             <p class="sel__intro">
-              For ${e.retailer||"this listing"}${t?K` on <strong>${t.title}</strong>`:null}. Use this when the automatic price reader can't
+              For ${e.retailer||"this listing"}${t?V` on <strong>${t.title}</strong>`:null}. Use this when the automatic price reader can't
               find the price. Open the page in your browser, press
               <kbd>F12</kbd>, right-click the price →
               <em>Copy → Copy selector</em>, and paste it below — or use
               the point-and-click picker further down.
             </p>
-            ${r?K`<div class="sel__url" title=${r}>${r}</div>`:K`<div class="modal__status modal__status--error">
+            ${r?V`<div class="sel__url" title=${r}>${r}</div>`:V`<div class="modal__status modal__status--error">
                   ⚠ This listing has no URL, so Test won't work.
                 </div>`}
 
@@ -1474,17 +1585,17 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
               >
             </div>
 
-            ${this._selTestError?K`<div class="modal__status modal__status--error">
+            ${this._selTestError?V`<div class="modal__status modal__status--error">
                   ⚠ ${this._selTestError}
                 </div>`:null}
             ${i?this._renderSelectorTestResult(i):null}
 
             ${this._renderBookmarklet()}
 
-            ${this._selSaveError?K`<div class="modal__status modal__status--error">
+            ${this._selSaveError?V`<div class="modal__status modal__status--error">
                   ⚠ ${this._selSaveError}
                 </div>`:null}
-            ${this._selSaved?K`<div class="modal__status modal__status--ok">
+            ${this._selSaved?V`<div class="modal__status modal__status--ok">
                   ✓ Saved — the listing will use it on the next check.
                 </div>`:null}
 
@@ -1508,31 +1619,31 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           </div>
         </div>
       </div>
-    `}_renderSelectorTestResult(e){const t=e.price,r=e.title;return K`
+    `}_renderSelectorTestResult(e){const t=e.price,r=e.title;return V`
       <div class="sel__result">
         <div class="sel__result-head">
-          Tested${e.page_title?K` — <span class="sel__page-title">${e.page_title}</span>`:null}
+          Tested${e.page_title?V` — <span class="sel__page-title">${e.page_title}</span>`:null}
         </div>
         <div class="sel__result-row">
           <span class="sel__result-label">Price</span>
-          ${t.found?K`<span class="sel__result-ok">
-                  ${null!==t.value&&void 0!==t.value?K`<strong>${t.value}</strong>`:K`<em>matched, but not a number</em>`}
+          ${t.found?V`<span class="sel__result-ok">
+                  ${null!==t.value&&void 0!==t.value?V`<strong>${t.value}</strong>`:V`<em>matched, but not a number</em>`}
                 </span>
-                <code class="sel__raw">${t.raw}</code>`:K`<span class="sel__result-bad"
-                >No match${t.error?K` — ${t.error}`:null}</span
+                <code class="sel__raw">${t.raw}</code>`:V`<span class="sel__result-bad"
+                >No match${t.error?V` — ${t.error}`:null}</span
               >`}
         </div>
-        ${r?K`<div class="sel__result-row">
+        ${r?V`<div class="sel__result-row">
               <span class="sel__result-label">Title</span>
-              ${r.found?K`<code class="sel__raw">${r.raw}</code>`:K`<span class="sel__result-bad">No match</span>`}
+              ${r.found?V`<code class="sel__raw">${r.raw}</code>`:V`<span class="sel__result-bad">No match</span>`}
             </div>`:null}
-        ${!t.found||null!==t.value&&void 0!==t.value?null:K`<p class="sel__warn">
+        ${!t.found||null!==t.value&&void 0!==t.value?null:V`<p class="sel__warn">
               The element matched but no number could be parsed from it. Try a
               more specific selector, or append <code>@content</code> /
               <code>@data-price</code> to read a price attribute.
             </p>`}
       </div>
-    `}_renderBookmarklet(){const e=this._bookmarkletHref();return K`
+    `}_renderBookmarklet(){const e=this._bookmarkletHref();return V`
       <details
         class="sel__bm"
         ?open=${this._selBookmarkletOpen}
@@ -1567,7 +1678,7 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
           >${e}</textarea>
         </div>
       </details>
-    `}}PriceWatchPanel.HIDE_NONSHIP_KEY="price-watch:hide-non-shipping",PriceWatchPanel.SORT_KEY="price-watch:sort",PriceWatchPanel.HIDE_DISCONTINUED_KEY="price-watch:hide-discontinued",PriceWatchPanel.HIDE_NONSHOPS_KEY="price-watch:hide-non-shops",PriceWatchPanel.styles=n`
+    `}}PriceWatchPanel.HIDE_NONSHIP_KEY="price-watch:hide-non-shipping",PriceWatchPanel.SORT_KEY="price-watch:sort",PriceWatchPanel.HIDE_DISCONTINUED_KEY="price-watch:hide-discontinued",PriceWatchPanel.HIDE_NONSHOPS_KEY="price-watch:hide-non-shops",PriceWatchPanel.styles=a`
     :host {
       display: block;
       width: 100%;
@@ -2096,6 +2207,49 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
       justify-content: space-between;
     }
 
+    /* --- Variant picker --- */
+    .var__groups {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .var__select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      font: inherit;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #c0c0c0);
+      border-radius: 8px;
+    }
+    .var__preview {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: var(--secondary-background-color, #f5f5f5);
+      border-radius: 10px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-height: 24px;
+    }
+    .var__price {
+      font-size: 1.4rem;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .var__oos {
+      font-size: 0.8rem;
+      color: var(--error-color, #c62828);
+    }
+    .var__hint {
+      color: var(--secondary-text-color, #757575);
+      font-size: 0.9rem;
+    }
+    .var__hint--warn {
+      color: var(--warning-color, #f57c00);
+    }
+
     /* --- Summary stat bar --- */
     .summary {
       display: grid;
@@ -2226,4 +2380,4 @@ function e(e,t,r,i){var s,o=arguments.length,n=o<3?t:null===i?i=Object.getOwnPro
     .loading p {
       margin: 0;
     }
-  `,e([he()],PriceWatchPanel.prototype,"_products",void 0),e([he()],PriceWatchPanel.prototype,"_registry",void 0),e([he()],PriceWatchPanel.prototype,"_registryError",void 0),e([he()],PriceWatchPanel.prototype,"_connected",void 0),e([he()],PriceWatchPanel.prototype,"_refreshingEntries",void 0),e([he()],PriceWatchPanel.prototype,"_hideNonShipping",void 0),e([he()],PriceWatchPanel.prototype,"_search",void 0),e([he()],PriceWatchPanel.prototype,"_sort",void 0),e([he()],PriceWatchPanel.prototype,"_hideDiscontinued",void 0),e([he()],PriceWatchPanel.prototype,"_refreshingNow",void 0),e([he()],PriceWatchPanel.prototype,"_searchOpen",void 0),e([he()],PriceWatchPanel.prototype,"_searchQuery",void 0),e([he()],PriceWatchPanel.prototype,"_searchLoading",void 0),e([he()],PriceWatchPanel.prototype,"_searchResults",void 0),e([he()],PriceWatchPanel.prototype,"_searchEngine",void 0),e([he()],PriceWatchPanel.prototype,"_searchRan",void 0),e([he()],PriceWatchPanel.prototype,"_searchError",void 0),e([he()],PriceWatchPanel.prototype,"_hideNonShops",void 0),e([he()],PriceWatchPanel.prototype,"_trackTarget",void 0),e([he()],PriceWatchPanel.prototype,"_trackName",void 0),e([he()],PriceWatchPanel.prototype,"_trackUrl",void 0),e([he()],PriceWatchPanel.prototype,"_trackTargetPrice",void 0),e([he()],PriceWatchPanel.prototype,"_tracking",void 0),e([he()],PriceWatchPanel.prototype,"_trackError",void 0),e([he()],PriceWatchPanel.prototype,"_providerOpen",void 0),e([he()],PriceWatchPanel.prototype,"_providerLoading",void 0),e([he()],PriceWatchPanel.prototype,"_providerSaving",void 0),e([he()],PriceWatchPanel.prototype,"_providerError",void 0),e([he()],PriceWatchPanel.prototype,"_providerSuccess",void 0),e([he()],PriceWatchPanel.prototype,"_providerAdvancedOpen",void 0),e([he()],PriceWatchPanel.prototype,"_pProvider",void 0),e([he()],PriceWatchPanel.prototype,"_pApiKey",void 0),e([he()],PriceWatchPanel.prototype,"_pModel",void 0),e([he()],PriceWatchPanel.prototype,"_pBaseUrl",void 0),e([he()],PriceWatchPanel.prototype,"_pInputCost",void 0),e([he()],PriceWatchPanel.prototype,"_pOutputCost",void 0),e([he()],PriceWatchPanel.prototype,"_pMaxHtml",void 0),e([he()],PriceWatchPanel.prototype,"_pForceJson",void 0),e([he()],PriceWatchPanel.prototype,"_pExtraHeaders",void 0),e([he()],PriceWatchPanel.prototype,"_pExcludedDomains",void 0),e([he()],PriceWatchPanel.prototype,"_providerHasKey",void 0),e([he()],PriceWatchPanel.prototype,"_providerModels",void 0),e([he()],PriceWatchPanel.prototype,"_selectorOpen",void 0),e([he()],PriceWatchPanel.prototype,"_selPriceSelector",void 0),e([he()],PriceWatchPanel.prototype,"_selTitleSelector",void 0),e([he()],PriceWatchPanel.prototype,"_selTesting",void 0),e([he()],PriceWatchPanel.prototype,"_selTestResult",void 0),e([he()],PriceWatchPanel.prototype,"_selTestError",void 0),e([he()],PriceWatchPanel.prototype,"_selSaving",void 0),e([he()],PriceWatchPanel.prototype,"_selSaveError",void 0),e([he()],PriceWatchPanel.prototype,"_selSaved",void 0),e([he()],PriceWatchPanel.prototype,"_selBookmarkletOpen",void 0),customElements.get("price-watch-panel")||customElements.define("price-watch-panel",PriceWatchPanel);export{PriceWatchPanel};
+  `,e([he()],PriceWatchPanel.prototype,"_products",void 0),e([he()],PriceWatchPanel.prototype,"_registry",void 0),e([he()],PriceWatchPanel.prototype,"_registryError",void 0),e([he()],PriceWatchPanel.prototype,"_connected",void 0),e([he()],PriceWatchPanel.prototype,"_refreshingEntries",void 0),e([he()],PriceWatchPanel.prototype,"_hideNonShipping",void 0),e([he()],PriceWatchPanel.prototype,"_search",void 0),e([he()],PriceWatchPanel.prototype,"_sort",void 0),e([he()],PriceWatchPanel.prototype,"_hideDiscontinued",void 0),e([he()],PriceWatchPanel.prototype,"_refreshingNow",void 0),e([he()],PriceWatchPanel.prototype,"_searchOpen",void 0),e([he()],PriceWatchPanel.prototype,"_searchQuery",void 0),e([he()],PriceWatchPanel.prototype,"_searchLoading",void 0),e([he()],PriceWatchPanel.prototype,"_searchResults",void 0),e([he()],PriceWatchPanel.prototype,"_searchEngine",void 0),e([he()],PriceWatchPanel.prototype,"_searchRan",void 0),e([he()],PriceWatchPanel.prototype,"_searchError",void 0),e([he()],PriceWatchPanel.prototype,"_hideNonShops",void 0),e([he()],PriceWatchPanel.prototype,"_trackTarget",void 0),e([he()],PriceWatchPanel.prototype,"_trackName",void 0),e([he()],PriceWatchPanel.prototype,"_trackUrl",void 0),e([he()],PriceWatchPanel.prototype,"_trackTargetPrice",void 0),e([he()],PriceWatchPanel.prototype,"_tracking",void 0),e([he()],PriceWatchPanel.prototype,"_trackError",void 0),e([he()],PriceWatchPanel.prototype,"_providerOpen",void 0),e([he()],PriceWatchPanel.prototype,"_providerLoading",void 0),e([he()],PriceWatchPanel.prototype,"_providerSaving",void 0),e([he()],PriceWatchPanel.prototype,"_providerError",void 0),e([he()],PriceWatchPanel.prototype,"_providerSuccess",void 0),e([he()],PriceWatchPanel.prototype,"_providerAdvancedOpen",void 0),e([he()],PriceWatchPanel.prototype,"_pProvider",void 0),e([he()],PriceWatchPanel.prototype,"_pApiKey",void 0),e([he()],PriceWatchPanel.prototype,"_pModel",void 0),e([he()],PriceWatchPanel.prototype,"_pBaseUrl",void 0),e([he()],PriceWatchPanel.prototype,"_pInputCost",void 0),e([he()],PriceWatchPanel.prototype,"_pOutputCost",void 0),e([he()],PriceWatchPanel.prototype,"_pMaxHtml",void 0),e([he()],PriceWatchPanel.prototype,"_pForceJson",void 0),e([he()],PriceWatchPanel.prototype,"_pExtraHeaders",void 0),e([he()],PriceWatchPanel.prototype,"_pExcludedDomains",void 0),e([he()],PriceWatchPanel.prototype,"_providerHasKey",void 0),e([he()],PriceWatchPanel.prototype,"_providerModels",void 0),e([he()],PriceWatchPanel.prototype,"_selectorOpen",void 0),e([he()],PriceWatchPanel.prototype,"_selPriceSelector",void 0),e([he()],PriceWatchPanel.prototype,"_selTitleSelector",void 0),e([he()],PriceWatchPanel.prototype,"_selTesting",void 0),e([he()],PriceWatchPanel.prototype,"_selTestResult",void 0),e([he()],PriceWatchPanel.prototype,"_selTestError",void 0),e([he()],PriceWatchPanel.prototype,"_selSaving",void 0),e([he()],PriceWatchPanel.prototype,"_selSaveError",void 0),e([he()],PriceWatchPanel.prototype,"_selSaved",void 0),e([he()],PriceWatchPanel.prototype,"_selBookmarkletOpen",void 0),e([he()],PriceWatchPanel.prototype,"_variantOpen",void 0),e([he()],PriceWatchPanel.prototype,"_varLoading",void 0),e([he()],PriceWatchPanel.prototype,"_varError",void 0),e([he()],PriceWatchPanel.prototype,"_varGroups",void 0),e([he()],PriceWatchPanel.prototype,"_varCombos",void 0),e([he()],PriceWatchPanel.prototype,"_varSelection",void 0),e([he()],PriceWatchPanel.prototype,"_varSupported",void 0),e([he()],PriceWatchPanel.prototype,"_varSaving",void 0),e([he()],PriceWatchPanel.prototype,"_varSaveError",void 0),e([he()],PriceWatchPanel.prototype,"_varSaved",void 0),customElements.get("price-watch-panel")||customElements.define("price-watch-panel",PriceWatchPanel);export{PriceWatchPanel};

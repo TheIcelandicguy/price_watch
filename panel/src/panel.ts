@@ -153,6 +153,28 @@ interface TestSelectorResponse {
   title?: SelectorRun;
 }
 
+// --- Variant picker ---
+// One option group on a Wix product page (e.g. "Remote", "Voltage").
+interface VariantOptionGroup {
+  title: string;
+  choices: string[];
+}
+// One concrete variant combo with its price.
+interface VariantCombo {
+  labels: string[];
+  price: number;
+  currency: string;
+  in_stock: boolean;
+}
+// Reply shape of price_watch/list_variants.
+interface ListVariantsResponse {
+  supported: boolean;
+  options?: VariantOptionGroup[];
+  variants?: VariantCombo[];
+  current?: string[];
+  currency?: string;
+}
+
 // The element-picker bookmarklet. When dropped on a retailer's product
 // page and clicked, it overlays a picker: hovering highlights elements,
 // clicking one computes a reasonably-robust CSS selector for it and
@@ -366,6 +388,33 @@ export class PriceWatchPanel extends LitElement {
   @state() private _selSaved = false;
   // Whether the bookmarklet "copy code" fallback block is expanded.
   @state() private _selBookmarkletOpen = false;
+
+  // --- Variant picker modal state ---
+  // Whether the variant picker overlay is open.
+  @state() private _variantOpen = false;
+  // The product + listing whose variant is being chosen.
+  private _varProduct: TrackedProduct | null = null;
+  private _varListing: Listing | null = null;
+  // True while the price_watch/list_variants fetch is in flight.
+  @state() private _varLoading = false;
+  // Fetch/parse error, or null.
+  @state() private _varError: string | null = null;
+  // The option groups returned by the backend (null before load / when
+  // the page isn't a variant page).
+  @state() private _varGroups: VariantOptionGroup[] | null = null;
+  // Every concrete combo the page ships, for price preview + validation.
+  @state() private _varCombos: VariantCombo[] = [];
+  // The user's current per-group selection (one label per group, index-
+  // aligned to _varGroups). Empty string = "not chosen yet".
+  @state() private _varSelection: string[] = [];
+  // Whether the inspected page even supports variant selection.
+  @state() private _varSupported = true;
+  // True while the set_variant save is in flight.
+  @state() private _varSaving = false;
+  // Error from the last save, or null.
+  @state() private _varSaveError: string | null = null;
+  // True briefly after a successful save (shows the confirmation banner).
+  @state() private _varSaved = false;
 
   // Stashed connection used for the post-bootstrap call_service
   // sends. Populated by _bootstrap() once the wrapper resolves.
@@ -862,6 +911,209 @@ export class PriceWatchPanel extends LitElement {
         (err as { message?: string })?.message ?? "Clear failed.";
     } finally {
       this._selSaving = false;
+    }
+  };
+
+  // --- Variant picker ---
+
+  /**
+   * Open the variant picker for one listing. Resets state, opens the
+   * overlay, and kicks off the price_watch/list_variants fetch which reads
+   * the page's embedded option groups (Wix stores). The user then picks one
+   * choice per group; Save pins that combo via set_variant (primary
+   * listing) or edit_listing's variant_options (secondary listings).
+   */
+  private _handleEditVariant = (
+    product: TrackedProduct,
+    listing: Listing
+  ): void => {
+    this._varProduct = product;
+    this._varListing = listing;
+    this._varError = null;
+    this._varGroups = null;
+    this._varCombos = [];
+    this._varSelection = [];
+    this._varSupported = true;
+    this._varSaveError = null;
+    this._varSaved = false;
+    this._variantOpen = true;
+    void this._loadVariants();
+  };
+
+  private _closeVariantPicker = (): void => {
+    this._variantOpen = false;
+    this._varProduct = null;
+    this._varListing = null;
+    this._varGroups = null;
+    this._varCombos = [];
+    this._varSelection = [];
+  };
+
+  private _onVariantBackdropClick = (e: Event): void => {
+    if (e.target === e.currentTarget) this._closeVariantPicker();
+  };
+
+  /**
+   * Fetch the listing page's variant option groups via the backend. The
+   * server fetches with the same pipeline the poller uses and parses the
+   * embedded Wix data. Seeds the per-group selection from the currently-
+   * pinned variant so the modal opens on the active combo.
+   */
+  private _loadVariants = async (): Promise<void> => {
+    if (!this._conn || !this._varProduct || !this._varListing) return;
+    this._varLoading = true;
+    this._varError = null;
+    try {
+      const req: Record<string, unknown> = {
+        type: "price_watch/list_variants",
+        entry_id: this._varProduct.entryId,
+      };
+      // Only target a specific listing for secondaries; the primary uses
+      // the product URL + product-level variant on the backend.
+      if (!this._varListing.isPrimary) {
+        req.listing_id = this._varListing.listingId;
+      }
+      const resp = await this._conn.sendMessagePromise<ListVariantsResponse>(
+        req as never
+      );
+      this._varSupported = !!resp.supported;
+      if (!resp.supported) {
+        this._varGroups = null;
+        this._varCombos = [];
+        this._varSelection = [];
+        return;
+      }
+      const groups = resp.options ?? [];
+      this._varGroups = groups;
+      this._varCombos = resp.variants ?? [];
+      // Pre-select from the currently-pinned variant (case-insensitive
+      // match against each group's choices); blank where no match.
+      const current = (resp.current ?? []).map((s) => s.toLowerCase());
+      this._varSelection = groups.map((g) => {
+        const hit = g.choices.find((c) => current.includes(c.toLowerCase()));
+        return hit ?? "";
+      });
+    } catch (err) {
+      this._varError =
+        (err as { message?: string })?.message ?? "Could not read variants.";
+    } finally {
+      this._varLoading = false;
+    }
+  };
+
+  private _onVariantSelect = (groupIndex: number, value: string): void => {
+    const next = [...this._varSelection];
+    next[groupIndex] = value;
+    this._varSelection = next;
+  };
+
+  /**
+   * The combo matching the current per-group selection, if every group is
+   * chosen and that exact combo exists on the page. Drives the live price
+   * preview and gates the Save button.
+   */
+  private _matchedCombo(): VariantCombo | null {
+    if (!this._varGroups || this._varGroups.length === 0) return null;
+    if (this._varSelection.some((s) => !s)) return null;
+    const want = this._varSelection.map((s) => s.toLowerCase());
+    return (
+      this._varCombos.find((c) => {
+        const labels = c.labels.map((l) => l.toLowerCase());
+        return want.every((w) => labels.includes(w));
+      }) ?? null
+    );
+  }
+
+  /**
+   * Persist the chosen variant. Primary listing → set_variant (writes the
+   * product-level fallback used by from-scratch entries). Secondary →
+   * edit_listing's variant_options. Both reload the entry server-side.
+   */
+  private _saveVariant = async (): Promise<void> => {
+    if (!this._conn || !this._varProduct || !this._varListing) return;
+    const labels = this._varSelection.filter((s) => !!s);
+    if (labels.length === 0) {
+      this._varSaveError = "Pick an option in each group first.";
+      return;
+    }
+    this._varSaving = true;
+    this._varSaveError = null;
+    this._varSaved = false;
+    try {
+      const data: Record<string, unknown> = this._varListing.isPrimary
+        ? {
+            type: "call_service",
+            domain: "price_watch",
+            service: "set_variant",
+            service_data: {
+              entry_id: this._varProduct.entryId,
+              variant_options: labels,
+            },
+          }
+        : {
+            type: "call_service",
+            domain: "price_watch",
+            service: "edit_listing",
+            service_data: {
+              entry_id: this._varProduct.entryId,
+              listing_id: this._varListing.listingId,
+              variant_options: labels,
+            },
+          };
+      await this._conn.sendMessagePromise(data as never);
+      this._varSaved = true;
+      window.setTimeout(() => this._closeVariantPicker(), 1200);
+    } catch (err) {
+      this._varSaveError =
+        (err as { message?: string })?.message ?? "Save failed.";
+    } finally {
+      this._varSaving = false;
+    }
+  };
+
+  /**
+   * Clear the pinned variant, reverting to the page's default offer. Same
+   * service split as save; an empty variant_options clears it.
+   */
+  private _clearVariant = async (): Promise<void> => {
+    if (!this._conn || !this._varProduct || !this._varListing) return;
+    if (
+      !window.confirm(
+        "Stop following a specific variant and go back to the default price?"
+      )
+    )
+      return;
+    this._varSaving = true;
+    this._varSaveError = null;
+    try {
+      const data: Record<string, unknown> = this._varListing.isPrimary
+        ? {
+            type: "call_service",
+            domain: "price_watch",
+            service: "set_variant",
+            service_data: {
+              entry_id: this._varProduct.entryId,
+              variant_options: [],
+            },
+          }
+        : {
+            type: "call_service",
+            domain: "price_watch",
+            service: "edit_listing",
+            service_data: {
+              entry_id: this._varProduct.entryId,
+              listing_id: this._varListing.listingId,
+              variant_options: [],
+            },
+          };
+      await this._conn.sendMessagePromise(data as never);
+      this._varSaved = true;
+      window.setTimeout(() => this._closeVariantPicker(), 1200);
+    } catch (err) {
+      this._varSaveError =
+        (err as { message?: string })?.message ?? "Clear failed.";
+    } finally {
+      this._varSaving = false;
     }
   };
 
@@ -2039,6 +2291,7 @@ export class PriceWatchPanel extends LitElement {
               .onRemoveListing=${this._handleRemoveListing}
               .onAddListing=${this._handleAddListing}
               .onEditListing=${this._handleEditListing}
+              .onEditVariant=${this._handleEditVariant}
             ></price-watch-card>
           `
         )}
@@ -2066,7 +2319,173 @@ export class PriceWatchPanel extends LitElement {
       ${this._renderSearchModal()}
       ${this._renderProviderModal()}
       ${this._renderSelectorModal()}
+      ${this._renderVariantModal()}
     `;
+  }
+
+  /**
+   * The variant picker overlay. Reads the listing page's embedded option
+   * groups (Wix stores) and renders one dropdown per group plus a live
+   * price preview, so the user can follow a specific combo (e.g. "with IR
+   * remote") instead of the default offer. Rendered at the panel root;
+   * nothing renders when closed.
+   */
+  private _renderVariantModal() {
+    if (!this._variantOpen || !this._varListing) return null;
+    const listing = this._varListing;
+    const product = this._varProduct;
+    const groups = this._varGroups;
+    const matched = this._matchedCombo();
+    const incomplete = this._varSelection.some((s) => !s);
+    return html`
+      <div
+        class="modal-backdrop"
+        @click=${this._onVariantBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose product variant"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>Choose variant</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeVariantPicker}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="trackform">
+            <p class="sel__intro">
+              For ${listing.retailer || "this listing"}${product
+                ? html` on <strong>${product.title}</strong>`
+                : null}. Pick the exact combination you want to track — the
+              price below updates to match, and the tracker follows it from
+              the next check on.
+            </p>
+
+            ${this._varLoading
+              ? html`<div class="modal__status">Reading variants…</div>`
+              : null}
+            ${this._varError
+              ? html`<div class="modal__status modal__status--error">
+                  ⚠ ${this._varError}
+                </div>`
+              : null}
+            ${!this._varLoading && !this._varError && !this._varSupported
+              ? html`<div class="modal__status">
+                  This page doesn't expose selectable variants, so there's
+                  nothing to pin — it already tracks its only price.
+                </div>`
+              : null}
+
+            ${groups && this._varSupported
+              ? html`
+                  <div class="var__groups">
+                    ${groups.map(
+                      (g, gi) => html`
+                        <label class="trackform__field">
+                          <span>${g.title}</span>
+                          <select
+                            class="var__select"
+                            .value=${this._varSelection[gi] ?? ""}
+                            @change=${(e: Event) =>
+                              this._onVariantSelect(
+                                gi,
+                                (e.target as HTMLSelectElement).value
+                              )}
+                          >
+                            <option value="" ?selected=${!this
+                              ._varSelection[gi]}>
+                              — choose —
+                            </option>
+                            ${g.choices.map(
+                              (c) => html`<option
+                                value=${c}
+                                ?selected=${this._varSelection[gi] === c}
+                              >
+                                ${c}
+                              </option>`
+                            )}
+                          </select>
+                        </label>
+                      `
+                    )}
+                  </div>
+
+                  <div class="var__preview">
+                    ${matched
+                      ? html`<span class="var__price"
+                            >${this._formatVariantPrice(matched)}</span
+                          >
+                          ${matched.in_stock
+                            ? null
+                            : html`<span class="var__oos"
+                                >out of stock</span
+                              >`}`
+                      : incomplete
+                      ? html`<span class="var__hint"
+                          >Pick an option in each group to see the price.</span
+                        >`
+                      : html`<span class="var__hint var__hint--warn"
+                          >That combination isn't available on the page.</span
+                        >`}
+                  </div>
+                `
+              : null}
+
+            ${this._varSaveError
+              ? html`<div class="modal__status modal__status--error">
+                  ⚠ ${this._varSaveError}
+                </div>`
+              : null}
+            ${this._varSaved
+              ? html`<div class="modal__status modal__status--ok">
+                  ✓ Saved — tracking this variant from the next check.
+                </div>`
+              : null}
+
+            <div class="trackform__actions sel__actions">
+              <button
+                class="trackform__cancel"
+                @click=${this._clearVariant}
+                ?disabled=${this._varSaving || !this._varSupported}
+                title="Revert to the page's default price"
+              >
+                Track default again
+              </button>
+              <button
+                class="add-button"
+                @click=${this._saveVariant}
+                ?disabled=${this._varSaving ||
+                !this._varSupported ||
+                incomplete ||
+                !matched}
+              >
+                ${this._varSaving ? "Saving…" : "Track this variant"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /** Format a variant combo's price with its currency for the preview. */
+  private _formatVariantPrice(combo: VariantCombo): string {
+    const cur = combo.currency || "";
+    try {
+      if (cur) {
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: cur,
+        }).format(combo.price);
+      }
+    } catch {
+      // Unknown currency code — fall through to a plain number.
+    }
+    return cur ? `${combo.price} ${cur}` : `${combo.price}`;
   }
 
   /**
@@ -2810,6 +3229,49 @@ export class PriceWatchPanel extends LitElement {
     }
     .sel__actions {
       justify-content: space-between;
+    }
+
+    /* --- Variant picker --- */
+    .var__groups {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .var__select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      font: inherit;
+      color: var(--primary-text-color, #212121);
+      background: var(--card-background-color, #fff);
+      border: 1px solid var(--divider-color, #c0c0c0);
+      border-radius: 8px;
+    }
+    .var__preview {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: var(--secondary-background-color, #f5f5f5);
+      border-radius: 10px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-height: 24px;
+    }
+    .var__price {
+      font-size: 1.4rem;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .var__oos {
+      font-size: 0.8rem;
+      color: var(--error-color, #c62828);
+    }
+    .var__hint {
+      color: var(--secondary-text-color, #757575);
+      font-size: 0.9rem;
+    }
+    .var__hint--warn {
+      color: var(--warning-color, #f57c00);
     }
 
     /* --- Summary stat bar --- */

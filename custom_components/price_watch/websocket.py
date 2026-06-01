@@ -99,6 +99,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_provider_settings)
     websocket_api.async_register_command(hass, ws_set_provider_settings)
     websocket_api.async_register_command(hass, ws_test_selector)
+    websocket_api.async_register_command(hass, ws_list_variants)
 
 
 def _settings_entry(hass: HomeAssistant) -> ConfigEntry | None:
@@ -775,3 +776,96 @@ async def ws_test_selector(
         reply["title"] = _run(title_selector)
 
     connection.send_result(msg["id"], reply)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "price_watch/list_variants",
+        vol.Required("entry_id"): str,
+        vol.Optional("listing_id"): vol.Any(None, str),
+    }
+)
+@websocket_api.async_response
+async def ws_list_variants(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Enumerate a product's selectable Wix variants for the panel picker.
+
+    Fetches the listing page, parses the embedded option groups + combos
+    via ``extractor.list_wix_variants``, and returns them along with the
+    variant currently pinned (so the panel pre-selects it).
+
+    Reply shape:
+        {
+          "supported": true,
+          "options": [{"title": "Remote", "choices": [...]}, ...],
+          "variants": [{"labels": [...], "price": ..., "currency": ...,
+                        "in_stock": ...}, ...],
+          "current": ["1xIR Remote", "5-48V"],
+          "currency": "USD"
+        }
+    When the page isn't a Wix variant page, replies {"supported": false}.
+    On fetch failure sends a typed WS error.
+    """
+    from .coordinator import PriceWatchCoordinator
+    from .extractor import _normalize_cookies, fetch_html, list_wix_variants
+
+    entry_id = (msg.get("entry_id") or "").strip()
+    listing_id = (msg.get("listing_id") or "").strip()
+
+    coord = hass.data.get(DOMAIN, {}).get(entry_id)
+    if not isinstance(coord, PriceWatchCoordinator):
+        connection.send_error(
+            msg["id"], "not_found", f"No tracked product with id {entry_id!r}."
+        )
+        return
+
+    # Resolve which URL + currently-pinned variant to surface. Default is the
+    # primary listing (product-level variant_options fallback); an explicit
+    # listing_id targets that listing's URL + per-listing variant.
+    url = coord.url
+    current: list[str] = list(coord.entry.options.get("variant_options") or [])
+    cookies_raw: Any = None
+    listings = coord.entry.options.get("listings") or []
+    if listing_id:
+        for listing in listings:
+            if isinstance(listing, dict) and listing.get("id") == listing_id:
+                url = listing.get("url") or url
+                current = list(listing.get("variant_options") or [])
+                cookies_raw = listing.get("request_cookies")
+                break
+
+    if not url:
+        connection.send_error(msg["id"], "no_url", "Product has no URL to inspect.")
+        return
+
+    cookies = _normalize_cookies(cookies_raw)
+    session = async_get_clientsession(hass)
+    try:
+        html = await fetch_html(url, session=session, cookies=cookies)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("list_variants fetch failed for %s: %s", url, err)
+        connection.send_error(
+            msg["id"],
+            "fetch_failed",
+            f"Could not fetch the page: {type(err).__name__}: {err}",
+        )
+        return
+
+    data = list_wix_variants(html)
+    if not data:
+        connection.send_result(msg["id"], {"supported": False})
+        return
+
+    connection.send_result(
+        msg["id"],
+        {
+            "supported": True,
+            "options": data.get("options", []),
+            "variants": data.get("variants", []),
+            "current": current,
+            "currency": data.get("currency", ""),
+        },
+    )

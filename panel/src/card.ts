@@ -66,6 +66,13 @@ export class PriceWatchCard extends LitElement {
   // takes effect on the next poll.
   @property({ attribute: false })
   onEditListing?: (product: TrackedProduct, listing: Listing) => void;
+  // Optional callback fired when the user clicks the ⚙ (variant) button on
+  // a listing row. The panel owner opens the variant picker, which fetches
+  // the page's embedded option groups (Wix stores) and lets the user pick a
+  // specific combo (e.g. "with IR remote") to follow, saved via
+  // price_watch.set_variant / edit_listing's variant_options.
+  @property({ attribute: false })
+  onEditVariant?: (product: TrackedProduct, listing: Listing) => void;
   // Optional callback fired when the user clicks the per-card "Refresh
   // now" button. The panel owner calls price_watch.refresh_now. While
   // in flight the parent sets `refreshingNow` so we spin the icon.
@@ -628,6 +635,19 @@ export class PriceWatchCard extends LitElement {
             </a>`
           : html`<div class="listings__link listings__link--noUrl">${body}</div>`}
         <div class="listings__actions">
+          ${this.onEditVariant
+            ? html`<button
+                class="listings__edit"
+                type="button"
+                @click=${(e: Event) => this.handleEditVariant(e, listing)}
+                aria-label=${`Choose variant for ${
+                  listing.retailer ?? "listing"
+                }`}
+                title="Track a specific product variant (e.g. with remote)"
+              >
+                ⚙
+              </button>`
+            : nothing}
           ${this.onEditListing
             ? html`<button
                 class="listings__edit"
@@ -666,6 +686,16 @@ export class PriceWatchCard extends LitElement {
     event.stopPropagation();
     event.preventDefault();
     this.onEditListing?.(this.product, listing);
+  }
+
+  /**
+   * Click handler for a row's ⚙ button. Stops propagation and delegates to
+   * onEditVariant, which opens the panel's variant picker for this listing.
+   */
+  private handleEditVariant(event: Event, listing: Listing): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.onEditVariant?.(this.product, listing);
   }
 
   /**

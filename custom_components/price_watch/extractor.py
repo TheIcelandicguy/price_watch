@@ -566,6 +566,120 @@ def try_wix_variant(
     return None
 
 
+def list_wix_variants(html: str) -> dict[str, Any] | None:
+    """Enumerate a Wix product page's variant option groups and combos.
+
+    Companion to ``try_wix_variant``: where that resolves ONE combo's price
+    from a set of pinned labels, this lists EVERY option group (e.g.
+    "Remote", "Voltage") with its choices, plus every concrete combo the
+    page ships with its price. The panel uses this to render dropdowns and
+    a live price preview so the user can pick a variant visually instead of
+    typing labels.
+
+    Reply shape (or None when the page isn't a Wix variant page):
+        {
+          "options": [
+            {"title": "Remote", "choices": ["None", "1xIR Remote", ...]},
+            {"title": "Voltage", "choices": ["5-24V", "5-48V"]},
+          ],
+          "variants": [
+            {"labels": ["None", "5-24V"], "price": 16.78,
+             "currency": "USD", "in_stock": true},
+            ...
+          ],
+          "currency": "USD",
+        }
+
+    Each combo's ``labels`` are ordered to match the ``options`` group
+    order, so the panel can zip a dropdown selection straight back into the
+    label set ``set_variant`` / ``edit_listing`` expect.
+    """
+    options = _json_array_after_key(html, "options")
+    items = _json_array_after_key(html, "productItems")
+    if not isinstance(options, list) or not isinstance(items, list) or not items:
+        return None
+
+    # Build the ordered option groups and a selection-id -> (group_index,
+    # label) map so each productItem's selections can be slotted back into
+    # the right group and ordered consistently.
+    groups: list[dict[str, Any]] = []
+    sel_meta: dict[Any, tuple[int, str]] = {}
+    for gi, opt in enumerate(options):
+        if not isinstance(opt, dict):
+            continue
+        title = str(
+            opt.get("title") or opt.get("name") or opt.get("key") or f"Option {gi + 1}"
+        ).strip()
+        choices: list[str] = []
+        for sel in opt.get("selections") or []:
+            if not isinstance(sel, dict):
+                continue
+            label = str(sel.get("value", "")).strip()
+            if not label:
+                continue
+            if "id" in sel:
+                sel_meta[sel["id"]] = (gi, label)
+            if label not in choices:
+                choices.append(label)
+        if choices:
+            groups.append({"title": title or f"Option {gi + 1}", "choices": choices})
+
+    if not groups:
+        return None
+
+    currency = ""
+    cur_match = re.search(r'"priceCurrency"\s*:\s*"([A-Za-z]{3})"', html)
+    if cur_match:
+        currency = cur_match.group(1).upper()
+
+    variants: list[dict[str, Any]] = []
+    seen: set[tuple[str, ...]] = set()
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        # Order each combo's labels by their group index so they line up
+        # with the `options` order the panel renders.
+        ordered: list[tuple[int, str]] = []
+        for s in it.get("optionsSelections") or []:
+            meta = sel_meta.get(s)
+            if meta is not None:
+                ordered.append(meta)
+        ordered.sort(key=lambda m: m[0])
+        labels = [lbl for _, lbl in ordered]
+        if not labels:
+            continue
+
+        price = _coerce_price(it.get("price"))
+        compare = _coerce_price(it.get("comparePrice"))
+        has_discount = bool(it.get("hasDiscount"))
+        if has_discount and price and compare:
+            current = min(price, compare)
+        else:
+            current = price if price else compare
+        if not current or current <= 0:
+            continue
+
+        key = tuple(lbl.lower() for lbl in labels)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        in_stock = it.get("inStock")
+        variants.append(
+            {
+                "labels": labels,
+                "price": float(current),
+                "currency": currency,
+                "in_stock": True if in_stock is None else bool(in_stock),
+            }
+        )
+
+    if not variants:
+        return None
+
+    return {"options": groups, "variants": variants, "currency": currency}
+
+
 def _normalize_cookies(cookies: Any) -> dict[str, str] | None:
     """Accept cookies as a dict or cookie-header string; return a dict.
 
