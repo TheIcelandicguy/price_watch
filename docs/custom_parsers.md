@@ -90,7 +90,7 @@ For Next.js / Nuxt / similar frameworks that embed initial state as JSON in a `<
 | `request_method` | `GET` (default) or `POST`. |
 | `request_body` | String body to send (POST only). For JSON APIs, set `Content-Type: application/json` in headers and the body to a JSON string. |
 | `request_headers` | Dict of extra headers to merge with the default browser headers. |
-| `request_cookies` | Cookie data: either a dict `{"name": "value"}` or a raw cookie-header string `"name1=val1; name2=val2"`. Useful for sites with hostile bot detection (Amazon) where you need to copy a real browser session's cookies. |
+| `request_cookies` | Cookie data: a raw cookie-header string `"name1=val1; name2=val2"`, a dict `{"name": "value"}`, or a list of cookie dicts `[{"name": .., "value": ..}, ...]`. Useful for sites with hostile bot detection (Amazon) where you need to copy a real browser session's cookies. |
 
 ## Cookie injection workflow (Amazon and similar)
 
@@ -104,9 +104,21 @@ Some sites (most notably Amazon) bot-detect aggressively and serve a "Continue s
 4. Headers tab → scroll to **Request Headers** → find `Cookie:`
 5. Copy the entire value after `Cookie: ` (will be a long string of `name=value;` pairs)
 
-**Then in HA:**
-- Settings → Devices & Services → Price Watch → click the product → Configure
-- Paste the cookie string into the `custom_parser` JSON's `request_cookies` field
+**Then in HA — three places accept the cookie string, pick whichever is handy:**
+- **Price Watch panel** → open a listing's price-selector editor → paste into
+  the **Request cookies** box and Save. Cookies are kept independent of the
+  price selector, so saving one never wipes the other. (This is the quickest
+  path and works per-listing.)
+- **Adding a product** → the **cookies** field on the add-product form now
+  works for *any* URL, not just sites with a built-in preset — paste the
+  string there and the very first extraction fetches as a returning visitor.
+- **Configure an existing product** → Settings → Devices & Services →
+  Price Watch → click the product → Configure → paste into the cookies field
+  (it round-trips into `custom_parser.request_cookies` for you).
+
+Under the hood all three (and the `add_listing` / `edit_listing` services)
+store the cookies inside `custom_parser.request_cookies` — the one place the
+extractor reads them at poll time.
 
 **Cookies expire.** Amazon rotates session cookies every few days. When extraction starts failing again, repeat the steps above. There's no clean automation for this — it's the trade-off for accessing aggressively-protected sites.
 

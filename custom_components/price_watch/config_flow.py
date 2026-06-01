@@ -767,13 +767,19 @@ class PriceWatchConfigFlow(ConfigFlow, domain=DOMAIN):
                     _LOGGER.exception("Preset %s build_parser raised", preset.NAME)
                     preset_parser = None
 
-            if cookies_raw and preset_parser is not None:
+            if cookies_raw:
+                # Cookies must reach the extractor even when no preset
+                # matched — build a cookies-only parser in that case. The
+                # extractor's cookie path runs regardless of parser
+                # type/selectors, and extraction falls through to JSON-LD /
+                # AI, which is the whole point of cookies (reach
+                # cookie-walled content like Amazon).
+                if preset_parser is None:
+                    preset_parser = {}
                 preset_parser["request_cookies"] = cookies_raw
-                _LOGGER.info("Cookies attached to %s parser config", preset.NAME)
-            elif cookies_raw and preset_parser is None:
-                _LOGGER.warning(
-                    "Cookies provided but no preset matched %s; cookies ignored. "
-                    "Add a custom_parser via Configure to use them.", url,
+                _LOGGER.info(
+                    "Cookies attached to parser config for %s (%s)",
+                    url, preset.NAME if preset else "cookies-only",
                 )
 
             try:

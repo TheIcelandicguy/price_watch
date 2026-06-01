@@ -7,6 +7,7 @@ import json
 import pytest
 
 from custom_components.price_watch.extractor import (
+    _normalize_cookies,
     preprocess_html,
     try_jsonld,
 )
@@ -169,3 +170,37 @@ def test_jsonld_offers_as_list():
     result = try_jsonld(html)
     assert result is not None
     assert result["price"] == 10
+
+
+# --- cookie normalization (the shape the extractor reads at fetch time) ---
+
+def test_normalize_cookies_header_string():
+    """The common DevTools copy-paste form: a single Cookie header value."""
+    assert _normalize_cookies("session-id=123; ubid=ABC; prefs=GBP") == {
+        "session-id": "123",
+        "ubid": "ABC",
+        "prefs": "GBP",
+    }
+
+
+def test_normalize_cookies_dict():
+    """A {name: value} mapping is accepted and stringified."""
+    assert _normalize_cookies({"a": 1, "b": "2"}) == {"a": "1", "b": "2"}
+
+
+def test_normalize_cookies_list_of_dicts():
+    """The list-of-dicts form documented in services.yaml (and produced by
+    browser cookie APIs) must also be accepted."""
+    cookies = [
+        {"name": "session-id", "value": "123", "domain": ".amazon.com"},
+        {"name": "ubid", "value": "ABC", "path": "/"},
+    ]
+    assert _normalize_cookies(cookies) == {"session-id": "123", "ubid": "ABC"}
+
+
+def test_normalize_cookies_empty_and_garbage():
+    assert _normalize_cookies("") is None
+    assert _normalize_cookies(None) is None
+    assert _normalize_cookies([]) is None
+    assert _normalize_cookies([{"no": "name"}]) is None
+    assert _normalize_cookies(42) is None

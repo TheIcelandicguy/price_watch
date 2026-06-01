@@ -34,6 +34,39 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.IMAGE]
 
+
+def _cookies_to_header_str(value: Any) -> str:
+    """Normalize a cookies value to a single Cookie-header string.
+
+    Accepts the shapes callers actually send:
+      - a header string ("a=1; b=2") — returned trimmed,
+      - a {name: value} dict,
+      - a list of cookie dicts ({"name": .., "value": ..}) as documented in
+        services.yaml and as produced by browser cookie APIs.
+    Returns "" for empty / unrecognized input (which clears the cookies).
+
+    Cookies are stored as a header string inside custom_parser.request_cookies
+    because that's the ONLY place the extractor reads them (see
+    extractor.extract_product) and the shape the config flow already
+    persists / _normalize_cookies parses back.
+    """
+    if not value:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        return "; ".join(f"{k}={v}" for k, v in value.items() if v is not None)
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            if isinstance(item, dict):
+                name = item.get("name")
+                val = item.get("value")
+                if name is not None and val is not None:
+                    parts.append(f"{name}={val}")
+        return "; ".join(parts)
+    return ""
+
 # Option keys the running coordinator reads LIVE on every tick (see the
 # "Pause / force-discontinued overrides" note in coordinator.py). When ONLY
 # these change, the coordinator already applies them itself, so the update
@@ -389,8 +422,10 @@ async def _register_services(hass: HomeAssistant) -> None:
                 extractor will populate it from JSON-LD if absent)
             custom_parser: JSON string with the parser config (optional;
                 JSON-LD fallback handles most retailers without one)
-            request_cookies: list of {name, value, domain?, path?} dicts
-                for cookie injection (optional, for Cloudflare bypass)
+            request_cookies: cookies for anti-bot bypass (optional). Accepts
+                a Cookie-header string, a {name: value} dict, or a list of
+                {name, value, ...} dicts. Stored inside custom_parser, the
+                only place the extractor reads cookies.
 
         After modifying entry.options, reloads the entry so the
         coordinator picks up the new listing and sensor.py creates
@@ -426,9 +461,15 @@ async def _register_services(hass: HomeAssistant) -> None:
                     f"custom_parser is not valid JSON: {err}"
                 ) from err
 
-        request_cookies = call.data.get("request_cookies") or []
-        if request_cookies and not isinstance(request_cookies, list):
-            raise HomeAssistantError("request_cookies must be a list")
+        # Cookies live inside custom_parser.request_cookies (the only place
+        # the extractor reads them). Build a cookies-only parser if none was
+        # supplied — the cookie path runs regardless of parser type, and
+        # extraction falls through to JSON-LD / AI, which is the whole point.
+        cookie_str = _cookies_to_header_str(call.data.get("request_cookies"))
+        if cookie_str:
+            if not isinstance(custom_parser, dict):
+                custom_parser = {}
+            custom_parser["request_cookies"] = cookie_str
 
         new_listing = {
             "id": listing_id,
@@ -436,7 +477,6 @@ async def _register_services(hass: HomeAssistant) -> None:
             "retailer": retailer,
             "currency": currency,
             "custom_parser": custom_parser,
-            "request_cookies": request_cookies,
             "min_price": None,
             "max_price": None,
             "paused": False,
@@ -573,7 +613,11 @@ async def _register_services(hass: HomeAssistant) -> None:
                 the listing to the default JSON-LD + AI pipeline).
             currency: ISO currency override (optional)
             retailer: display name override (optional)
-            request_cookies: list of cookie dicts (optional)
+            request_cookies: cookies for anti-bot bypass (optional). Accepts
+                a Cookie-header string, a {name: value} dict, or a list of
+                {name, value, ...} dicts. Stored inside custom_parser and
+                kept independent of the parser's selectors — setting one
+                doesn't clobber the other. An empty value clears cookies.
 
         Only the fields present in the call are touched; everything else on
         the listing is preserved. Reloads the entry so the coordinator
@@ -597,6 +641,22 @@ async def _register_services(hass: HomeAssistant) -> None:
                 f"Listing {listing_id!r} not found on entry {entry.entry_id}"
             )
 
+        # Cookies are stored INSIDE custom_parser.request_cookies (the only
+        # place the extractor reads them) but are treated as ORTHOGONAL to
+        # the rest of the parser, so the two can be edited independently:
+        #   - Setting a new custom_parser preserves existing cookies. The
+        #     panel rewrites custom_parser wholesale and can't see the cookie
+        #     value (cookies are never surfaced to the frontend), so without
+        #     this a selector edit would silently drop the cookies.
+        #   - Setting request_cookies updates/clears cookies in place without
+        #     disturbing the rest of the parser.
+        prior_parser = target.get("custom_parser")
+        prior_cookies = (
+            prior_parser.get("request_cookies")
+            if isinstance(prior_parser, dict)
+            else None
+        )
+
         # custom_parser: present-and-empty clears it; present-and-set parses
         # it; absent leaves it untouched.
         if "custom_parser" in call.data:
@@ -604,7 +664,7 @@ async def _register_services(hass: HomeAssistant) -> None:
             if not raw:
                 target["custom_parser"] = None
             elif isinstance(raw, dict):
-                target["custom_parser"] = raw
+                target["custom_parser"] = dict(raw)
             else:
                 try:
                     import json as _json
@@ -613,16 +673,35 @@ async def _register_services(hass: HomeAssistant) -> None:
                     raise HomeAssistantError(
                         f"custom_parser is not valid JSON: {err}"
                     ) from err
+            # Carry existing cookies across the replacement unless the new
+            # parser brought its own, or request_cookies is being set below
+            # (which is authoritative). A cleared parser keeps cookies alive
+            # on their own — clearing a selector shouldn't drop a session.
+            if "request_cookies" not in call.data and prior_cookies:
+                new_parser = target["custom_parser"]
+                if isinstance(new_parser, dict):
+                    new_parser.setdefault("request_cookies", prior_cookies)
+                else:
+                    target["custom_parser"] = {"request_cookies": prior_cookies}
 
         if "currency" in call.data:
             target["currency"] = call.data.get("currency") or ""
         if "retailer" in call.data and call.data.get("retailer"):
             target["retailer"] = call.data["retailer"]
+
         if "request_cookies" in call.data:
-            cookies = call.data.get("request_cookies") or []
-            if cookies and not isinstance(cookies, list):
-                raise HomeAssistantError("request_cookies must be a list")
-            target["request_cookies"] = cookies
+            cookie_str = _cookies_to_header_str(call.data.get("request_cookies"))
+            base = target.get("custom_parser")
+            parser = dict(base) if isinstance(base, dict) else {}
+            if cookie_str:
+                parser["request_cookies"] = cookie_str
+            else:
+                parser.pop("request_cookies", None)
+            target["custom_parser"] = parser or None
+
+        # Drop the legacy top-level field if a prior version wrote it; the
+        # extractor never read it, so leaving it would be a silent no-op.
+        target.pop("request_cookies", None)
 
         new_options = dict(entry.options)
         new_options["listings"] = existing
@@ -717,7 +796,7 @@ async def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("retailer"): str,
                 vol.Optional("currency"): str,
                 vol.Optional("custom_parser"): vol.Any(str, dict),
-                vol.Optional("request_cookies"): list,
+                vol.Optional("request_cookies"): vol.Any(str, dict, list),
             }
         ),
     )
@@ -743,7 +822,7 @@ async def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("custom_parser"): vol.Any(None, str, dict),
                 vol.Optional("currency"): str,
                 vol.Optional("retailer"): str,
-                vol.Optional("request_cookies"): list,
+                vol.Optional("request_cookies"): vol.Any(str, dict, list),
             }
         ),
     )

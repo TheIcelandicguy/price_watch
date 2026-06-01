@@ -397,12 +397,23 @@ def _normalize_cookies(cookies: Any) -> dict[str, str] | None:
     Supports the format users typically copy from browser DevTools, which
     is a single Cookie header value like:
         session-id=123-456-789; ubid-acbuk=ABC; i18n-prefs=GBP
-    Also accepts a JSON dict form: {"session-id": "123", ...}
+    Also accepts a JSON dict form: {"session-id": "123", ...} and the list
+    of cookie dicts form documented in services.yaml:
+        [{"name": "session-id", "value": "123", ...}, ...]
     """
     if not cookies:
         return None
     if isinstance(cookies, dict):
         return {str(k): str(v) for k, v in cookies.items() if v is not None}
+    if isinstance(cookies, list):
+        result: dict[str, str] = {}
+        for item in cookies:
+            if isinstance(item, dict):
+                name = item.get("name")
+                value = item.get("value")
+                if name is not None and value is not None:
+                    result[str(name)] = str(value)
+        return result or None
     if isinstance(cookies, str):
         result: dict[str, str] = {}
         for pair in cookies.split(";"):
