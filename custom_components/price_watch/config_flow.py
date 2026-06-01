@@ -84,6 +84,7 @@ from .const import (
     ENTRY_TYPE_SETTINGS,
     MIN_SCAN_INTERVAL_MINUTES,
 )
+from .cookies import to_header_str as cookies_to_header_str
 from .extractor import ExtractionError, extract_product
 from .presets import find_preset, normalize_url as preset_normalize_url
 
@@ -200,13 +201,10 @@ def _parser_get_cookies(custom_parser_raw: Any) -> str:
     else:
         return ""
     cookies = parsed.get("request_cookies") if isinstance(parsed, dict) else None
-    if isinstance(cookies, str):
-        return cookies
-    if isinstance(cookies, dict):
-        # Some users may have provided cookies as {"key": "value", ...}.
-        # Round-trip back to a header string for editing convenience.
-        return "; ".join(f"{k}={v}" for k, v in cookies.items())
-    return ""
+    # Round-trip whatever shape was stored (string/dict/list) back to a
+    # header string for editing convenience. Shared with the services so the
+    # str/dict/list handling stays in one place.
+    return cookies_to_header_str(cookies)
 
 
 def _parser_with_cookies(custom_parser_raw: Any, cookies: str) -> str:

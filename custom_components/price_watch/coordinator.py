@@ -402,6 +402,22 @@ class PriceWatchCoordinator(
         self._state["alternatives_fetched_at"] = self._product_state.get("alternatives_fetched_at")
         self._state["alternatives_error"] = self._product_state.get("alternatives_error")
 
+    def effective_custom_parser(self, listing_id: str) -> dict[str, Any] | None:
+        """The parser dict the poll will actually use for this listing.
+
+        Resolves the listing's own custom_parser, falling back to the
+        product-level parser for the primary listing, and normalizes through
+        the single tolerant boundary so a parser persisted as a JSON string
+        (config flow) is handled the same as one persisted as a dict
+        (services). Returns a dict or None. Shared by the poll path and the
+        sensor's has_cookies attribute so the resolution lives in one place.
+        """
+        config = self._get_listing_config(listing_id) or {}
+        parser = self._parse_custom_parser(config.get("custom_parser"))
+        if parser is None and listing_id == self._primary_listing_id:
+            parser = self._custom_parser
+        return parser
+
     def _get_listing_config(self, listing_id: str) -> dict[str, Any] | None:
         """Return the listing's CONFIG dict from entry.options.listings.
 
@@ -764,9 +780,7 @@ class PriceWatchCoordinator(
         url = config.get("url") or (
             self.url if listing_id == self._primary_listing_id else None
         )
-        custom_parser = config.get("custom_parser")
-        if custom_parser is None and listing_id == self._primary_listing_id:
-            custom_parser = self._custom_parser
+        custom_parser = self.effective_custom_parser(listing_id)
 
         if not url:
             raise UpdateFailed(f"Listing {listing_id} has no URL")

@@ -666,7 +666,10 @@ _SELECTOR_RAW_CAP = 300
         vol.Required("url"): str,
         vol.Required("price_selector"): str,
         vol.Optional("title_selector"): vol.Any(None, str),
-        vol.Optional("request_cookies"): vol.Any(None, list),
+        # Accept the same shapes _normalize_cookies handles: a Cookie-header
+        # string (what the panel sends), a {name: value} dict, or a list of
+        # cookie dicts.
+        vol.Optional("request_cookies"): vol.Any(None, str, dict, list),
     }
 )
 @websocket_api.async_response

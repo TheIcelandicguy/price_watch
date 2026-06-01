@@ -12,9 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a **Request cookies** box, so anti-bot cookies (Amazon/Cloudflare) can be
   pasted without editing JSON or digging into the config flow. Cookies are
   kept independent of the price selector — saving one never clobbers the
-  other — and "Reset to automatic" clears both.
+  other — and "Reset to automatic" clears both. The editor shows a
+  "✓ cookies currently set" hint when a listing already has cookies (the
+  value itself is never surfaced), and "Test on live page" now fetches with
+  the pasted cookies so testing a walled page reflects the real poll.
 
 ### Fixed
+- Cookie-walled sites with no custom selector no longer fail extraction: a
+  cookies-only parser now fetches with its cookies and falls through to the
+  JSON-LD / AI pipeline instead of being forced down the (empty) CSS path,
+  which previously hard-failed on the free/no-AI tier.
 - Cookies pasted on the add-product form are no longer silently dropped for
   sites without a built-in preset; they now build a cookies-only parser so
   the first fetch already runs as a returning visitor.
@@ -24,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored inside `custom_parser.request_cookies` (the only place the extractor
   reads them) and the services accept a header string, a `{name: value}`
   dict, or a list of cookie dicts.
+- A non-empty but unparseable `request_cookies` value now raises instead of
+  silently clearing a listing's existing cookies; a `custom_parser` that is
+  valid JSON but not an object is rejected instead of crashing every poll.
+
+### Internal
+- Cookie normalization consolidated into a single `cookies` module
+  (`to_header_str` / `to_dict`) shared by the services, config flow,
+  extractor and websocket, replacing four drifting copies. Per-listing
+  parser reads now go through one tolerant boundary
+  (`coordinator.effective_custom_parser`).
 
 ## [0.1.0] - 2026-04-29
 

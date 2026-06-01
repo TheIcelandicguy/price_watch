@@ -765,12 +765,17 @@ export class PriceWatchPanel extends LitElement {
     this._selTestError = null;
     this._selTestResult = null;
     const titleSelector = this._selTitleSelector.trim() || "h1";
+    const cookies = this._selCookies.trim();
     try {
       const resp = await this._conn.sendMessagePromise<TestSelectorResponse>({
         type: "price_watch/test_selector",
         url,
         price_selector: priceSelector,
         title_selector: titleSelector,
+        // Include any pasted cookies so the test fetches the page the same
+        // way the poll will — otherwise testing a cookie-walled site hits
+        // the bot wall and fails even though the real listing would work.
+        ...(cookies ? { request_cookies: cookies } : {}),
       });
       this._selTestResult = resp;
     } catch (err) {
@@ -2124,12 +2129,21 @@ export class PriceWatchPanel extends LitElement {
             ${this._renderBookmarklet()}
 
             <label class="trackform__field">
-              <span>Request cookies <em>(optional — for bot-walled sites)</em></span>
+              <span>
+                Request cookies <em>(optional — for bot-walled sites)</em>
+                ${listing.hasCookies
+                  ? html`<span class="sel__cookies-set"
+                      >✓ cookies currently set</span
+                    >`
+                  : null}
+              </span>
               <textarea
                 rows="3"
                 .value=${this._selCookies}
                 @input=${this._onSelCookiesInput}
-                placeholder="session-id=123-456; ubid=ABC; i18n-prefs=GBP"
+                placeholder=${listing.hasCookies
+                  ? "Leave blank to keep current cookies, or paste new ones to replace"
+                  : "session-id=123-456; ubid=ABC; i18n-prefs=GBP"}
                 spellcheck="false"
                 autocapitalize="off"
               ></textarea>
@@ -2654,6 +2668,13 @@ export class PriceWatchPanel extends LitElement {
     .sel__hint {
       font-size: 0.75rem;
       color: var(--secondary-text-color, #9e9e9e);
+    }
+    .sel__cookies-set {
+      font-size: 0.72rem;
+      font-style: normal;
+      font-weight: 600;
+      color: var(--success-color, #4caf50);
+      margin-left: 0.4rem;
     }
     .sel__hint code,
     .sel__result code,

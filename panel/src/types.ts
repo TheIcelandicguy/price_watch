@@ -134,6 +134,10 @@ export interface Listing {
   // doesn't ship. The panel's "Ships to me only" toggle hides false ones
   // (but never the primary listing). Mirrors Alternative.shipsToUserRegion.
   shipsToUserRegion: boolean | null;
+  // Whether anti-bot cookies are stored for this listing (the value itself
+  // is never sent to the frontend). Drives the "cookies set" hint in the
+  // editor; the cookie box stays write-only.
+  hasCookies: boolean;
   // Entity IDs for this listing's sensors. Used for service-call
   // targeting and cross-references. Always populated with the price
   // entity (the listing wouldn't exist without it); others optional.

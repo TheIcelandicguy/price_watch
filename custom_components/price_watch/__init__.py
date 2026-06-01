@@ -17,6 +17,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from .config_flow import ENTRY_TYPE_PRODUCT, ENTRY_TYPE_SETTINGS
+from .cookies import to_header_str as _cookies_to_header_str
 from .migration import migrate_entry_v1_to_v2
 from .const import (
     CONF_FORCE_DISCONTINUED,
@@ -38,39 +39,6 @@ _COOKIE_PARSE_ERR = (
     "request_cookies could not be parsed; expected a 'name=value; ...' header "
     "string, a {name: value} dict, or a list of {name, value} dicts"
 )
-
-
-def _cookies_to_header_str(value: Any) -> str:
-    """Normalize a cookies value to a single Cookie-header string.
-
-    Accepts the shapes callers actually send:
-      - a header string ("a=1; b=2") — returned trimmed,
-      - a {name: value} dict,
-      - a list of cookie dicts ({"name": .., "value": ..}) as documented in
-        services.yaml and as produced by browser cookie APIs.
-    Returns "" for empty / unrecognized input (which clears the cookies).
-
-    Cookies are stored as a header string inside custom_parser.request_cookies
-    because that's the ONLY place the extractor reads them (see
-    extractor.extract_product) and the shape the config flow already
-    persists / _normalize_cookies parses back.
-    """
-    if not value:
-        return ""
-    if isinstance(value, str):
-        return value.strip()
-    if isinstance(value, dict):
-        return "; ".join(f"{k}={v}" for k, v in value.items() if v is not None)
-    if isinstance(value, list):
-        parts: list[str] = []
-        for item in value:
-            if isinstance(item, dict):
-                name = item.get("name")
-                val = item.get("value")
-                if name is not None and val is not None:
-                    parts.append(f"{name}={val}")
-        return "; ".join(parts)
-    return ""
 
 # Option keys the running coordinator reads LIVE on every tick (see the
 # "Pause / force-discontinued overrides" note in coordinator.py). When ONLY
@@ -446,7 +414,7 @@ async def _register_services(hass: HomeAssistant) -> None:
         if not retailer:
             # Derive a reasonable default from URL host
             from urllib.parse import urlparse
-            host = urlparse(url).netloc.lower().lstrip("www.")
+            host = urlparse(url).netloc.lower().removeprefix("www.")
             retailer = host.split(".")[0].title() if host else "Unknown"
 
         # Optional fields
@@ -554,8 +522,8 @@ async def _register_services(hass: HomeAssistant) -> None:
 
         existing = list(entry.options.get("listings") or [])
         new_listings = [
-            l for l in existing
-            if not (isinstance(l, dict) and l.get("id") == listing_id)
+            listing for listing in existing
+            if not (isinstance(listing, dict) and listing.get("id") == listing_id)
         ]
         if len(new_listings) == len(existing):
             raise HomeAssistantError(
