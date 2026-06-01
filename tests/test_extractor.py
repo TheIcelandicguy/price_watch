@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
+from custom_components.price_watch import extractor as extractor_mod
 from custom_components.price_watch.extractor import (
     _normalize_cookies,
+    extract_product,
     preprocess_html,
     try_jsonld,
 )
@@ -204,3 +204,60 @@ def test_normalize_cookies_empty_and_garbage():
     assert _normalize_cookies([]) is None
     assert _normalize_cookies([{"no": "name"}]) is None
     assert _normalize_cookies(42) is None
+
+
+# --- cookies-only parser must fetch WITH cookies, then use JSON-LD ---
+# Regression: a parser carrying only request_cookies (no selectors) used to be
+# forced down the CSS path, which raised "did not extract a title" and — with
+# no AI provider — failed the whole extraction, never reaching JSON-LD.
+
+@pytest.mark.asyncio
+async def test_cookies_only_parser_falls_through_to_jsonld(monkeypatch):
+    captured = {}
+
+    async def fake_fetch_html(url, session=None, method="GET", body=None,
+                              extra_headers=None, cookies=None):
+        captured["url"] = url
+        captured["cookies"] = cookies
+        return SAMPLE_JSONLD_PRODUCT
+
+    monkeypatch.setattr(extractor_mod, "fetch_html", fake_fetch_html)
+
+    # No AI provider — the previously-broken free-tier case.
+    result = await extract_product(
+        url="https://example.com/dp/X",
+        session=None,
+        ai_provider=None,
+        custom_parser={"request_cookies": "session-id=123; ubid=ABC"},
+    )
+
+    # Reached JSON-LD rather than failing on an empty CSS parse.
+    assert result.method == "jsonld"
+    assert result.price == 4999.0
+    # And the cookies were actually applied to the fetch.
+    assert captured["cookies"] == {"session-id": "123", "ubid": "ABC"}
+
+
+@pytest.mark.asyncio
+async def test_real_css_parser_still_uses_custom_path(monkeypatch):
+    """A parser WITH selectors must not be treated as cookies-only."""
+    html = '<html><body><h1>Widget</h1><span class="p">19.99</span></body></html>'
+
+    async def fake_fetch_html(url, session=None, method="GET", body=None,
+                              extra_headers=None, cookies=None):
+        return html
+
+    monkeypatch.setattr(extractor_mod, "fetch_html", fake_fetch_html)
+
+    result = await extract_product(
+        url="https://example.com/p",
+        session=None,
+        ai_provider=None,
+        custom_parser={
+            "type": "css",
+            "selectors": {"price": ".p", "title": "h1"},
+            "transforms": {"price": "price_clean"},
+        },
+    )
+    assert result.method == "custom"
+    assert result.price == 19.99

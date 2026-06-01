@@ -34,6 +34,11 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.IMAGE]
 
+_COOKIE_PARSE_ERR = (
+    "request_cookies could not be parsed; expected a 'name=value; ...' header "
+    "string, a {name: value} dict, or a list of {name, value} dicts"
+)
+
 
 def _cookies_to_header_str(value: Any) -> str:
     """Normalize a cookies value to a single Cookie-header string.
@@ -460,12 +465,21 @@ async def _register_services(hass: HomeAssistant) -> None:
                 raise HomeAssistantError(
                     f"custom_parser is not valid JSON: {err}"
                 ) from err
+            # Must be a JSON object — the extractor calls .get() on it, so a
+            # bare list/str/number would crash every poll with AttributeError.
+            if not isinstance(custom_parser, dict):
+                raise HomeAssistantError("custom_parser must be a JSON object")
 
         # Cookies live inside custom_parser.request_cookies (the only place
         # the extractor reads them). Build a cookies-only parser if none was
-        # supplied — the cookie path runs regardless of parser type, and
-        # extraction falls through to JSON-LD / AI, which is the whole point.
-        cookie_str = _cookies_to_header_str(call.data.get("request_cookies"))
+        # supplied — the cookie path runs regardless of parser type, and a
+        # selector-less parser falls through to JSON-LD / AI, which is the
+        # whole point. A non-empty value that can't be parsed is an error, not
+        # a silent drop.
+        raw_cookies = call.data.get("request_cookies")
+        cookie_str = _cookies_to_header_str(raw_cookies)
+        if raw_cookies and not cookie_str:
+            raise HomeAssistantError(_COOKIE_PARSE_ERR)
         if cookie_str:
             if not isinstance(custom_parser, dict):
                 custom_parser = {}
@@ -668,11 +682,16 @@ async def _register_services(hass: HomeAssistant) -> None:
             else:
                 try:
                     import json as _json
-                    target["custom_parser"] = _json.loads(raw)
+                    parsed = _json.loads(raw)
                 except Exception as err:  # noqa: BLE001
                     raise HomeAssistantError(
                         f"custom_parser is not valid JSON: {err}"
                     ) from err
+                # Must be a JSON object — the extractor calls .get() on it, so
+                # a bare list/str/number would crash every poll.
+                if not isinstance(parsed, dict):
+                    raise HomeAssistantError("custom_parser must be a JSON object")
+                target["custom_parser"] = parsed
             # Carry existing cookies across the replacement unless the new
             # parser brought its own, or request_cookies is being set below
             # (which is authoritative). A cleared parser keeps cookies alive
@@ -690,7 +709,13 @@ async def _register_services(hass: HomeAssistant) -> None:
             target["retailer"] = call.data["retailer"]
 
         if "request_cookies" in call.data:
-            cookie_str = _cookies_to_header_str(call.data.get("request_cookies"))
+            raw_cookies = call.data.get("request_cookies")
+            cookie_str = _cookies_to_header_str(raw_cookies)
+            # A non-empty value that normalizes to nothing means the caller
+            # sent an unparseable shape — raise rather than silently CLEAR
+            # the listing's existing cookies (which an empty value would do).
+            if raw_cookies and not cookie_str:
+                raise HomeAssistantError(_COOKIE_PARSE_ERR)
             base = target.get("custom_parser")
             parser = dict(base) if isinstance(base, dict) else {}
             if cookie_str:

@@ -631,6 +631,20 @@ async def extract_product(
     3. AI extraction via ai_provider (paid for hosted providers, free for
        local).
     """
+    if custom_parser and not custom_parser.get("selectors"):
+        # A parser with no selectors can't extract anything (css/regex/
+        # jsonpath iterate selectors; raw_json needs them too) — it's a
+        # "cookies-only" config that exists purely to fetch cookie-walled
+        # pages. Don't force it down the css path (which would raise "did
+        # not extract a title"); instead lift its cookies and fall through
+        # to the standard JSON-LD → AI pipeline so the cookied HTML is read
+        # normally. This is the whole point of cookies on a site that serves
+        # real content (and JSON-LD) only to returning visitors, e.g. Amazon.
+        passthrough_cookies = _normalize_cookies(custom_parser.get("request_cookies"))
+        custom_parser = None
+    else:
+        passthrough_cookies = None
+
     if custom_parser:
         from .parsers import apply_custom_parser, ParserError
 
@@ -768,8 +782,10 @@ async def extract_product(
             raw=data,
         )
 
-    # No custom parser: standard JSON-LD then Claude pipeline
-    html = await fetch_html(url, session=session)
+    # No custom parser: standard JSON-LD then Claude pipeline. passthrough_cookies
+    # carries any cookies lifted from a cookies-only parser above, so a
+    # cookie-walled page still reaches the JSON-LD / AI extractor.
+    html = await fetch_html(url, session=session, cookies=passthrough_cookies)
     cleaned, content_hash = preprocess_html(html)
 
     if previous_hash and previous_hash == content_hash:
