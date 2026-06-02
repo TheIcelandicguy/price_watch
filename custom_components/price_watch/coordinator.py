@@ -1330,7 +1330,15 @@ class PriceWatchCoordinator(
              return None rather than "" in that case)
         """
         result = self.data
-        title = result.title if result else "Price Watch product"
+        # Prefer the extracted title; fall back to the config entry title
+        # (the name the user gave when adding the product) so a product
+        # whose first fetch failed still shows its real name in the panel
+        # and device list — not a generic placeholder.
+        title = (
+            result.title
+            if result
+            else (self.entry.title or "Price Watch product")
+        )
         retailer = result.retailer if result else None
 
         config_url: str | None = self.url or None

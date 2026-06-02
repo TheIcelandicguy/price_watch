@@ -11,7 +11,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
@@ -191,10 +190,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Stop the polling loop so the coordinator doesn't tick.
         coordinator.update_interval = None
     else:
-        try:
-            await coordinator.async_config_entry_first_refresh()
-        except Exception as err:  # noqa: BLE001
-            raise ConfigEntryNotReady(f"Initial fetch failed: {err}") from err
+        # Initial fetch — but DON'T hard-fail setup if it errors. A product
+        # whose page can't be read yet (a free-mode page with no JSON-LD, a
+        # cookie/CAPTCHA wall, or a custom parser the user hasn't configured
+        # yet) must still appear in the panel as a card so the user can open
+        # the ✎ editor and attach a price selector or cookies. Raising
+        # ConfigEntryNotReady here drops the entry into setup_retry with NO
+        # entities and NO card — hiding the very product that needs fixing,
+        # with no way to reach the tools that would fix it.
+        #
+        # Instead, set it up in an unavailable state. The coordinator keeps
+        # polling on its normal interval, so the card recovers on its own
+        # once the page becomes readable (or the user attaches a parser).
+        # async_refresh() (unlike async_config_entry_first_refresh) records
+        # the failure on the coordinator without raising.
+        await coordinator.async_refresh()
+        if not coordinator.last_update_success:
+            _LOGGER.warning(
+                "%s: initial fetch failed (%s); setting up anyway so the "
+                "product stays visible and editable in the panel. It will "
+                "keep retrying on the normal interval.",
+                entry.entry_id,
+                coordinator.last_exception,
+            )
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
