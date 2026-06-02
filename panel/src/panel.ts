@@ -1630,6 +1630,22 @@ export class PriceWatchPanel extends LitElement {
     }
   };
 
+  /**
+   * Jump to Home Assistant's Price Watch integration page (Settings →
+   * Devices & Services → Price Watch), where the settings entry's region,
+   * currency, budgets, and the add/remove-product config live. The panel
+   * renders in the main HA document (embed_iframe=False), so we navigate
+   * with HA's client-side router — pushState + a "location-changed" event —
+   * rather than a full page reload.
+   */
+  private _openIntegrationSettings = (): void => {
+    const path = "/config/integrations/integration/price_watch";
+    window.history.pushState(null, "", path);
+    window.dispatchEvent(
+      new CustomEvent("location-changed", { detail: { replace: false } })
+    );
+  };
+
   private _renderHeader() {
     return html`
       <header class="panel-header">
@@ -1637,6 +1653,13 @@ export class PriceWatchPanel extends LitElement {
           <h1>Price Watch</h1>
         </div>
         <div class="panel-header__actions">
+          <button
+            class="add-button add-button--secondary"
+            @click=${this._openIntegrationSettings}
+            title="Open the Price Watch integration page in Home Assistant settings — region, currency, budgets, and tracked products"
+          >
+            🛠 Settings
+          </button>
           <button
             class="add-button add-button--secondary"
             @click=${this._openProviderEditor}
