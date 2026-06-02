@@ -265,6 +265,30 @@ def _ci_get(d: dict[str, Any], key: str) -> Any:
     return None
 
 
+def _offer_price(offers: dict[str, Any]) -> float | None:
+    """Pull a usable price from an Offer or AggregateOffer node.
+
+    A standard Schema.org ``Offer`` carries ``price``. An ``AggregateOffer``
+    (used by sites that advertise a price range across configurations or
+    sellers — e.g. logitech.com) has no ``price`` at all, only ``lowPrice``
+    and ``highPrice``. The low price is what a shopper can actually pay, so
+    we track that; ``highPrice`` is a last resort. Tolerates comma decimals
+    and string/number values. Returns a positive float, or None when no
+    usable price is present (caller then skips the candidate).
+    """
+    for key in ("price", "lowPrice", "highPrice"):
+        raw = _ci_get(offers, key)
+        if raw in (None, ""):
+            continue
+        try:
+            val = float(str(raw).replace(",", "."))
+        except (ValueError, TypeError):
+            continue
+        if val > 0:
+            return val
+    return None
+
+
 def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
     """Try to extract from Schema.org Product JSON-LD.
 
@@ -351,11 +375,8 @@ def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
             if not isinstance(offers, dict):
                 continue
 
-            try:
-                price = float(str(_ci_get(offers, "price") or "").replace(",", "."))
-            except (ValueError, TypeError):
-                continue
-            if price <= 0:
+            price = _offer_price(offers)
+            if not price:
                 continue
 
             all_candidates.append((item, offers))
@@ -407,7 +428,7 @@ def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
 
     return {
         "title": _ci_get(item, "name") or "",
-        "price": float(str(_ci_get(offers, "price") or "").replace(",", ".")),
+        "price": _offer_price(offers) or 0.0,
         "currency": _ci_get(offers, "priceCurrency") or "",
         "in_stock": in_stock,
         "stock_count": stock_count,

@@ -172,6 +172,44 @@ def test_jsonld_offers_as_list():
     assert result["price"] == 10
 
 
+def test_jsonld_aggregate_offer_low_price():
+    """AggregateOffer (price range) has no `price`, only lowPrice/highPrice.
+
+    Sites like logitech.com advertise a range across configurations. The
+    low price is what a shopper can actually pay, so we track that. Without
+    the fallback the candidate is skipped and extraction reports "No JSON-LD
+    found", which hard-fails the free/no-AI tier.
+    """
+    html = """
+    <script type="application/ld+json">
+    [{"@type": "Product", "name": "MX Master 3S",
+      "offers": {"@type": "AggregateOffer", "priceCurrency": "USD",
+                 "availability": "https://schema.org/InStock",
+                 "lowPrice": 89.99, "highPrice": 99.99, "offerCount": "1"}},
+     {"@type": "BreadcrumbList", "itemListElement": []}]
+    </script>
+    """
+    result = try_jsonld(html)
+    assert result is not None
+    assert result["price"] == 89.99
+    assert result["currency"] == "USD"
+    assert result["in_stock"] is True
+
+
+def test_jsonld_aggregate_offer_high_price_fallback():
+    """When only highPrice is present, fall back to it rather than failing."""
+    html = """
+    <script type="application/ld+json">
+    {"@type": "Product", "name": "Y",
+     "offers": {"@type": "AggregateOffer", "priceCurrency": "EUR",
+                "highPrice": 42.0}}
+    </script>
+    """
+    result = try_jsonld(html)
+    assert result is not None
+    assert result["price"] == 42.0
+
+
 # --- cookie normalization (the shape the extractor reads at fetch time) ---
 
 def test_normalize_cookies_header_string():
