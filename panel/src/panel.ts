@@ -310,6 +310,9 @@ export class PriceWatchPanel extends LitElement {
   @state() private _searchRan = false;
   // User-facing error from the last search (WS error message), or null.
   @state() private _searchError: string | null = null;
+  // Hosts with an exclude_domain call currently in flight (disables that
+  // row's "Exclude site" button and shows a spinner label).
+  @state() private _excludingHosts: Set<string> = new Set();
   // When true, Free-mode results flagged as non-stores (GitHub, YouTube,
   // wiki, docs/forums) are hidden from the list. Persisted to localStorage.
   // Only affects rows with likely_non_shop===true (Free mode only); AI
@@ -1815,7 +1818,16 @@ export class PriceWatchPanel extends LitElement {
             : html`<span class="results__thumb-ph">🏷️</span>`}
         </div>
         <div class="results__info">
-          <div class="results__title" title=${r.title}>${r.title}</div>
+          <a
+            class="results__title results__title--link"
+            href=${r.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title=${`${r.title} — open to verify`}
+          >
+            ${r.title}
+            <span class="results__ext" aria-hidden="true">↗</span>
+          </a>
           <div class="results__meta">
             <span class="results__price">${price}</span>
             ${r.retailer
@@ -1828,12 +1840,65 @@ export class PriceWatchPanel extends LitElement {
             ? html`<div class="results__notes">${r.notes}</div>`
             : null}
         </div>
-        <button class="results__add" @click=${() => this._pickResult(r)}>
-          Track
-        </button>
+        <div class="results__actions">
+          <button class="results__add" @click=${() => this._pickResult(r)}>
+            Track
+          </button>
+          <button
+            class="results__exclude"
+            @click=${() => this._excludeResultSite(r)}
+            ?disabled=${this._excludingHosts.has(this._hostOf(r.url))}
+            title=${`Hide ${this._hostOf(r.url) ||
+              "this site"} from all current and future searches`}
+          >
+            ${this._excludingHosts.has(this._hostOf(r.url))
+              ? "Excluding…"
+              : "Exclude site"}
+          </button>
+        </div>
       </li>
     `;
   }
+
+  /** Bare lowercase host for a URL (www. stripped), or "" if unparseable. */
+  private _hostOf(url: string): string {
+    try {
+      return new URL(url).hostname.replace(/^www\./i, "").toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+
+  /**
+   * Add a search result's site to the global excluded-domains blocklist
+   * via price_watch/exclude_domain, then drop every result from that host
+   * out of the current list. Future searches honor the blocklist server-
+   * side (ws_search filters it), so the site won't come back.
+   */
+  private _excludeResultSite = async (r: SearchResult): Promise<void> => {
+    if (!this._conn) return;
+    const host = this._hostOf(r.url);
+    if (!host) return;
+    this._excludingHosts = new Set(this._excludingHosts).add(host);
+    try {
+      await this._conn.sendMessagePromise({
+        type: "price_watch/exclude_domain",
+        domain: host,
+      });
+      // Drop all rows from this host from the visible results immediately.
+      this._searchResults = this._searchResults.filter(
+        (row) => this._hostOf(row.url) !== host
+      );
+    } catch (err) {
+      this._searchError =
+        (err as { message?: string })?.message ??
+        `Could not exclude ${host}.`;
+    } finally {
+      const next = new Set(this._excludingHosts);
+      next.delete(host);
+      this._excludingHosts = next;
+    }
+  };
 
   private _renderTrackForm() {
     const r = this._trackTarget;
@@ -2994,6 +3059,21 @@ export class PriceWatchPanel extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .results__title--link {
+      display: block;
+      color: inherit;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .results__title--link:hover {
+      color: var(--primary-color, #03a9f4);
+      text-decoration: underline;
+    }
+    .results__ext {
+      font-size: 0.72rem;
+      opacity: 0.6;
+      margin-left: 2px;
+    }
     .results__meta {
       display: flex;
       align-items: center;
@@ -3055,6 +3135,31 @@ export class PriceWatchPanel extends LitElement {
     }
     .results__add:hover {
       filter: brightness(1.1);
+    }
+    .results__actions {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+    }
+    .results__exclude {
+      padding: 5px 12px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      font-size: 0.74rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .results__exclude:hover:not(:disabled) {
+      color: var(--error-color, #f44336);
+      border-color: var(--error-color, #f44336);
+    }
+    .results__exclude:disabled {
+      opacity: 0.6;
+      cursor: default;
     }
 
     /* --- Track-this confirm form --- */

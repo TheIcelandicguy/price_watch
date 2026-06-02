@@ -100,6 +100,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_set_provider_settings)
     websocket_api.async_register_command(hass, ws_test_selector)
     websocket_api.async_register_command(hass, ws_list_variants)
+    websocket_api.async_register_command(hass, ws_exclude_domain)
 
 
 def _settings_entry(hass: HomeAssistant) -> ConfigEntry | None:
@@ -653,6 +654,60 @@ async def ws_set_provider_settings(
     connection.send_result(
         msg["id"],
         {**_current_provider_state(settings), "reloaded": scheduled},
+    )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "price_watch/exclude_domain",
+        # A hostname or a full URL — we normalize either to a bare host.
+        vol.Required("domain"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_exclude_domain(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Append one host to the global excluded-domains blocklist.
+
+    The lightweight counterpart to set_provider_settings' excluded_domains
+    field: lets the panel's "Search & add" results offer a one-click
+    "exclude this site" button without re-sending (and re-validating) the
+    whole provider payload. Idempotent — re-excluding an already-blocked
+    host is a no-op. Returns the updated, normalized list.
+
+    No product reload is scheduled: the blocklist is read fresh on every
+    search (ws_search) and alternatives run, so the next search already
+    honors it. Provider/coordinator config is untouched.
+    """
+    settings = _settings_entry(hass)
+    if settings is None:
+        connection.send_error(
+            msg["id"], "no_settings", "No Price Watch settings entry exists yet."
+        )
+        return
+
+    norm = _normalize_domain(str(msg.get("domain") or ""))
+    if not norm:
+        connection.send_error(
+            msg["id"],
+            "invalid_domain",
+            "Could not read a hostname from that value.",
+        )
+        return
+
+    current = _read_excluded_domains(settings)
+    added = norm not in current
+    updated = [*current, norm] if added else current
+    if added:
+        new_options = {**settings.options, CONF_EXCLUDED_DOMAINS: updated}
+        hass.config_entries.async_update_entry(settings, options=new_options)
+        _LOGGER.info("Added %s to excluded domains (now %d)", norm, len(updated))
+
+    connection.send_result(
+        msg["id"], {"excluded_domains": updated, "added": norm, "was_new": added}
     )
 
 
