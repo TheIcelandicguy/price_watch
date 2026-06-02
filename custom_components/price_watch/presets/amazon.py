@@ -126,6 +126,11 @@ def build_parser(url: str) -> dict[str, Any] | None:
                 r'|"priceToPay"\s*:\s*\{[^}]*"amount"\s*:\s*([0-9.,]+)'
                 r'|"buyingPrice"\s*:\s*([0-9.,]+)'
                 r'|<span\s+class="a-offscreen">[^0-9]*([0-9.,]+)</span>'
+                # Last resort: "buying options" pages with no buy-box price,
+                # where the only figure is the marketplace offer message
+                # ("1 option from $49.99"). Anchored on a currency symbol so
+                # we capture the PRICE, not the leading option count.
+                r'|"olpMessage"\s*:\s*"[^"]*?[$£€]\s*([0-9.,]+)'
             ),
             # Image - reliable across all layouts
             "image_url": (
