@@ -37,6 +37,9 @@ from .const import (
     HTTP_TIMEOUT,
     USER_AGENT,
 )
+# Cookie normalization is shared with the services / config flow / websocket;
+# re-exported under the historical name used throughout the extractor.
+from .cookies import to_dict as _normalize_cookies
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -680,33 +683,6 @@ def list_wix_variants(html: str) -> dict[str, Any] | None:
     return {"options": groups, "variants": variants, "currency": currency}
 
 
-def _normalize_cookies(cookies: Any) -> dict[str, str] | None:
-    """Accept cookies as a dict or cookie-header string; return a dict.
-
-    Supports the format users typically copy from browser DevTools, which
-    is a single Cookie header value like:
-        session-id=123-456-789; ubid-acbuk=ABC; i18n-prefs=GBP
-    Also accepts a JSON dict form: {"session-id": "123", ...}
-    """
-    if not cookies:
-        return None
-    if isinstance(cookies, dict):
-        return {str(k): str(v) for k, v in cookies.items() if v is not None}
-    if isinstance(cookies, str):
-        result: dict[str, str] = {}
-        for pair in cookies.split(";"):
-            pair = pair.strip()
-            if not pair or "=" not in pair:
-                continue
-            name, _, value = pair.partition("=")
-            name = name.strip()
-            value = value.strip()
-            if name:
-                result[name] = value
-        return result or None
-    return None
-
-
 async def _fetch_with_curl_cffi(
     url: str,
     method: str = "GET",
@@ -912,6 +888,20 @@ async def extract_product(
     4. AI extraction via ai_provider (paid for hosted providers, free for
        local).
     """
+    if custom_parser and not custom_parser.get("selectors"):
+        # A parser with no selectors can't extract anything (css/regex/
+        # jsonpath iterate selectors; raw_json needs them too) — it's a
+        # "cookies-only" config that exists purely to fetch cookie-walled
+        # pages. Don't force it down the css path (which would raise "did
+        # not extract a title"); instead lift its cookies and fall through
+        # to the standard JSON-LD → AI pipeline so the cookied HTML is read
+        # normally. This is the whole point of cookies on a site that serves
+        # real content (and JSON-LD) only to returning visitors, e.g. Amazon.
+        passthrough_cookies = _normalize_cookies(custom_parser.get("request_cookies"))
+        custom_parser = None
+    else:
+        passthrough_cookies = None
+
     if custom_parser:
         from .parsers import apply_custom_parser, ParserError
 
@@ -1049,8 +1039,10 @@ async def extract_product(
             raw=data,
         )
 
-    # No custom parser: standard JSON-LD then Claude pipeline
-    html = await fetch_html(url, session=session)
+    # No custom parser: standard JSON-LD then Claude pipeline. passthrough_cookies
+    # carries any cookies lifted from a cookies-only parser above, so a
+    # cookie-walled page still reaches the JSON-LD / AI extractor.
+    html = await fetch_html(url, session=session, cookies=passthrough_cookies)
     cleaned, content_hash = preprocess_html(html)
 
     if previous_hash and previous_hash == content_hash:

@@ -305,6 +305,7 @@ function buildListing(
       typeof attrs.ships_to_user_region === "boolean"
         ? attrs.ships_to_user_region
         : null,
+    hasCookies: attrs.has_cookies === true,
     entityIds: { price: priceEntity },
   };
 

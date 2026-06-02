@@ -27,6 +27,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .config_flow import ENTRY_TYPE_PRODUCT
+from .cookies import to_header_str as _cookies_to_header_str
 from .const import (
     ATTR_ALTERNATIVES,
     ATTR_ALTERNATIVES_ERROR,
@@ -317,6 +318,14 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
             # product-scoped; the panel reads them off the primary.
             "target_price": self.coordinator.target_price,
             "paused": self.coordinator.paused,
+            # Whether anti-bot cookies are stored for this listing. Only the
+            # boolean is exposed — the cookie value is a secret and never
+            # surfaced to the frontend. Lets the panel show a "cookies set"
+            # hint without round-tripping the value.
+            "has_cookies": bool(
+                (parser := self.coordinator.effective_custom_parser(self._listing_id))
+                and _cookies_to_header_str(parser.get("request_cookies"))
+            ),
         }
 
         # Per-listing shipping signal, reusing the same heuristic that

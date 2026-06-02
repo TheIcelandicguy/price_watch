@@ -374,6 +374,11 @@ export class PriceWatchPanel extends LitElement {
   // Editable form fields.
   @state() private _selPriceSelector = "";
   @state() private _selTitleSelector = "";
+  // Request cookies (Cookie-header string). Write-only: we never surface
+  // the stored value to the frontend (cookies are session secrets), so the
+  // field starts blank and an empty value means "leave existing cookies
+  // untouched". The backend keeps cookies independent of the selector.
+  @state() private _selCookies = "";
   // True while a price_watch/test_selector call is in flight.
   @state() private _selTesting = false;
   // The last test result, or null before the first test.
@@ -765,6 +770,7 @@ export class PriceWatchPanel extends LitElement {
     this._selListing = listing;
     this._selPriceSelector = "";
     this._selTitleSelector = "";
+    this._selCookies = "";
     this._selTestResult = null;
     this._selTestError = null;
     this._selSaveError = null;
@@ -789,6 +795,10 @@ export class PriceWatchPanel extends LitElement {
 
   private _onSelTitleInput = (e: Event): void => {
     this._selTitleSelector = (e.target as HTMLInputElement).value;
+  };
+
+  private _onSelCookiesInput = (e: Event): void => {
+    this._selCookies = (e.target as HTMLTextAreaElement).value;
   };
 
   /**
@@ -816,12 +826,17 @@ export class PriceWatchPanel extends LitElement {
     this._selTestError = null;
     this._selTestResult = null;
     const titleSelector = this._selTitleSelector.trim() || "h1";
+    const cookies = this._selCookies.trim();
     try {
       const resp = await this._conn.sendMessagePromise<TestSelectorResponse>({
         type: "price_watch/test_selector",
         url,
         price_selector: priceSelector,
         title_selector: titleSelector,
+        // Include any pasted cookies so the test fetches the page the same
+        // way the poll will — otherwise testing a cookie-walled site hits
+        // the bot wall and fails even though the real listing would work.
+        ...(cookies ? { request_cookies: cookies } : {}),
       });
       this._selTestResult = resp;
     } catch (err) {
@@ -833,25 +848,35 @@ export class PriceWatchPanel extends LitElement {
   };
 
   /**
-   * Build the custom_parser config from the form and persist it via
-   * price_watch.edit_listing. The parser is a CSS type with price +
-   * title selectors and the price_clean transform — the same shape the
-   * built-in retailer parsers use. edit_listing reloads the entry, so
-   * the next poll uses the new selector.
+   * Persist the form via price_watch.edit_listing. The price selector and
+   * the cookies are independent: a CSS custom_parser is only sent when a
+   * price selector is entered, and request_cookies is only sent when the
+   * cookie box is non-empty. The backend keeps the two orthogonal — setting
+   * one never clobbers the other — so either can be saved on its own.
    */
   private _saveSelector = async (): Promise<void> => {
     if (!this._conn || !this._selProduct || !this._selListing) return;
     const priceSelector = this._selPriceSelector.trim();
-    if (!priceSelector) {
-      this._selSaveError = "Enter a price selector first.";
+    const cookies = this._selCookies.trim();
+    if (!priceSelector && !cookies) {
+      this._selSaveError = "Enter a price selector or cookies first.";
       return;
     }
-    const titleSelector = this._selTitleSelector.trim() || "h1";
-    const customParser = {
-      type: "css",
-      selectors: { price: priceSelector, title: titleSelector },
-      transforms: { price: "price_clean" },
+    const serviceData: Record<string, unknown> = {
+      entry_id: this._selProduct.entryId,
+      listing_id: this._selListing.listingId,
     };
+    if (priceSelector) {
+      const titleSelector = this._selTitleSelector.trim() || "h1";
+      serviceData.custom_parser = {
+        type: "css",
+        selectors: { price: priceSelector, title: titleSelector },
+        transforms: { price: "price_clean" },
+      };
+    }
+    if (cookies) {
+      serviceData.request_cookies = cookies;
+    }
     this._selSaving = true;
     this._selSaveError = null;
     this._selSaved = false;
@@ -860,11 +885,7 @@ export class PriceWatchPanel extends LitElement {
         type: "call_service",
         domain: "price_watch",
         service: "edit_listing",
-        service_data: {
-          entry_id: this._selProduct.entryId,
-          listing_id: this._selListing.listingId,
-          custom_parser: customParser,
-        },
+        service_data: serviceData,
       });
       this._selSaved = true;
       // Brief success flash, then close. The entry reloads server-side;
@@ -881,13 +902,16 @@ export class PriceWatchPanel extends LitElement {
   /**
    * Clear the custom parser on this listing, reverting it to the default
    * JSON-LD + AI extraction pipeline. edit_listing treats an empty
-   * custom_parser as "clear".
+   * custom_parser as "clear". Cookies normally survive a parser edit
+   * (they're orthogonal), so a full reset clears them explicitly too —
+   * this is also the panel's only way to drop stored cookies.
    */
   private _clearSelector = async (): Promise<void> => {
     if (!this._conn || !this._selProduct || !this._selListing) return;
     if (
       !window.confirm(
-        "Remove the custom price selector and go back to automatic extraction?"
+        "Remove the custom price selector and any stored cookies, and go " +
+          "back to automatic extraction?"
       )
     )
       return;
@@ -902,6 +926,7 @@ export class PriceWatchPanel extends LitElement {
           entry_id: this._selProduct.entryId,
           listing_id: this._selListing.listingId,
           custom_parser: "",
+          request_cookies: "",
         },
       });
       this._selSaved = true;
@@ -2582,6 +2607,35 @@ export class PriceWatchPanel extends LitElement {
 
             ${this._renderBookmarklet()}
 
+            <label class="trackform__field">
+              <span>
+                Request cookies <em>(optional — for bot-walled sites)</em>
+                ${listing.hasCookies
+                  ? html`<span class="sel__cookies-set"
+                      >✓ cookies currently set</span
+                    >`
+                  : null}
+              </span>
+              <textarea
+                rows="3"
+                .value=${this._selCookies}
+                @input=${this._onSelCookiesInput}
+                placeholder=${listing.hasCookies
+                  ? "Leave blank to keep current cookies, or paste new ones to replace"
+                  : "session-id=123-456; ubid=ABC; i18n-prefs=GBP"}
+                spellcheck="false"
+                autocapitalize="off"
+              ></textarea>
+            </label>
+            <p class="sel__hint">
+              Paste the page's <code>Cookie</code> header (F12 → Network →
+              any request → Request Headers → <em>Cookie</em>) to reach
+              content behind Cloudflare / Amazon session walls. Stored
+              separately from the selector — saving a selector won't erase
+              cookies and vice-versa. Leave blank to keep existing cookies;
+              cookies expire, so re-paste when a site starts failing.
+            </p>
+
             ${this._selSaveError
               ? html`<div class="modal__status modal__status--error">
                   ⚠ ${this._selSaveError}
@@ -2598,16 +2652,17 @@ export class PriceWatchPanel extends LitElement {
                 class="trackform__cancel"
                 @click=${this._clearSelector}
                 ?disabled=${this._selSaving}
-                title="Revert to automatic extraction"
+                title="Revert to automatic extraction (clears selector + cookies)"
               >
-                Clear custom parser
+                Reset to automatic
               </button>
               <button
                 class="add-button"
                 @click=${this._saveSelector}
-                ?disabled=${this._selSaving || !this._selPriceSelector.trim()}
+                ?disabled=${this._selSaving ||
+                (!this._selPriceSelector.trim() && !this._selCookies.trim())}
               >
-                ${this._selSaving ? "Saving…" : "Save selector"}
+                ${this._selSaving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>
@@ -3128,6 +3183,13 @@ export class PriceWatchPanel extends LitElement {
     .sel__hint {
       font-size: 0.75rem;
       color: var(--secondary-text-color, #9e9e9e);
+    }
+    .sel__cookies-set {
+      font-size: 0.72rem;
+      font-style: normal;
+      font-weight: 600;
+      color: var(--success-color, #4caf50);
+      margin-left: 0.4rem;
     }
     .sel__hint code,
     .sel__result code,

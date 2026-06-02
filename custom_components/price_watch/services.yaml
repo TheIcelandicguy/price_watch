@@ -189,8 +189,11 @@ add_listing:
     request_cookies:
       name: Request cookies
       description: >
-        Optional list of cookie dicts for Cloudflare/anti-bot bypass.
-        Each cookie: {name, value, domain?, path?}.
+        Optional cookies for Cloudflare/anti-bot bypass. Accepts a
+        Cookie-header string ("a=1; b=2"), a {name: value} mapping, or a
+        list of cookie dicts {name, value, domain?, path?}. Stored inside
+        the listing's custom_parser (the only place the extractor reads
+        cookies) and kept independent of any price selectors.
       selector:
         object:
 
@@ -273,8 +276,11 @@ edit_listing:
     request_cookies:
       name: Request cookies
       description: >
-        Optional list of cookie dicts for Cloudflare/anti-bot bypass.
-        Each cookie: {name, value, domain?, path?}.
+        Optional cookies for Cloudflare/anti-bot bypass. Accepts a
+        Cookie-header string ("a=1; b=2"), a {name: value} mapping, or a
+        list of cookie dicts {name, value, domain?, path?}. Stored inside
+        the listing's custom_parser (the only place the extractor reads
+        cookies) and kept independent of any price selectors.
       selector:
         object:
 
