@@ -267,13 +267,30 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
 
     @property
     def available(self) -> bool:
-        """Hide price_local until we have a value (avoids "unavailable" noise)."""
+        """Availability per sensor kind.
+
+        price_local: hidden until we actually have a converted value
+        (avoids "unavailable" noise on products with no FX rate yet).
+
+        price: stays available even when the coordinator's last update
+        failed, AS LONG AS we have a URL to track. A product whose first
+        fetch failed (free-mode page with no JSON-LD, a cookie wall, or a
+        parser not configured yet) must remain available so it shows as a
+        card with state "unknown" and its extra_state_attributes (URL,
+        title) reach the panel — HA strips ALL attributes from an
+        `unavailable` entity, which would otherwise hide the URL the ✎
+        editor's "Test on live page" button needs. Once an extraction
+        succeeds the state becomes the real price.
+        """
         if self.entity_description.key == "price_local":
             return (
                 super().available
                 and self._result is not None
                 and self.coordinator.price_local is not None
             )
+        if self.entity_description.key == "price" and not super().available:
+            config = self.coordinator.get_listing_config(self._listing_id) or {}
+            return bool(config.get("url") or self.coordinator.url)
         return super().available
 
     @property
@@ -288,14 +305,24 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
         """
         if self.entity_description.key != "price":
             return None
-        result = self._result
-        if result is None:
-            return None
-        state = self._listing_state
         config = self.coordinator.get_listing_config(self._listing_id) or {}
         # Listing URL: prefer the listing config's URL; fall back to
         # the coordinator's product-level URL (primary listing).
         product_url = config.get("url") or self.coordinator.url
+        result = self._result
+        if result is None:
+            # Extraction hasn't succeeded yet (first fetch failed: no
+            # JSON-LD, a cookie/CAPTCHA wall, or a custom parser not
+            # configured yet). Still surface the URL and a title so the
+            # panel renders the card and the ✎ editor's "Test on live page"
+            # button has a URL to act on — otherwise the user can't reach
+            # the tools that would fix this very listing.
+            return {
+                ATTR_TITLE: self.coordinator.entry.title or "",
+                ATTR_PRODUCT_URL: product_url,
+                ATTR_RETAILER: config.get("retailer"),
+            }
+        state = self._listing_state
 
         attrs: dict[str, Any] = {
             ATTR_TITLE: result.title,

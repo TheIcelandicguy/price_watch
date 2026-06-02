@@ -22,6 +22,7 @@ from .const import (
     CONF_FORCE_DISCONTINUED,
     CONF_PAUSED,
     CONF_TARGET_PRICE,
+    CONF_URL,
     DOMAIN,
     STORAGE_VERSION,
 )
@@ -696,9 +697,36 @@ async def _register_services(hass: HomeAssistant) -> None:
                 target = listing
                 break
         if target is None:
-            raise HomeAssistantError(
-                f"Listing {listing_id!r} not found on entry {entry.entry_id}"
-            )
+            # Panel-track / from-scratch products have an IMPLICIT primary
+            # listing: the coordinator synthesizes it (deterministic id =
+            # l_<last-12-of-entry-id>) from entry.data.url, but it was never
+            # materialized into options["listings"]. The panel's ✎ editor
+            # targets that synthesized id, so the first edit on such a
+            # product lands here with no matching listing. Rather than fail
+            # (leaving the user unable to attach a selector/cookies to the
+            # very product that needs them), materialize the primary listing
+            # now from the entry's URL — then this and every future edit
+            # find it normally.
+            primary_id = f"l_{entry.entry_id[-12:].lower()}"
+            if listing_id == primary_id:
+                primary_url = entry.data.get(CONF_URL) or ""
+                from urllib.parse import urlparse
+                host = urlparse(primary_url).netloc.lower().removeprefix("www.")
+                target = {
+                    "id": listing_id,
+                    "url": primary_url,
+                    "retailer": host.split(".")[0].title() if host else "",
+                }
+                existing.append(target)
+                _LOGGER.info(
+                    "edit_listing: materialized implicit primary listing %s "
+                    "for entry %s (url=%s)",
+                    listing_id, entry.entry_id, primary_url,
+                )
+            else:
+                raise HomeAssistantError(
+                    f"Listing {listing_id!r} not found on entry {entry.entry_id}"
+                )
 
         # Cookies are stored INSIDE custom_parser.request_cookies (the only
         # place the extractor reads them) but are treated as ORTHOGONAL to
