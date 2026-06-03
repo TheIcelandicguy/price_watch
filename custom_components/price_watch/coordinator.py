@@ -42,7 +42,6 @@ from .const import (
     CONF_EXTRA_HEADERS,
     CONF_FORCE_DISCONTINUED,
     CONF_FORCE_JSON_MODE,
-    CONF_HOME_CURRENCY,
     CONF_INPUT_COST_PER_MTOK,
     CONF_MAX_ALTERNATIVES,
     CONF_MAX_HTML_CHARS,
@@ -61,7 +60,6 @@ from .const import (
     EVENT_DISCONTINUED,
     EVENT_NEW_LOW,
     EVENT_PRICE_DROP,
-    EVENT_TARGET_HIT,
     MAX_HISTORY_ENTRIES,
     STORAGE_VERSION,
 )
@@ -77,6 +75,8 @@ from .search import (
 )
 from .migration import migrate_storage_v1_to_v2
 from .coordinator_alternatives import AlternativesMixin
+from .coordinator_events import EventsMixin
+from .coordinator_fx import FxMixin
 from .provider_config import build_ai_provider
 from .store import PriceWatchStore, derive_listing_id, empty_listing_state
 
@@ -85,15 +85,20 @@ _LOGGER = logging.getLogger(__name__)
 
 class PriceWatchCoordinator(
     AlternativesMixin,
+    EventsMixin,
+    FxMixin,
     TimestampDataUpdateCoordinator[ExtractionResult],
 ):
     """Coordinator for a single tracked product.
 
-    Alternatives-discovery behavior (find/maybe-refresh, search-provider
-    selection, alternatives* properties) lives in AlternativesMixin
-    (coordinator_alternatives.py). AI-provider resolution lives in
-    provider_config.py; the Store subclass + listing-id/empty-state
-    helpers live in store.py.
+    Cohesive concerns are split into mixins the coordinator inherits:
+    - AlternativesMixin (coordinator_alternatives.py): alternatives discovery
+      (find/maybe-refresh, search-provider selection, alternatives* props).
+    - EventsMixin (coordinator_events.py): HA bus event emission (price drop /
+      new low / back-in-stock / target hit / discontinued).
+    - FxMixin (coordinator_fx.py): price_local / home-currency conversion.
+    AI-provider resolution lives in provider_config.py; the Store subclass +
+    listing-id/empty-state helpers live in store.py.
     """
 
     config_entry: ConfigEntry
@@ -1116,71 +1121,6 @@ class PriceWatchCoordinator(
             fetched[1],
         )
 
-    async def _update_price_local(self, result: ExtractionResult) -> None:
-        """Compute price_local from the current result, if home_currency is set.
-
-        Failure is non-fatal: price_local stays None, sensor reports unavailable.
-        Called both on a fresh fetch AND on the UNCHANGED short-circuit so that
-        adding/changing home_currency in settings options takes effect on the
-        next coordinator tick without needing the source page to change.
-        """
-        home = self.home_currency
-        if not home:
-            _LOGGER.info(
-                "price_local: no home_currency configured (set one in "
-                "Settings -> Devices & Services -> Price Watch -> Configure)"
-            )
-            self._price_local = None
-            return
-        if not result or not result.currency:
-            _LOGGER.warning(
-                "price_local: no source currency available on result, skipping"
-            )
-            self._price_local = None
-            return
-        src = result.currency.upper()
-        dst = home.upper()
-        if src == dst:
-            _LOGGER.debug("price_local: %s == %s, no conversion needed", src, dst)
-            self._price_local = result.price
-            return
-        try:
-            converted = await self._fx.convert(result.price, src, dst)
-            if converted is None:
-                _LOGGER.warning(
-                    "price_local: FX conversion %s->%s returned None "
-                    "(see earlier FX log lines for the cause)",
-                    src, dst,
-                )
-            else:
-                _LOGGER.debug(
-                    "price_local: %s %s -> %s %s", result.price, src, converted, dst
-                )
-            self._price_local = converted
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("price_local: FX conversion threw: %s", err)
-            self._price_local = None
-
-    @property
-    def home_currency(self) -> str | None:
-        """User's home currency from settings entry, if configured.
-
-        Looked up fresh on every access so changing it in settings options
-        takes effect on next update without reload.
-        """
-        for entry in self.hass.config_entries.async_entries(DOMAIN):
-            if entry.data.get("entry_type") == "settings":
-                value = entry.options.get(
-                    CONF_HOME_CURRENCY, entry.data.get(CONF_HOME_CURRENCY)
-                )
-                return (value or "").upper() or None
-        return None
-
-    @property
-    def price_local(self) -> float | None:
-        """Price in user's home currency, if conversion succeeded."""
-        return self._price_local
-
     @property
     def lowest(self) -> float | None:
         """Lifetime lowest price."""
@@ -1356,55 +1296,3 @@ class PriceWatchCoordinator(
             "entry_type": "service",
         }
 
-    def _fire_event(
-        self, event_type: str, result: ExtractionResult, previous: ExtractionResult | None
-    ) -> None:
-        """Fire an HA event with consistent payload shape."""
-        self.hass.bus.async_fire(
-            event_type,
-            {
-                "entry_id": self.entry.entry_id,
-                "title": result.title,
-                "url": self.url,
-                "retailer": result.retailer,
-                "price": result.price,
-                "currency": result.currency,
-                "previous_price": previous.price if previous else None,
-                "target": self._target_price,
-                "image_url": result.image_url,
-                "in_stock": result.in_stock,
-            },
-        )
-
-    def _fire_event_with_extra(
-        self,
-        event_type: str,
-        result: ExtractionResult,
-        previous: ExtractionResult | None,
-        extra: dict[str, Any],
-    ) -> None:
-        """Same as _fire_event but merges in event-type-specific fields.
-
-        Used by EVENT_DISCONTINUED to attach last_known_price /
-        discontinued_at / discontinued_reason that aren't present on
-        regular price events.
-        """
-        payload = {
-            "entry_id": self.entry.entry_id,
-            "title": result.title,
-            "url": self.url,
-            "retailer": result.retailer,
-            "price": result.price,
-            "currency": result.currency,
-            "previous_price": previous.price if previous else None,
-            "target": self._target_price,
-            "image_url": result.image_url,
-            "in_stock": result.in_stock,
-        }
-        payload.update(extra)
-        self.hass.bus.async_fire(event_type, payload)
-
-    def _fire_target_hit(
-        self, result: ExtractionResult, previous: ExtractionResult | None
-    ) -> None:
-        self._fire_event(EVENT_TARGET_HIT, result, previous)
