@@ -250,8 +250,28 @@ interface HassConnection {
 
 interface HassConnectionWrapper {
   conn: HassConnection;
-  // auth field present but we don't use it
+  // The home-assistant-js-websocket Auth object. We use its access token to
+  // POST to HA's REST automation-config endpoint (the same mechanism HA's
+  // own automation editor uses) when creating price alerts.
+  auth?: {
+    accessToken?: string;
+    data?: { access_token?: string };
+  };
 }
+
+// One notify.* target from price_watch/list_notify_targets.
+interface NotifyTarget {
+  service: string; // e.g. "notify.mobile_app_davids_simi"
+  label: string; // e.g. "Davids Simi"
+}
+
+// The three alert triggers, mapped to the integration's bus events.
+type AlertTrigger = "back_in_stock" | "below_target" | "price_drop";
+const ALERT_EVENT: Record<AlertTrigger, string> = {
+  back_in_stock: "price_watch_back_in_stock",
+  below_target: "price_watch_target_hit",
+  price_drop: "price_watch_price_drop",
+};
 
 declare global {
   interface Window {
@@ -423,6 +443,20 @@ export class PriceWatchPanel extends LitElement {
   @state() private _varSaveError: string | null = null;
   // True briefly after a successful save (shows the confirmation banner).
   @state() private _varSaved = false;
+
+  // --- Alert ("notify me") dialog state ---
+  @state() private _alertOpen = false;
+  private _alertProduct: TrackedProduct | null = null;
+  @state() private _alertTrigger: AlertTrigger = "back_in_stock";
+  // notify.* targets fetched from the backend on open.
+  @state() private _alertTargets: NotifyTarget[] = [];
+  // Which notify services the user ticked.
+  @state() private _alertSelected: Set<string> = new Set();
+  @state() private _alertLoading = false;
+  @state() private _alertSaving = false;
+  @state() private _alertError: string | null = null;
+  // Holds the created automation's friendly id briefly on success.
+  @state() private _alertSaved: string | null = null;
 
   // Stashed connection used for the post-bootstrap call_service
   // sends. Populated by _bootstrap() once the wrapper resolves.
@@ -1630,6 +1664,159 @@ export class PriceWatchPanel extends LitElement {
     }
   };
 
+  // --- Alert ("notify me") dialog ---
+
+  private _handleAlert = (product: TrackedProduct): void => {
+    this._alertProduct = product;
+    this._alertTrigger = "back_in_stock";
+    this._alertSelected = new Set();
+    this._alertError = null;
+    this._alertSaved = null;
+    this._alertOpen = true;
+    void this._loadNotifyTargets();
+  };
+
+  private _closeAlert = (): void => {
+    this._alertOpen = false;
+    this._alertProduct = null;
+  };
+
+  private _onAlertBackdropClick = (e: Event): void => {
+    if (e.target === e.currentTarget) this._closeAlert();
+  };
+
+  /** Fetch the notify.* targets for the device picker. */
+  private _loadNotifyTargets = async (): Promise<void> => {
+    if (!this._conn) return;
+    this._alertLoading = true;
+    this._alertError = null;
+    try {
+      const resp = await this._conn.sendMessagePromise<{ targets: NotifyTarget[] }>({
+        type: "price_watch/list_notify_targets",
+      });
+      this._alertTargets = resp.targets ?? [];
+    } catch (err) {
+      this._alertError =
+        (err as { message?: string })?.message ?? "Could not load notify targets.";
+    } finally {
+      this._alertLoading = false;
+    }
+  };
+
+  private _setAlertTrigger = (t: AlertTrigger): void => {
+    this._alertTrigger = t;
+  };
+
+  private _toggleAlertTarget = (service: string): void => {
+    const next = new Set(this._alertSelected);
+    if (next.has(service)) next.delete(service);
+    else next.add(service);
+    this._alertSelected = next;
+  };
+
+  /**
+   * POST an automation config to HA's REST endpoint — the same mechanism
+   * HA's own automation editor uses, so HA owns validation, storage location
+   * (automations.yaml vs storage), and the reload. We pull the access token
+   * off the bootstrapped connection's Auth object.
+   */
+  private async _createAutomation(uniqueId: string, config: unknown): Promise<void> {
+    const wrapper = await window.hassConnection;
+    const auth = wrapper?.auth;
+    const token = auth?.accessToken ?? auth?.data?.access_token;
+    const resp = await fetch(
+      `/api/config/automation/config/${encodeURIComponent(uniqueId)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(config),
+      }
+    );
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(
+        `Home Assistant rejected the automation (HTTP ${resp.status}). ${text.slice(0, 180)}`
+      );
+    }
+  }
+
+  /** Build the alert automation from the dialog and create it via HA. */
+  private _createAlert = async (): Promise<void> => {
+    const product = this._alertProduct;
+    if (!product) return;
+    const services = [...this._alertSelected];
+    if (services.length === 0) {
+      this._alertError = "Pick at least one device to notify.";
+      return;
+    }
+    const trigger = this._alertTrigger;
+    const eventType = ALERT_EVENT[trigger];
+
+    // Per-trigger title + message. The bus event payload carries title,
+    // price, currency, previous_price, target and url, so the message is
+    // rich and independent of entity_id renames.
+    const COPY: Record<AlertTrigger, { emoji: string; title: string; body: string }> = {
+      back_in_stock: {
+        emoji: "🛒",
+        title: "Back in stock!",
+        body: "{{ trigger.event.data.title }} is back in stock at {{ trigger.event.data.price }} {{ trigger.event.data.currency }}",
+      },
+      below_target: {
+        emoji: "🎯",
+        title: "Target price hit!",
+        body: "{{ trigger.event.data.title }} hit your target — now {{ trigger.event.data.price }} {{ trigger.event.data.currency }}",
+      },
+      price_drop: {
+        emoji: "📉",
+        title: "Price drop",
+        body: "{{ trigger.event.data.title }}: {{ trigger.event.data.price }} {{ trigger.event.data.currency }} (was {{ trigger.event.data.previous_price }})",
+      },
+    };
+    const copy = COPY[trigger];
+    const action = services.map((svc) => ({
+      service: svc,
+      data: {
+        title: `${copy.emoji} ${copy.title}`,
+        message: copy.body,
+        data: { url: "{{ trigger.event.data.url }}" },
+      },
+    }));
+
+    const config = {
+      alias: `Price Watch: ${product.title} — ${copy.title}`,
+      description: "Created via the Price Watch panel's Alert-me button.",
+      mode: "single",
+      trigger: [
+        {
+          platform: "event",
+          event_type: eventType,
+          event_data: { entry_id: product.entryId },
+        },
+      ],
+      action,
+    };
+    // Stable id → re-creating the same product+trigger updates in place
+    // rather than piling up duplicates.
+    const uniqueId = `pw_alert_${product.entryId.toLowerCase()}_${trigger}`;
+
+    this._alertSaving = true;
+    this._alertError = null;
+    this._alertSaved = null;
+    try {
+      await this._createAutomation(uniqueId, config);
+      this._alertSaved = config.alias;
+      window.setTimeout(() => this._closeAlert(), 1600);
+    } catch (err) {
+      this._alertError =
+        (err as { message?: string })?.message ?? "Could not create the alert.";
+    } finally {
+      this._alertSaving = false;
+    }
+  };
+
   /**
    * Jump to Home Assistant's Price Watch integration page (Settings →
    * Devices & Services → Price Watch), where the settings entry's region,
@@ -2405,6 +2592,7 @@ export class PriceWatchPanel extends LitElement {
               .onAddListing=${this._handleAddListing}
               .onEditListing=${this._handleEditListing}
               .onEditVariant=${this._handleEditVariant}
+              .onAlert=${this._handleAlert}
             ></price-watch-card>
           `
         )}
@@ -2433,6 +2621,136 @@ export class PriceWatchPanel extends LitElement {
       ${this._renderProviderModal()}
       ${this._renderSelectorModal()}
       ${this._renderVariantModal()}
+      ${this._renderAlertModal()}
+    `;
+  }
+
+  /**
+   * The "Alert me" overlay. Pick a trigger (back in stock / target hit /
+   * any price drop) and one or more notify devices; on Create it builds a
+   * Home Assistant automation (event trigger on the integration's bus event,
+   * scoped to this product's entry_id) and saves it via HA's automation
+   * config endpoint. Rendered at the panel root; nothing when closed.
+   */
+  private _renderAlertModal() {
+    if (!this._alertOpen || !this._alertProduct) return null;
+    const product = this._alertProduct;
+    const hasTarget = product.targetPrice != null;
+    const triggers: { key: AlertTrigger; label: string; hint: string; disabled?: boolean }[] = [
+      {
+        key: "back_in_stock",
+        label: "Back in stock",
+        hint: "When this product returns to stock",
+      },
+      {
+        key: "below_target",
+        label: "Target price hit",
+        hint: hasTarget
+          ? `When the price reaches your target (${product.targetPrice})`
+          : "Set a target price on this product first",
+        disabled: !hasTarget,
+      },
+      {
+        key: "price_drop",
+        label: "Any price drop",
+        hint: "Every time the price drops",
+      },
+    ];
+    return html`
+      <div
+        class="modal-backdrop"
+        @click=${this._onAlertBackdropClick}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Create a price alert"
+      >
+        <div class="modal">
+          <div class="modal__head">
+            <h2>🔔 Alert me</h2>
+            <button class="modal__close" @click=${this._closeAlert} aria-label="Close">
+              ✕
+            </button>
+          </div>
+          <div class="trackform">
+            <p class="sel__intro">
+              Get a notification about <strong>${product.title}</strong>. This
+              creates a Home Assistant automation for you — no YAML needed.
+            </p>
+
+            <div class="alert__section-label">When</div>
+            <div class="alert__triggers">
+              ${triggers.map(
+                (t) => html`
+                  <label
+                    class="alert__trigger ${this._alertTrigger === t.key
+                      ? "alert__trigger--on"
+                      : ""} ${t.disabled ? "alert__trigger--disabled" : ""}"
+                  >
+                    <input
+                      type="radio"
+                      name="pw-alert-trigger"
+                      .checked=${this._alertTrigger === t.key}
+                      ?disabled=${t.disabled}
+                      @change=${() => this._setAlertTrigger(t.key)}
+                    />
+                    <span class="alert__trigger-body">
+                      <span class="alert__trigger-label">${t.label}</span>
+                      <span class="alert__trigger-hint">${t.hint}</span>
+                    </span>
+                  </label>
+                `
+              )}
+            </div>
+
+            <div class="alert__section-label">Notify</div>
+            ${this._alertLoading
+              ? html`<div class="modal__status">Loading your devices…</div>`
+              : this._alertTargets.length === 0
+              ? html`<div class="modal__status">
+                  No notify devices found. Set up the Home Assistant mobile app
+                  to get push notifications.
+                </div>`
+              : html`<div class="alert__targets">
+                  ${this._alertTargets.map(
+                    (t) => html`
+                      <label class="alert__target">
+                        <input
+                          type="checkbox"
+                          .checked=${this._alertSelected.has(t.service)}
+                          @change=${() => this._toggleAlertTarget(t.service)}
+                        />
+                        <span>${t.label}</span>
+                      </label>
+                    `
+                  )}
+                </div>`}
+
+            ${this._alertError
+              ? html`<div class="modal__status modal__status--error">
+                  ⚠ ${this._alertError}
+                </div>`
+              : null}
+            ${this._alertSaved
+              ? html`<div class="modal__status modal__status--ok">
+                  ✓ Created "${this._alertSaved}". You'll be notified.
+                </div>`
+              : null}
+
+            <div class="trackform__actions sel__actions">
+              <button class="trackform__cancel" @click=${this._closeAlert}>
+                Cancel
+              </button>
+              <button
+                class="add-button"
+                @click=${this._createAlert}
+                ?disabled=${this._alertSaving || this._alertSelected.size === 0}
+              >
+                ${this._alertSaving ? "Creating…" : "Create alert"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -3462,6 +3780,69 @@ export class PriceWatchPanel extends LitElement {
     }
     .var__hint--warn {
       color: var(--warning-color, #f57c00);
+    }
+
+    /* --- Alert ("notify me") dialog --- */
+    .alert__section-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--secondary-text-color, #757575);
+      margin: 14px 0 6px;
+    }
+    .alert__triggers {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .alert__trigger {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .alert__trigger--on {
+      border-color: var(--primary-color, #03a9f4);
+      background: rgba(3, 169, 244, 0.07);
+    }
+    .alert__trigger--disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .alert__trigger input {
+      margin-top: 3px;
+    }
+    .alert__trigger-body {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .alert__trigger-label {
+      font-size: 0.92rem;
+      font-weight: 500;
+    }
+    .alert__trigger-hint {
+      font-size: 0.78rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .alert__targets {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .alert__target {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 2px;
+      font-size: 0.9rem;
+      cursor: pointer;
     }
 
     /* --- Summary stat bar --- */

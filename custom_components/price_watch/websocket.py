@@ -101,6 +101,7 @@ def async_register_websocket_api(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_test_selector)
     websocket_api.async_register_command(hass, ws_list_variants)
     websocket_api.async_register_command(hass, ws_exclude_domain)
+    websocket_api.async_register_command(hass, ws_list_notify_targets)
 
 
 def _settings_entry(hass: HomeAssistant) -> ConfigEntry | None:
@@ -709,6 +710,53 @@ async def ws_exclude_domain(
     connection.send_result(
         msg["id"], {"excluded_domains": updated, "added": norm, "was_new": added}
     )
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "price_watch/list_notify_targets"}
+)
+@callback
+def ws_list_notify_targets(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """List the available notify.* services for the panel's alert dialog.
+
+    The "Alert me" dialog needs to offer the user a device/target to notify.
+    notify targets are SERVICES (notify.mobile_app_*), not entities, so the
+    panel can't read them from the state machine — we surface them here.
+    Returns each as {service, label}, with the generic plumbing services
+    (send_message, the bare notify.notify) filtered out in favour of the
+    concrete per-device ones, but notify.notify kept as an "all devices"
+    convenience. Sorted, mobile apps first.
+    """
+    services = hass.services.async_services().get("notify", {})
+    targets: list[dict[str, str]] = []
+    for name in services:
+        if name == "send_message":
+            continue  # generic entity-targeted plumbing, not a destination
+        service = f"notify.{name}"
+        if name == "notify":
+            label = "All devices"
+        else:
+            # Prettify the slug: drop the mobile_app_ prefix, title-case.
+            pretty = name.removeprefix("mobile_app_").replace("_", " ").strip()
+            label = pretty.title() or name
+        targets.append({"service": service, "label": label})
+
+    # Mobile apps first (most useful for a phone alert), then the rest;
+    # "All devices" pinned to the end. Alphabetical within each group.
+    def _sort_key(t: dict[str, str]) -> tuple[int, str]:
+        svc = t["service"]
+        if svc == "notify.notify":
+            return (2, "")
+        if svc.startswith("notify.mobile_app_"):
+            return (0, t["label"].lower())
+        return (1, t["label"].lower())
+
+    targets.sort(key=_sort_key)
+    connection.send_result(msg["id"], {"targets": targets})
 
 
 # ---------------------------------------------------------------------------

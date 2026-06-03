@@ -89,6 +89,11 @@ export class PriceWatchCard extends LitElement {
   // panel owner calls price_watch.set_paused.
   @property({ attribute: false })
   onSetPaused?: (product: TrackedProduct, paused: boolean) => void;
+  // Optional callback fired when the user clicks the 🔔 alert button. The
+  // panel owner opens the "Alert me" dialog, which creates an HA automation
+  // (notify when back in stock / target hit / price drop).
+  @property({ attribute: false })
+  onAlert?: (product: TrackedProduct) => void;
 
   /**
    * The currency we show next to the headline price. Prefer the local
@@ -737,6 +742,11 @@ export class PriceWatchCard extends LitElement {
     this.onSetPaused?.(this.product, !this.product.paused);
   };
 
+  private handleAlert = (event: Event): void => {
+    event.stopPropagation();
+    this.onAlert?.(this.product);
+  };
+
   /**
    * Commit an inline target-price edit. Parses the input value: empty
    * (or non-numeric) clears the target (null); a valid number sets it.
@@ -773,7 +783,12 @@ export class PriceWatchCard extends LitElement {
    * presentational when used standalone, e.g. in tests).
    */
   private renderActions() {
-    if (!this.onRefreshNow && !this.onSetTarget && !this.onSetPaused) {
+    if (
+      !this.onRefreshNow &&
+      !this.onSetTarget &&
+      !this.onSetPaused &&
+      !this.onAlert
+    ) {
       return nothing;
     }
     const { product } = this;
@@ -797,6 +812,17 @@ export class PriceWatchCard extends LitElement {
             </label>`
           : nothing}
         <div class="actions__spacer"></div>
+        ${this.onAlert
+          ? html`<button
+              class="actions__btn"
+              type="button"
+              @click=${this.handleAlert}
+              aria-label="Create a price alert"
+              title="Notify me (back in stock / target hit / price drop)"
+            >
+              <ha-icon icon="mdi:bell-plus-outline"></ha-icon>
+            </button>`
+          : nothing}
         ${this.onSetPaused
           ? html`<button
               class="actions__btn"
