@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from typing import Any
 
@@ -14,6 +15,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
+from homeassistant.util.yaml import dump as _yaml_dump, load_yaml as _load_yaml
 
 from .config_flow import ENTRY_TYPE_PRODUCT, ENTRY_TYPE_SETTINGS
 from .cookies import to_header_str as _cookies_to_header_str
@@ -282,6 +284,78 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     _LOGGER.info(
         "Removed persistent storage for entry %s", entry.entry_id,
     )
+    # Also remove any "Alert me" automations the panel created for this
+    # product, so they don't pile up as dead weight after the product is
+    # deleted (or the user bought it and stopped tracking it).
+    await _remove_alert_automations(hass, entry.entry_id)
+
+
+async def _remove_alert_automations(hass: HomeAssistant, entry_id: str) -> None:
+    """Delete the panel-created "Alert me" automations for a removed product.
+
+    The Alert-me button creates automations with the stable id
+    ``pw_alert_<entry_id>_<trigger>`` (and a trigger that fires on this
+    entry's bus events). Once the product is gone those automations can
+    never fire again, so we strip them from the automation config store
+    and reload — otherwise they accumulate every add/buy/remove cycle.
+
+    Scoped strictly to our ``pw_alert_<entry_id>_`` id namespace, so a
+    user's own automations are never touched. Best-effort: any failure is
+    logged and swallowed (a leftover inert automation is harmless and must
+    not block entry removal). No-op when automations live somewhere other
+    than a flat ``automations.yaml`` list (e.g. split-config setups) — we
+    only rewrite what we can safely parse.
+    """
+    prefix = f"pw_alert_{entry_id.lower()}_"
+    path = hass.config.path("automations.yaml")
+
+    def _strip() -> list[str]:
+        if not os.path.isfile(path):
+            return []
+        try:
+            data = _load_yaml(path)
+        except Exception:  # noqa: BLE001 — unreadable/!include etc. → skip
+            return []
+        if not isinstance(data, list):
+            return []
+
+        def _is_ours(item: Any) -> bool:
+            return isinstance(item, dict) and str(item.get("id", "")).startswith(prefix)
+
+        removed = [str(a.get("id")) for a in data if _is_ours(a)]
+        if not removed:
+            return []
+        kept = [a for a in data if not _is_ours(a)]
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(_yaml_dump(kept))
+        return removed
+
+    try:
+        removed = await hass.async_add_executor_job(_strip)
+    except Exception:  # noqa: BLE001
+        _LOGGER.exception(
+            "Alert-automation cleanup failed for entry %s", entry_id
+        )
+        return
+
+    if removed:
+        # Stripping the config + reloading removes the automation from the
+        # state machine, but its entity REGISTRY entry lingers as an
+        # "unavailable" ghost (an automation's unique_id is its config id).
+        # Drop those too, mirroring what HA's own delete-automation view does.
+        ent_reg = er.async_get(hass)
+        for auto_id in removed:
+            entity_id = ent_reg.async_get_entity_id("automation", "automation", auto_id)
+            if entity_id:
+                ent_reg.async_remove(entity_id)
+        _LOGGER.info(
+            "Removed %d Price Watch alert automation(s) for entry %s: %s",
+            len(removed), entry_id, removed,
+        )
+        # Reload so HA re-reads the (now-stripped) automation config.
+        await hass.services.async_call(
+            "automation", "reload", blocking=False
+        )
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
