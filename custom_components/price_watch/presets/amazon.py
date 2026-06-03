@@ -123,23 +123,26 @@ def build_parser(url: str) -> dict[str, Any] | None:
             # so a formatted "$49.99" string beats a raw numeric field that
             # might be in cents or belong to a different on-page widget.
             "price": [
-                # Formatted price string — unambiguous ("$49.99", "£82.99").
+                # Currency-anchored FORMATTED strings first — they're
+                # unambiguous (symbol + proper decimal), unlike Amazon's raw
+                # JSON numbers, which the site inconsistently stores in
+                # dollars OR cents (4999 = $49.99) with no way to tell from
+                # the value alone. These are tied to the actual offer.
                 r'"displayPrice"\s*:\s*"[^"0-9]*([0-9][0-9.,]*)"',
-                # Buy-box "price to pay" amount (JSON decimal).
-                r'"priceToPay"\s*:\s*\{[^}]*"amount"\s*:\s*([0-9][0-9.]*)',
-                # priceAmount / buyingPrice — ONLY with a decimal point. A
-                # bare integer there is frequently cents (4999 = $49.99) and
-                # would 100x the price, so we skip integer-only matches and
-                # let a later strategy win.
+                # "1 option from $49.99" marketplace offer message. Anchored
+                # on a currency symbol so we get the PRICE, not the count.
+                r'"olpMessage"\s*:\s*"[^"]*?[$£€]\s*([0-9][0-9.,]*)',
+                # Raw JSON numeric fields — ONLY with a decimal point, so a
+                # bare integer (cents) can't 100x the price. A genuine
+                # whole-dollar price is caught by a formatted string above
+                # or the a-offscreen text below.
+                r'"priceToPay"\s*:\s*\{[^}]*"amount"\s*:\s*([0-9]+\.[0-9]{1,2})\b',
                 r'"priceAmount"\s*:\s*([0-9]+\.[0-9]{1,2})\b',
                 r'"buyingPrice"\s*:\s*([0-9]+\.[0-9]{1,2})\b',
-                # Visible .a-offscreen text (simpler "Buy Now" pages).
+                # Visible .a-offscreen text — LAST: it's generic (every price
+                # on the page uses it, including recommendations), so it's the
+                # least trustworthy and only used when nothing else matched.
                 r'<span\s+class="a-offscreen">[^0-9]*([0-9][0-9.,]*)</span>',
-                # Last resort: "buying options" pages with no buy-box price,
-                # where the only figure is the marketplace offer message
-                # ("1 option from $49.99"). Anchored on a currency symbol so
-                # we capture the PRICE, not the leading option count.
-                r'"olpMessage"\s*:\s*"[^"]*?[$£€]\s*([0-9][0-9.,]*)',
             ],
             # Image - reliable across all layouts
             "image_url": (
