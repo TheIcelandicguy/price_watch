@@ -3,10 +3,13 @@
 **Status:** Phases 1–4 SHIPPED + IN PRODUCTION. Phase 1/2/3a/3b shipped 2026-05-28;
 Phase 4 (panel listing rows) + Phase 3c (per-listing images) + the "Ships to me only"
 shipping filter shipped 2026-05-30/31. `async_remove_entry` validated end-to-end
-2026-05-31. Phase 5 (production migrate) happened during Phase 1. Several post-3b
-hotfixes also landed — see **"Post-3b: shipped reality (2026-05-30/31)"** below for the
-authoritative current state; the per-phase sections above it are kept as the historical
-design record.
+2026-05-31. Phase 5 (production migrate) happened during Phase 1. A large follow-up
+wave (variant tracking, cookie capture, free-mode extraction hardening, the FX
+home-currency fix, failed-product resilience, and a real test suite) shipped
+2026-06-02/03 — see **"Post-Phase-4: shipped reality (2026-06-02/03)"** below for the
+authoritative current state. The earlier "Post-3b: shipped reality (2026-05-30/31)"
+section remains accurate for its window; the per-phase sections above are the
+historical design record.
 
 ### Phase 2 sub-phases (2026-05-28, all shipped same evening as Phase 1)
 
@@ -294,6 +297,115 @@ per-phase design sections above are the historical plan.
 **Author:** Claude + Davíð (conversation)
 **Estimated effort:** 7–12 hours across 4–5 sessions (Step 6 revised down — see Q6 DECIDED)
 **Date to revisit:** Tomorrow, with fresh eyes
+
+---
+
+### Post-Phase-4: shipped reality (2026-06-02/03)
+
+A large follow-up wave landed after the search-first refactor was in
+production. This is now the authoritative "what's deployed" record. All
+commits are on `main` (pushed to origin); the test suite passes (43 tests).
+
+**Variant tracking (Wix stores) — `431296f`, picker `98937f3`:**
+- Sites like athom.tech (Wix) embed EVERY variant's price in the page with no
+  per-variant URL — variant selection is client-side JS the server fetch never
+  triggers. `extractor.try_wix_variant()` reads the embedded `options` (selection
+  id→label) + `productItems` (each combo's `optionsSelections` + price) and
+  resolves a pinned combo's price (selling price = lower of `price`/`comparePrice`
+  when on sale, robust to both Wix conventions).
+- Pinned per-listing via `TrackedListing.variant_options`, OR product-wide via
+  the new `set_variant` service for from-scratch/panel-track entries that have no
+  materialized `listings[]` array. `coordinator._variant_options` mirrors
+  `_custom_parser` as the product-level fallback for the primary listing.
+- Panel ⚙ picker: `price_watch/list_variants` WS command (`extractor.list_wix_variants`)
+  returns the option groups + concrete combos + the currently-pinned combo; the
+  card's ⚙ button opens dropdowns with a live price preview. Save routes to
+  `set_variant` (primary) or `edit_listing.variant_options` (secondary).
+
+**Cookie capture — merged from `claude/price-watch-chrome-extension-qTO74` (`24543fc`):**
+- The extractor reads cookies from EXACTLY one place: `custom_parser.request_cookies`
+  (stored as a header string, converted to a dict at fetch time via `cookies.py`).
+- THE critical fix: a selector-less ("cookies-only") parser lifts its cookies,
+  sets `custom_parser=None`, and falls through to the standard JSON-LD → AI
+  pipeline — so a cookie-walled page (Amazon-style "returning visitor" content)
+  is read normally instead of hard-failing the free tier on an empty CSS parse.
+  Cookies are ORTHOGONAL to the rest of the parser in `edit_listing` (a selector
+  edit must not wipe cookies; the panel never sees the secret cookie value).
+- `has_cookies` boolean attribute; `coordinator.effective_custom_parser()` is the
+  single tolerant read boundary (JSON-string vs dict, primary fallback).
+  Note: the standalone Chrome-extension design (`docs/` design note) was NOT built;
+  only the in-tree cookie plumbing shipped.
+
+**Free-mode extraction hardening (no AI needed):**
+- **Capitalized JSON-LD keys (`189e313`):** Wix emits `"Offers"`/`"Availability"`;
+  `extractor._ci_get()` does a case-insensitive Schema.org lookup.
+- **AggregateOffer (`112d15e`):** sites that advertise a price RANGE (e.g.
+  logitech.com) emit an `AggregateOffer` with no `price`, only `lowPrice`/
+  `highPrice`. `extractor._offer_price()` falls back to `lowPrice` (what a
+  shopper pays) then `highPrice`.
+- **Amazon preset (`presets/amazon.py`) hardened (`76ff0de`, `ada2f90`, `ea116be`):**
+  `parsers._apply_regex` now accepts a LIST of patterns per field, tried in
+  PRIORITY order (first match wins) rather than leftmost-in-HTML. The Amazon
+  price strategies are ranked: formatted strings (`displayPrice`, `olpMessage`
+  "from $X") first; raw JSON numerics (`priceToPay`/`priceAmount`/`buyingPrice`)
+  ONLY with a decimal point so an integer-cents value (4999 = $49.99) can't 100×
+  the price; generic `.a-offscreen` last (it grabs the first price on the page).
+- Reality check: Amazon's served markup VARIES between fetches — the preset gets
+  many pages right but can't be made 100% reliable in free mode; JS-rendered
+  buy-box prices need AI. Clean stores (JSON-LD / static price) "just work."
+
+**Failed-product resilience — `5deda99`, `9badc8d`:**
+- A product whose first fetch fails (no JSON-LD, cookie wall, parser not
+  configured) used to raise `ConfigEntryNotReady` → `setup_retry` → NO entities,
+  NO panel card — hiding the very product that needs fixing, with no way to reach
+  the ✎ editor. Now `async_setup_entry` calls `async_refresh()` (records the
+  failure without raising) and sets the entry up anyway; the card shows in an
+  "unknown" state and the coordinator keeps retrying.
+- The PRIMARY price sensor stays AVAILABLE (state "unknown") whenever there's a
+  URL, and exposes `product_url`/title in `extra_state_attributes` even with no
+  result — HA strips ALL attributes from an `unavailable` entity, which would
+  otherwise hide the URL the editor's "Test on live page" button needs.
+- `edit_listing` MATERIALIZES the implicit primary listing (deterministic id
+  `l_<last-12-of-entry-id>`, from `entry.data.url`) when it's not yet in
+  `options["listings"]`, so the first selector/cookie edit on a panel-track
+  product has somewhere to land instead of failing "Listing not found".
+
+**FX / home-currency conversion fix — `b794b39` (the nastiest bug):**
+- `price_local` was ALWAYS unavailable for every product. Root cause: the FX
+  cache `Store` was built with the product-data `STORAGE_VERSION`, which got
+  bumped 1→2 for the v2 model — orphaning every version-1 fx cache file so
+  `Store.async_load` raised `NotImplementedError` ("no migration") on every load.
+  The exception escaped `convert()` and was swallowed as `None` upstream,
+  silently disabling ALL conversion; the cache could never refresh because
+  `_load()` died before `_save()` was reached.
+- Fixes: dedicated `_FX_STORE_VERSION = 1` (permanently decoupled from product
+  storage); defensive `_load()` (any failure → refetch, never breaks conversion);
+  and `convert()` now CROSS-RATES through whatever base the cached matrix has
+  (`amount * rate_to / rate_from`), so one ECB matrix in any base serves every
+  pair it lists, with a stale matrix as a usable fallback. Verified live: Logitech
+  89.99 USD → 11 093 ISK. Covered by `tests/test_fx.py`.
+
+**Panel additions:**
+- **Exclude-site button + verify links (`a09c541`):** each Search & Add result is
+  a clickable link (opens the page to verify) with an "Exclude site" button that
+  appends the host to the global blocklist (`price_watch/exclude_domain` WS) and
+  drops it from results. `ws_search` already filters the blocklist, so future
+  searches honor it.
+- **Settings shortcut (`23c7984`):** header "🛠 Settings" button navigates to the
+  HA Price Watch integration page via the client-side router (panel renders in the
+  main document, `embed_iframe=False`).
+- **"doesn't ship" badge** on listing rows when `shipsToUserRegion === false`.
+
+**Test suite + infra — `2dc3759`, `d9b69ed`:**
+- `tests/test_fx.py` (new): cross-rate, stale fallback, version-decoupling guard.
+- `tests/test_parsers.py`: priority-list regex + `price_clean` format cases.
+- `tests/test_extractor.py`: AggregateOffer cases.
+- `pytest.ini` (new): `asyncio_mode=auto` (required by
+  pytest-homeassistant-custom-component) — the repo previously had no pytest
+  config, so the suite errored at fixture setup. `requirements_test.txt` gained
+  `openai` (imported unconditionally at module load).
+- Run from repo root in a Linux env (Windows lacks `fcntl`): a WSL venv works.
+  **43 passed.**
 
 ---
 
