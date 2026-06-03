@@ -607,6 +607,13 @@ export class PriceWatchCard extends LitElement {
           ${listing.isPrimary
             ? html`<span class="listings__badge">primary</span>`
             : nothing}
+          ${listing.shipsToUserRegion === false
+            ? html`<span
+                class="listings__badge listings__badge--noship"
+                title="This retailer doesn't appear to ship to your region"
+                >doesn't ship</span
+              >`
+            : nothing}
         </span>
         <span class="listings__row-meta">
           ${stockChip}
@@ -1476,6 +1483,10 @@ export class PriceWatchCard extends LitElement {
       white-space: nowrap;
       background: var(--primary-color, #03a9f4);
       color: var(--text-primary-color, #fff);
+    }
+    .listings__badge--noship {
+      background: rgba(244, 67, 54, 0.16);
+      color: var(--error-color, #f44336);
     }
     .listings__row-meta {
       display: inline-flex;

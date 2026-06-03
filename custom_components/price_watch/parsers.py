@@ -232,28 +232,42 @@ def _apply_css(html: str, selectors: dict[str, str], transforms: dict[str, str])
     return result
 
 
-def _apply_regex(html: str, selectors: dict[str, str], transforms: dict[str, str]) -> dict[str, Any]:
+def _apply_regex(html: str, selectors: dict[str, Any], transforms: dict[str, str]) -> dict[str, Any]:
     """Extract fields using regex patterns.
 
-    Supports alternation patterns with multiple capture groups - returns
-    the first non-None group. This lets a single selector try multiple
-    extraction strategies, e.g.:
-        r'"priceAmount":([0-9.]+)|"displayPrice":"[^0-9]*([0-9.]+)"'
-    With Amazon-style HTML, the right one matches and others are None.
+    A selector value may be:
+      - a single pattern string. Supports alternation with multiple capture
+        groups; returns the first non-None group. One re.search, so the
+        LEFTMOST match in the HTML wins regardless of which alternative it
+        is.
+      - a LIST of pattern strings, tried in PRIORITY order: the first
+        pattern that matches anywhere wins, and later patterns aren't tried.
+        This lets a parser rank strategies by reliability rather than page
+        position — e.g. prefer a formatted "$49.99" string over a raw
+        numeric field that might be in cents, even when the raw field
+        appears earlier in the HTML (the Amazon cents-misfire bug).
     """
     result: dict[str, Any] = {}
     for field, pattern in selectors.items():
         if not pattern:
             continue
-        match = re.search(pattern, html, re.DOTALL)
+        patterns = pattern if isinstance(pattern, list) else [pattern]
+        match = None
+        for pat in patterns:
+            if not pat:
+                continue
+            match = re.search(pat, html, re.DOTALL)
+            if match is not None:
+                break
         if match is None:
             if field in ("title", "price"):
                 # Diagnostic for required fields - include page <title>.
                 soup = BeautifulSoup(html, "html.parser")
                 page_title = soup.title.string if soup.title and soup.title.string else "(no title)"
+                shown = patterns[0] if patterns else ""
                 raise ParserError(
                     f"Regex for required field '{field}' did not match. "
-                    f"Page title: {page_title!r}. Pattern (truncated): {pattern[:120]}..."
+                    f"Page title: {page_title!r}. Pattern (truncated): {str(shown)[:120]}..."
                 )
             continue
         # Find the first non-None capture group. Fall back to group(0) if

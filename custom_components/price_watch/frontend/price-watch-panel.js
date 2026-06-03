@@ -125,6 +125,11 @@ function e(e,t,r,i){var s,o=arguments.length,a=o<3?t:null===i?i=Object.getOwnPro
             >${e.retailer??"Unknown"}</span
           >
           ${e.isPrimary?F`<span class="listings__badge">primary</span>`:K}
+          ${!1===e.shipsToUserRegion?F`<span
+                class="listings__badge listings__badge--noship"
+                title="This retailer doesn't appear to ship to your region"
+                >doesn't ship</span
+              >`:K}
         </span>
         <span class="listings__row-meta">
           ${t}
@@ -846,6 +851,10 @@ function e(e,t,r,i){var s,o=arguments.length,a=o<3?t:null===i?i=Object.getOwnPro
       white-space: nowrap;
       background: var(--primary-color, #03a9f4);
       color: var(--text-primary-color, #fff);
+    }
+    .listings__badge--noship {
+      background: rgba(244, 67, 54, 0.16);
+      color: var(--error-color, #f44336);
     }
     .listings__row-meta {
       display: inline-flex;
