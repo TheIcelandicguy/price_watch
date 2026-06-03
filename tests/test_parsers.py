@@ -123,6 +123,65 @@ def test_unknown_parser_type_raises():
         apply_custom_parser("<html/>", {"type": "telepathy", "selectors": {}})
 
 
+def test_regex_parser_priority_list_skips_cents_prefers_formatted():
+    """A list of price patterns is tried in PRIORITY order. A decimal-guarded
+    numeric pattern skips an integer-cents value (4999) so a later formatted
+    pattern wins — the Amazon cents-misfire fix.
+    """
+    html = (
+        "<title>Echo Dot</title>"
+        '<script>{"priceToPay":{"amount":4999},'
+        '"olpMessage":"1 option from $49.99"}</script>'
+    )
+    parser = {
+        "type": "regex",
+        "selectors": {
+            "title": r"<title>([^<]+)</title>",
+            "price": [
+                r'"amount"\s*:\s*([0-9]+\.[0-9]{1,2})\b',  # decimal-required: skips 4999
+                r"[$£€]\s*([0-9][0-9.,]*)",  # formatted "$49.99"
+            ],
+        },
+        "transforms": {"price": "price_clean"},
+    }
+    result = apply_custom_parser(html, parser)
+    assert result["price"] == 49.99
+
+
+def test_regex_parser_list_first_match_wins():
+    """First pattern in the list that matches wins; later ones aren't tried."""
+    html = "<title>X</title><span>A: 11.11 B: 22.22</span>"
+    parser = {
+        "type": "regex",
+        "selectors": {
+            "title": r"<title>([^<]+)</title>",
+            "price": [r"A:\s*([0-9.]+)", r"B:\s*([0-9.]+)"],
+        },
+        "transforms": {"price": "float"},
+    }
+    result = apply_custom_parser(html, parser)
+    assert result["price"] == 11.11
+
+
+def test_price_clean_simple_decimal():
+    assert _apply_transforms("$49.99", "price_clean") == 49.99
+
+
+def test_price_clean_comma_thousands():
+    # "4,999" -> comma is a thousands separator (3 trailing digits).
+    assert _apply_transforms("4,999", "price_clean") == 4999.0
+
+
+def test_price_clean_period_thousands():
+    # "$1.299" -> period is a thousands separator (3 trailing digits).
+    assert _apply_transforms("$1.299", "price_clean") == 1299.0
+
+
+def test_price_clean_euro_format():
+    # "€1.299,99" -> period thousands + comma decimal.
+    assert _apply_transforms("€1.299,99", "price_clean") == 1299.99
+
+
 def test_default_currency_and_retailer_applied():
     html = "<html><body><h1>P</h1><span class='p'>10</span></body></html>"
     parser = {
