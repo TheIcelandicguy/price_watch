@@ -232,6 +232,25 @@ def test_custom_parser_no_original_price_when_absent():
     assert "original_price" not in result
 
 
+def test_regex_parser_decodes_html_entities_in_title():
+    """Regex captures raw HTML, so character refs must be decoded (Húsa)."""
+    html = (
+        '<title>HFL ABV 45X95 - H&#xFA;sasmi&#xF0;jan</title>'
+        '<span class="p">488</span>'
+    )
+    parser = {
+        "type": "regex",
+        "selectors": {
+            "title": r"<title>([^<]+)</title>",
+            "price": r'class="p">([0-9]+)',
+        },
+        "transforms": {"price": "float"},
+    }
+    result = apply_custom_parser(html, parser)
+    assert result["title"] == "HFL ABV 45X95 - Húsasmiðjan"
+    assert result["price"] == 488
+
+
 def test_default_currency_and_retailer_applied():
     html = "<html><body><h1>P</h1><span class='p'>10</span></body></html>"
     parser = {

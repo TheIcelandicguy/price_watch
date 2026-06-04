@@ -50,6 +50,7 @@ to fill missing values from other extracted fields.
 
 from __future__ import annotations
 
+import html as _html
 import json
 import logging
 import re
@@ -283,6 +284,12 @@ def _apply_regex(html: str, selectors: dict[str, Any], transforms: dict[str, str
             pass
         if value is None:
             value = match.group(0)
+        # Regex captures raw HTML, so a title like "… - H&#xFA;sasmi&#xF0;jan"
+        # keeps its character references. Decode them (CSS/JSON-LD parsers get
+        # this for free via BeautifulSoup). Harmless on numeric fields —
+        # price strings contain no entities.
+        if isinstance(value, str):
+            value = _html.unescape(value)
         result[field] = value
 
     for field in result:
