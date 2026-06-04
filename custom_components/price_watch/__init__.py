@@ -868,6 +868,16 @@ async def _register_services(hass: HomeAssistant) -> None:
                     "variant_options must be a list or comma-separated string"
                 )
 
+        # Switch the tracked page (e.g. JYSK size picker → a sibling size's
+        # own product URL). For the primary listing this overrides the
+        # coordinator's entry.data[CONF_URL] fallback, so the product tracks
+        # the new page on the next refresh.
+        if "url" in call.data:
+            new_url = (call.data.get("url") or "").strip()
+            if not new_url:
+                raise HomeAssistantError("url cannot be empty")
+            target["url"] = new_url
+
         if "currency" in call.data:
             target["currency"] = call.data.get("currency") or ""
         if "retailer" in call.data and call.data.get("retailer"):
@@ -1017,6 +1027,7 @@ async def _register_services(hass: HomeAssistant) -> None:
             {
                 vol.Required("entry_id"): str,
                 vol.Required("listing_id"): str,
+                vol.Optional("url"): str,
                 vol.Optional("custom_parser"): vol.Any(None, str, dict),
                 vol.Optional("variant_options"): vol.Any(None, str, list),
                 vol.Optional("currency"): str,

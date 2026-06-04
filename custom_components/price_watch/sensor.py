@@ -373,11 +373,25 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
         # show "in stock at: …" without re-deriving the statuses.
         if result.store_availability:
             attrs["store_availability"] = result.store_availability
-            attrs["available_stores"] = [
-                s["store"]
+            in_stock_rows = [
+                s
                 for s in result.store_availability
                 if s.get("status") in ("in_stock", "limited")
             ]
+            attrs["available_stores"] = [s["store"] for s in in_stock_rows]
+            # JYSK marks stock that's at the Reykjavík warehouse (not the
+            # store itself) with a red asterisk. When every in-stock store is
+            # warehouse-sourced, the item can't be picked up locally without
+            # ordering it in — surface that as a single convenience flag.
+            if in_stock_rows and all(
+                s.get("from_warehouse") for s in in_stock_rows
+            ):
+                attrs["stock_from_warehouse"] = True
+
+        # Sibling size pages (JYSK "Stærðir"). The panel renders these as
+        # chips and swaps the tracked URL when the user picks another size.
+        if result.size_options:
+            attrs["size_options"] = result.size_options
 
         # Per-listing shipping signal, reusing the same heuristic that
         # decides this for AI alternatives. There's no AI guess for a

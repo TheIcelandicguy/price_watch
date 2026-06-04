@@ -283,6 +283,169 @@ def test_parse_store_availability_absent_returns_none():
     assert _parse_store_availability("<html><body>nothing here</body></html>") is None
 
 
+def _jysk_li(store, status_text="Til á lager", cls="available", star=True):
+    star_span = (
+        '<span style="font-weight: bold; margin-left: 5px; color: #d91a00;"> *</span>'
+        if star
+        else ""
+    )
+    return (
+        f'<li class="{cls}" title="{store}: {status_text} ">'
+        f'<img class="svg" alt="" src="/x.svg" />{store}{star_span}</li>'
+    )
+
+
+def test_parse_store_availability_jysk_warehouse_stars():
+    """JYSK: each store available, red asterisk → from_warehouse True."""
+    from custom_components.price_watch.extractor import _parse_store_availability
+
+    stores = ["Akureyri", "Selfoss", "Skeifan", "Grandi"]
+    html = (
+        '<div class="rfl-single-product__availability">'
+        '<ul class="availability-list">'
+        + "".join(_jysk_li(s) for s in stores)
+        + "</ul></div>"
+    )
+    res = _parse_store_availability(html)
+    assert res is not None
+    assert len(res) == 4
+    by_store = {r["store"]: r for r in res}
+    assert by_store["Akureyri"]["status"] == "in_stock"
+    assert by_store["Akureyri"]["from_warehouse"] is True
+    assert all(r["from_warehouse"] for r in res)
+
+
+def test_parse_store_availability_jysk_no_star_is_local():
+    """A store with NO red asterisk has the stock locally (from_warehouse False)."""
+    from custom_components.price_watch.extractor import _parse_store_availability
+
+    html = (
+        '<ul class="availability-list">'
+        + _jysk_li("Skeifan", star=False)
+        + "</ul>"
+    )
+    res = _parse_store_availability(html)
+    assert res == [
+        {"store": "Skeifan", "status": "in_stock", "from_warehouse": False}
+    ]
+
+
+def test_parse_store_availability_jysk_sold_out():
+    """An 'unavailable' / Uppselt store maps to sold_out."""
+    from custom_components.price_watch.extractor import _parse_store_availability
+
+    html = (
+        '<ul class="availability-list">'
+        + _jysk_li("Akureyri", status_text="Til á lager", cls="available")
+        + _jysk_li("Selfoss", status_text="Uppselt", cls="unavailable", star=False)
+        + "</ul>"
+    )
+    res = _parse_store_availability(html)
+    by_store = {r["store"]: r["status"] for r in res}
+    assert by_store["Akureyri"] == "in_stock"
+    assert by_store["Selfoss"] == "sold_out"
+
+
+def test_parse_jysk_original_price_on_sale():
+    from custom_components.price_watch.extractor import _parse_jysk_original_price
+
+    html = (
+        '<div class="product-price-container">'
+        '<div class="discount-container"><div class="sticker discount-sticker">'
+        '<span class="sticker-text">20%</span></div></div>'
+        '<p><span class="product-price__price red-text"><strong>79.990 kr.</strong></span>'
+        '<br><span class="product-price__offer-price"><strike>99.990 kr.</strike></span></p>'
+        '</div>'
+    )
+    assert _parse_jysk_original_price(html) == 99990.0
+
+
+def test_parse_jysk_original_price_not_on_sale_returns_none():
+    from custom_components.price_watch.extractor import _parse_jysk_original_price
+
+    html = '<span class="product-price__price"><strong>79.990 kr.</strong></span>'
+    assert _parse_jysk_original_price(html) is None
+
+
+def test_parse_jysk_sizes_resolves_urls_and_selected():
+    from custom_components.price_watch.extractor import _parse_jysk_sizes
+
+    html = (
+        '<div class="size-options-container"><label>Stærðir</label>'
+        '<div class="size-options">'
+        '<div href="/stok-vara/NORDMARKA-solhysi-3x3x2-78-m-gratt" '
+        'class="size-option-item selected">300x300</div>'
+        '<div href="/stok-vara/NORDMARKA-solhysi-3x4x2-78-m-gratt" '
+        'class="size-option-item">300x400</div>'
+        '</div></div>'
+    )
+    res = _parse_jysk_sizes(html, "https://jysk.is/stok-vara/NORDMARKA-solhysi-3x3x2-78-m-gratt/?PathId=abc")
+    assert res == [
+        {
+            "label": "300x300",
+            "url": "https://jysk.is/stok-vara/NORDMARKA-solhysi-3x3x2-78-m-gratt",
+            "selected": True,
+        },
+        {
+            "label": "300x400",
+            "url": "https://jysk.is/stok-vara/NORDMARKA-solhysi-3x4x2-78-m-gratt",
+            "selected": False,
+        },
+    ]
+
+
+def test_parse_jysk_sizes_single_size_returns_none():
+    """A lone size isn't a picker."""
+    from custom_components.price_watch.extractor import _parse_jysk_sizes
+
+    html = (
+        '<div class="size-options">'
+        '<div href="/x" class="size-option-item selected">300x300</div></div>'
+    )
+    assert _parse_jysk_sizes(html, "https://jysk.is/x") is None
+
+
+def test_parse_jysk_sizes_absent_returns_none():
+    from custom_components.price_watch.extractor import _parse_jysk_sizes
+
+    assert _parse_jysk_sizes("<html><body>nope</body></html>", "https://jysk.is") is None
+
+
+@pytest.mark.asyncio
+async def test_extract_product_jysk_jsonld_with_store_availability(monkeypatch):
+    """End-to-end: a JYSK page (JSON-LD price + availability-list) yields the
+    price AND per-store availability with the warehouse flag, no AI needed."""
+    page = (
+        "<html><head>"
+        '<script type="application/ld+json">'
+        '{"@type":"Product","name":"NORDMARKA solhysi",'
+        '"offers":[{"@type":"Offer","price":"79990","priceCurrency":"ISK",'
+        '"availability":"in stock"}]}'
+        "</script></head><body>"
+        '<ul class="availability-list">'
+        + _jysk_li("Akureyri") + _jysk_li("Grandi") +
+        "</ul></body></html>"
+    )
+
+    async def fake_fetch_html(url, session=None, cookies=None):
+        return page
+
+    monkeypatch.setattr(extractor_mod, "fetch_html", fake_fetch_html)
+
+    result = await extract_product(
+        url="https://jysk.is/stok-vara/NORDMARKA",
+        session=None,
+        ai_provider=None,
+    )
+    assert result.method == "jsonld"
+    assert result.price == 79990.0
+    assert result.currency == "ISK"
+    assert result.store_availability is not None
+    assert len(result.store_availability) == 2
+    assert all(s["from_warehouse"] for s in result.store_availability)
+    assert result.in_stock is True
+
+
 # --- cookies-only parser must fetch WITH cookies, then use JSON-LD ---
 # Regression: a parser carrying only request_cookies (no selectors) used to be
 # forced down the CSS path, which raised "did not extract a title" and — with

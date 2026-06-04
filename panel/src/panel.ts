@@ -333,6 +333,10 @@ export class PriceWatchPanel extends LitElement {
   // Hosts with an exclude_domain call currently in flight (disables that
   // row's "Exclude site" button and shows a spinner label).
   @state() private _excludingHosts: Set<string> = new Set();
+  // Hosts excluded this session via an alternative row's "⊘" button. Passed
+  // to each card so its alternatives from these hosts hide immediately, until
+  // the next find_alternatives drops them server-side.
+  @state() private _hiddenAltHosts: Set<string> = new Set();
   // When true, Free-mode results flagged as non-stores (GitHub, YouTube,
   // wiki, docs/forums) are hidden from the list. Persisted to localStorage.
   // Only affects rows with likely_non_shop===true (Free mode only); AI
@@ -1009,6 +1013,45 @@ export class PriceWatchPanel extends LitElement {
     this._varGroups = null;
     this._varCombos = [];
     this._varSelection = [];
+  };
+
+  /**
+   * JYSK size chip → switch the tracked page. Each size is its own product
+   * URL, so we point the PRIMARY listing at the chosen size's URL via
+   * edit_listing; the coordinator then tracks that size on the next refresh.
+   */
+  private _handleChangeSize = async (
+    product: TrackedProduct,
+    url: string,
+    label: string
+  ): Promise<void> => {
+    if (!this._conn) return;
+    const primary = product.listings.find((l) => l.isPrimary);
+    const listingId = primary?.listingId;
+    if (!listingId) {
+      window.alert("Could not resolve the primary listing to switch size.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Track the ${label} size instead?\n\nThis product will follow that size's own page — its price, stock and discount.`
+      )
+    )
+      return;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "edit_listing",
+        service_data: { entry_id: product.entryId, listing_id: listingId, url },
+      } as never);
+    } catch (err) {
+      window.alert(
+        `Could not switch size: ${
+          (err as { message?: string })?.message ?? "unknown error"
+        }`
+      );
+    }
   };
 
   private _onVariantBackdropClick = (e: Event): void => {
@@ -2110,6 +2153,34 @@ export class PriceWatchPanel extends LitElement {
     }
   };
 
+  /**
+   * Add an alternative's site to the global excluded-domains blocklist via
+   * price_watch/exclude_domain, then hide that host's alternatives on every
+   * card immediately. The blocklist is honored server-side on the next
+   * find_alternatives / search, so the site won't return.
+   */
+  private _handleExcludeAlternative = async (
+    _product: TrackedProduct,
+    alt: Alternative
+  ): Promise<void> => {
+    if (!this._conn) return;
+    const host = this._hostOf(alt.url ?? "");
+    if (!host) return;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "price_watch/exclude_domain",
+        domain: host,
+      });
+      this._hiddenAltHosts = new Set(this._hiddenAltHosts).add(host);
+    } catch (err) {
+      window.alert(
+        `Could not exclude ${host}: ${
+          (err as { message?: string })?.message ?? "unknown error"
+        }`
+      );
+    }
+  };
+
   private _renderTrackForm() {
     const r = this._trackTarget;
     return html`
@@ -2593,6 +2664,9 @@ export class PriceWatchPanel extends LitElement {
               .onEditListing=${this._handleEditListing}
               .onEditVariant=${this._handleEditVariant}
               .onAlert=${this._handleAlert}
+              .onChangeSize=${this._handleChangeSize}
+              .onExcludeAlternative=${this._handleExcludeAlternative}
+              .excludedAltHosts=${this._hiddenAltHosts}
             ></price-watch-card>
           `
         )}

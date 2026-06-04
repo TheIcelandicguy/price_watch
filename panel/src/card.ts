@@ -57,6 +57,17 @@ export class PriceWatchCard extends LitElement {
   // disabled state instead of the add button.
   @property({ attribute: false })
   onAddListing?: (product: TrackedProduct, alt: Alternative) => void;
+  // Optional callback fired when the user clicks "Exclude site" on an
+  // alternative row. The panel owner adds the alternative's host to the
+  // global excluded-domains blocklist (price_watch/exclude_domain) so it
+  // stops showing up in future searches/alternatives.
+  @property({ attribute: false })
+  onExcludeAlternative?: (product: TrackedProduct, alt: Alternative) => void;
+  // Hosts the user just excluded (this session) — alternatives from these
+  // hosts are hidden immediately, before the next alternatives refetch drops
+  // them server-side. Normalized to bare lowercase host (no leading www.).
+  @property({ attribute: false })
+  excludedAltHosts?: Set<string>;
   // Optional callback fired when the user clicks the ✎ (edit) button on a
   // listing row. The panel owner opens the advanced price-selector editor
   // for that listing — capture a CSS selector via F12 / the bookmarklet,
@@ -94,6 +105,11 @@ export class PriceWatchCard extends LitElement {
   // (notify when back in stock / target hit / price drop).
   @property({ attribute: false })
   onAlert?: (product: TrackedProduct) => void;
+  // Optional callback fired when the user picks a different JYSK size chip.
+  // The panel owner switches the tracked listing's URL (edit_listing) so the
+  // product follows that size's own page.
+  @property({ attribute: false })
+  onChangeSize?: (product: TrackedProduct, url: string, label: string) => void;
 
   /**
    * The currency we show next to the headline price. Prefer the local
@@ -308,9 +324,16 @@ export class PriceWatchCard extends LitElement {
     // dropped; unknown shipping (null) is always kept. hiddenCount drives
     // a small note so the user knows the list was trimmed (and isn't
     // confused by a shorter count than they expected).
-    const visibleAlts = this.hideNonShipping
+    const shipFiltered = this.hideNonShipping
       ? product.alternatives.filter((a) => a.shipsToUserRegion !== false)
       : product.alternatives;
+    // Also drop rows from hosts the user just excluded, so the row vanishes
+    // immediately on click (the backend filters them on the next refetch).
+    const excluded = this.excludedAltHosts;
+    const visibleAlts =
+      excluded && excluded.size > 0
+        ? shipFiltered.filter((a) => !excluded.has(this.altHost(a.url)))
+        : shipFiltered;
     const hiddenCount = product.alternatives.length - visibleAlts.length;
     const hasAny = visibleAlts.length > 0;
 
@@ -397,6 +420,15 @@ export class PriceWatchCard extends LitElement {
     return urls;
   }
 
+  /** Bare lowercase host of a URL (no leading www.), or "" if unparseable. */
+  private altHost(url: string | null | undefined): string {
+    try {
+      return new URL(url ?? "").hostname.replace(/^www\./i, "").toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+
   private renderAlternative(alt: Alternative) {
     const { product } = this;
     let delta: number | null = null;
@@ -462,8 +494,37 @@ export class PriceWatchCard extends LitElement {
                 +
               </button>`
           : nothing}
+        ${this.onExcludeAlternative
+          ? html`<button
+              class="alts__exclude"
+              type="button"
+              @click=${(e: Event) => this.handleExcludeAlternative(e, alt)}
+              aria-label=${`Exclude ${this.altHost(alt.url) || "this site"} from future results`}
+              title=${`Exclude ${this.altHost(alt.url) || "this site"} from searches`}
+            >
+              ⊘
+            </button>`
+          : nothing}
       </li>
     `;
+  }
+
+  /**
+   * Click handler for an alternative row's "⊘" button. Stops propagation,
+   * confirms, and delegates to onExcludeAlternative, which adds the site's
+   * host to the global excluded-domains blocklist.
+   */
+  private handleExcludeAlternative(event: Event, alt: Alternative): void {
+    event.stopPropagation();
+    event.preventDefault();
+    const host = this.altHost(alt.url);
+    if (
+      !window.confirm(
+        `Exclude ${host || "this site"} from all future searches and alternatives?`
+      )
+    )
+      return;
+    this.onExcludeAlternative?.(this.product, alt);
   }
 
   /**
@@ -490,30 +551,90 @@ export class PriceWatchCard extends LitElement {
   };
 
   /**
-   * Per-physical-store stock line (retailers like Húsa that expose it).
-   * Shows "In stock at N/M: store, store…" in green, or "Sold out at all
-   * M stores" in red. Hidden when the retailer has no per-store data.
+   * Per-physical-store stock (retailers like Húsa / JYSK that expose it),
+   * rendered as a collapsible <details>: a one-line summary ("In stock · N
+   * stores · from Reykjavík") that expands to the per-store list. Native
+   * <details> keeps the open/closed state in the DOM, so the card stays
+   * stateless. Hidden when the retailer has no per-store data.
+   *
+   * JYSK marks stock that's at the central Reykjavík warehouse (not on the
+   * store's own shelf) with a red asterisk; we mirror that with a "*" per
+   * store and a "from Reykjavík" tag so "in stock at Akureyri" isn't misread
+   * as local pickup.
    */
   private renderStoreAvailability() {
     const sa = this.product.storeAvailability;
     if (!sa || sa.length === 0) return nothing;
+
     const total = new Set(sa.map((s) => s.store)).size;
-    const inStock = this.product.availableStores ?? [];
-    if (inStock.length === 0) {
-      return html`<div class="stores stores--out" title="Sold out at every store">
-        <ha-icon icon="mdi:store-off-outline"></ha-icon>
-        <span>Sold out at all ${total} stores</span>
-      </div>`;
-    }
-    return html`<div
-      class="stores stores--in"
-      title=${`In stock at: ${inStock.join(", ")}`}
+    const inStockCount = this.product.availableStores?.length ?? 0;
+    const soldOutAll = inStockCount === 0;
+    const warehouse = this.product.stockFromWarehouse;
+
+    const countLabel =
+      !soldOutAll && inStockCount < total
+        ? `${inStockCount}/${total} stores`
+        : `${total} ${total === 1 ? "store" : "stores"}`;
+    const summary = soldOutAll
+      ? `Sold out · ${countLabel}`
+      : `In stock · ${countLabel}${warehouse ? " · from Reykjavík" : ""}`;
+
+    const chips = sa.map((s) => {
+      const out = s.status === "sold_out";
+      return html`<span
+        class=${out ? "stores-d__store stores-d__store--out" : "stores-d__store"}
+        >${s.store}${s.fromWarehouse
+          ? html`<span class="stores-d__star" title="At the Reykjavík warehouse">*</span>`
+          : nothing}</span
+      >`;
+    });
+
+    return html`<details
+      class=${soldOutAll ? "stores-d stores-d--out" : "stores-d stores-d--in"}
     >
-      <ha-icon icon="mdi:store-check-outline"></ha-icon>
-      <span
-        ><strong>${inStock.length}/${total}</strong> stores:
-        ${inStock.join(", ")}</span
-      >
+      <summary class="stores-d__summary">
+        <ha-icon
+          icon=${soldOutAll ? "mdi:store-off-outline" : "mdi:store-check-outline"}
+        ></ha-icon>
+        <span class="stores-d__label">${summary}</span>
+      </summary>
+      <div class="stores-d__list">${chips}</div>
+      ${warehouse
+        ? html`<div class="stores-d__hint">
+            * stock is at the Reykjavík warehouse — stores outside the capital
+            may need to order it in.
+          </div>`
+        : nothing}
+    </details>`;
+  }
+
+  /**
+   * JYSK "Stærðir" size picker: a chip per sibling size. The current size is
+   * highlighted and inert; picking another fires onChangeSize, which swaps
+   * the tracked listing's URL to that size's own page. Hidden when the
+   * retailer exposes no size options.
+   */
+  private renderSizeOptions() {
+    const sizes = this.product.sizeOptions;
+    if (!sizes || sizes.length < 2 || !this.onChangeSize) return nothing;
+    return html`<div class="sizes">
+      <span class="sizes__label">Stærðir</span>
+      <div class="sizes__chips">
+        ${sizes.map((s) =>
+          s.selected
+            ? html`<span class="sizes__chip sizes__chip--on" aria-current="true"
+                >${s.label}</span
+              >`
+            : html`<button
+                type="button"
+                class="sizes__chip"
+                title=${`Track the ${s.label} size instead`}
+                @click=${() => this.onChangeSize?.(this.product, s.url, s.label)}
+              >
+                ${s.label}
+              </button>`
+        )}
+      </div>
     </div>`;
   }
 
@@ -888,25 +1009,41 @@ export class PriceWatchCard extends LitElement {
     this.onOpen?.(this.product);
   }
 
+  private handleKeydown(event: KeyboardEvent) {
+    // Keyboard activation for the focusable open targets (image + header).
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      this.onOpen?.(this.product);
+    }
+  }
+
   render() {
     const { product } = this;
     const { value, currency } = this.headlinePrice;
     const sub = this.sourcePriceLine;
 
+    // Only the image and the header (title + status chips, above the price)
+    // open the product. The rest of the card holds its own interactive bits
+    // (collapsible stores, listing buttons, actions), so a card-wide click
+    // target would swallow those and fire opens by accident.
     return html`
-      <article
-        class="card ${product.discontinued ? "card--faded" : ""}"
-        @click=${this.handleClick}
-        tabindex="0"
-        role="button"
-        aria-label=${`Open ${product.title}`}
-      >
-        ${this.renderImage()}
-        <div class="body">
+      <article class="card ${product.discontinued ? "card--faded" : ""}">
+        <div
+          class="card__open"
+          @click=${this.handleClick}
+          @keydown=${this.handleKeydown}
+          tabindex="0"
+          role="button"
+          aria-label=${`Open ${product.title}`}
+        >
+          ${this.renderImage()}
           <header class="header">
             <h3 class="title">${product.title}</h3>
             ${this.renderStatusChips()}
           </header>
+        </div>
+        <div class="body">
+          ${this.renderSizeOptions()}
 
           <div class="price-block">
             <div class="price">${formatPrice(value, currency)}</div>
@@ -976,15 +1113,28 @@ export class PriceWatchCard extends LitElement {
       border-radius: var(--ha-card-border-radius, 12px);
       box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.08));
       overflow: hidden;
-      cursor: pointer;
       transition: transform 120ms ease, box-shadow 120ms ease;
       color: var(--primary-text-color, #212121);
     }
-    .card:hover,
-    .card:focus-visible {
+    /* Only the image + header open the product; the lift/affordance follows
+       that region, not the whole card. */
+    .card:has(.card__open:hover),
+    .card:focus-within {
       transform: translateY(-2px);
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    }
+    .card__open {
+      cursor: pointer;
       outline: none;
+    }
+    .card__open:focus-visible {
+      outline: 2px solid var(--primary-color, #03a9f4);
+      outline-offset: -2px;
+    }
+    .card__open:hover .title {
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
     }
     .card--faded {
       opacity: 0.65;
@@ -1020,6 +1170,9 @@ export class PriceWatchCard extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      /* The header now lives in .card__open (outside .body), so it carries
+         its own padding to sit flush under the full-bleed image. */
+      padding: 14px 16px 0;
     }
     .title {
       margin: 0;
@@ -1166,28 +1319,116 @@ export class PriceWatchCard extends LitElement {
       color: var(--error-color, #f44336);
     }
     /* Per-store availability line */
-    .stores {
+    /* JYSK size picker chips */
+    .sizes {
       display: flex;
       align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+    }
+    .sizes__label {
+      color: var(--secondary-text-color, #9e9e9e);
+      flex: 0 0 auto;
+    }
+    .sizes__chips {
+      display: flex;
+      flex-wrap: wrap;
       gap: 6px;
+    }
+    .sizes__chip {
+      font: inherit;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      background: transparent;
+      color: var(--primary-text-color, #212121);
+      cursor: pointer;
+      transition: border-color 0.12s ease, background 0.12s ease;
+    }
+    .sizes__chip:hover {
+      border-color: var(--primary-color, #03a9f4);
+      background: var(--secondary-background-color, #f5f5f5);
+    }
+    .sizes__chip--on {
+      cursor: default;
+      border-color: var(--primary-color, #03a9f4);
+      background: var(--primary-color, #03a9f4);
+      color: var(--text-primary-color, #fff);
+      font-weight: 600;
+    }
+
+    /* Collapsible per-store availability (Húsa / JYSK) */
+    .stores-d {
       font-size: 0.8rem;
       margin-top: 4px;
       min-width: 0;
     }
-    .stores ha-icon {
+    .stores-d__summary {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .stores-d__summary::-webkit-details-marker {
+      display: none;
+    }
+    .stores-d__summary ha-icon {
       --mdc-icon-size: 18px;
       flex: 0 0 auto;
     }
-    .stores span {
+    .stores-d__label {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .stores--in {
+    /* disclosure chevron, pushed to the right; flips when open */
+    .stores-d__summary::after {
+      content: "";
+      flex: 0 0 auto;
+      margin-left: auto;
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid currentColor;
+      opacity: 0.55;
+      transition: transform 0.15s ease;
+    }
+    .stores-d[open] .stores-d__summary::after {
+      transform: rotate(180deg);
+    }
+    .stores-d--in .stores-d__summary {
       color: var(--success-color, #4caf50);
     }
-    .stores--out {
+    .stores-d--out .stores-d__summary {
       color: var(--error-color, #f44336);
+    }
+    .stores-d__list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      margin: 6px 0 0 24px;
+      color: var(--primary-text-color);
+    }
+    .stores-d__store {
+      white-space: nowrap;
+    }
+    .stores-d__store--out {
+      color: var(--secondary-text-color, #9e9e9e);
+      text-decoration: line-through;
+    }
+    .stores-d__star {
+      color: #d91a00;
+      font-weight: bold;
+      margin-left: 1px;
+    }
+    .stores-d__hint {
+      margin: 4px 0 0 24px;
+      font-size: 0.72rem;
+      color: var(--secondary-text-color, #9e9e9e);
     }
 
     /* Price-movement indicator: red ↑ for an increase, green ↓ for
@@ -1393,6 +1634,33 @@ export class PriceWatchCard extends LitElement {
     .alts__add--done:hover {
       background: transparent;
       border-color: transparent;
+    }
+    /* "Exclude site" button — red accent, mirrors .alts__add layout */
+    .alts__exclude {
+      flex: 0 0 auto;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--secondary-text-color, #757575);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+    .alts__exclude:hover {
+      color: var(--error-color, #c62828);
+      background: rgba(198, 40, 40, 0.08);
+      border-color: rgba(198, 40, 40, 0.25);
+    }
+    .alts__exclude:focus-visible {
+      outline: 2px solid var(--error-color, #c62828);
+      outline-offset: 1px;
     }
     .alts__link:hover {
       background: var(--secondary-background-color, #f5f5f5);

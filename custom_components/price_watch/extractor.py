@@ -28,6 +28,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup, Comment
@@ -139,6 +140,10 @@ class ExtractionResult:
     # {"store": name, "status": "in_stock"|"limited"|"sold_out"}. None when
     # the page has no such breakdown.
     store_availability: list[dict[str, Any]] | None = None
+    # Sibling size/variant pages, when the retailer lists them as separate
+    # product URLs (e.g. JYSK's "Stærðir" 300x300 / 300x400). List of
+    # {"label", "url", "selected"}. None when the page has no size picker.
+    size_options: list[dict[str, Any]] | None = None
     raw: dict[str, Any] = field(default_factory=dict)
     # Set True when the AI determines the product has been permanently
     # removed from the retailer's catalog. When True:
@@ -253,21 +258,45 @@ def find_meta_image(html: str) -> str | None:
 
 
 def _parse_store_availability(html: str) -> list[dict[str, Any]] | None:
-    """Parse per-physical-store stock from a Húsa-style availability block.
+    """Parse per-physical-store stock from a retailer's availability block.
 
-    Húsasmiðjan renders a ``product-availability-section`` with one row per
-    stock status — Til á lager (in stock) / Fá eintök (a few left) / Uppselt
-    (sold out) — each listing the stores in that state. Returns a flat list
-    of ``{"store": name, "status": "in_stock"|"limited"|"sold_out"}``, or
-    None when the page has no such section (i.e. every other site). The
-    string fast-path keeps bs4 off the hot path for non-Húsa pages.
+    Supports two Icelandic layouts (dispatched by a cheap string fast-path
+    so bs4 stays off the hot path for every other site):
+
+    - **Húsasmiðjan** — a ``product-availability-section`` with one row per
+      stock status (Til á lager / Fá eintök / Uppselt), each row listing the
+      stores in that state.
+    - **JYSK / Rúmfatalagerinn** — an ``availability-list`` <ul> with one
+      <li> per store, the store's status in the <li> ``title`` + class, and a
+      red asterisk (``<span style="…#d91a00">*</span>``) marking stock that
+      actually sits at the central Reykjavík warehouse rather than in that
+      store (so a non-capital store would have to order it in).
+
+    Returns a flat list of ``{"store", "status"}`` dicts — JYSK rows also
+    carry ``"from_warehouse": bool`` — or None when the page has neither
+    block. ``status`` is one of ``in_stock`` / ``limited`` / ``sold_out``.
     """
-    if "product-availability-section" not in html:
+    has_husa = "product-availability-section" in html
+    has_jysk = "availability-list" in html
+    if not has_husa and not has_jysk:
         return None
     soup = BeautifulSoup(html, "html.parser")
+    if has_husa:
+        out = _parse_husa_availability(soup)
+        if out:
+            return out
+    if has_jysk:
+        out = _parse_jysk_availability(soup)
+        if out:
+            return out
+    return None
+
+
+def _parse_husa_availability(soup: BeautifulSoup) -> list[dict[str, Any]]:
+    """Húsasmiðjan: one ``row`` per status, each listing its stores."""
     section = soup.find(class_="product-availability-section")
     if section is None:
-        return None
+        return []
     out: list[dict[str, Any]] = []
     for row in section.find_all(class_="row"):
         label = row.find(class_="availability-label")
@@ -289,7 +318,113 @@ def _parse_store_availability(html: str) -> list[dict[str, Any]] | None:
             if name and name not in seen:
                 seen.add(name)
                 out.append({"store": name, "status": status})
-    return out or None
+    return out
+
+
+def _parse_jysk_availability(soup: BeautifulSoup) -> list[dict[str, Any]]:
+    """JYSK: one ``<li>`` per store; red ``*`` = central-warehouse stock.
+
+    The store name + Icelandic status text live in the ``<li title>``
+    ("Akureyri: Til á lager"); the ``<li>`` class echoes it (``available`` /
+    ``unavailable``). A bold red asterisk span flags stock that's at the
+    Reykjavík warehouse rather than physically in that store.
+    """
+    ul = soup.find(class_="availability-list")
+    if ul is None:
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for li in ul.find_all("li"):
+        classes = " ".join(li.get("class") or []).lower()
+        title = (li.get("title") or "").strip()
+        if ":" in title:
+            name, status_text = (p.strip() for p in title.split(":", 1))
+        else:
+            # No title — fall back to the visible text minus the asterisk.
+            name, status_text = li.get_text(strip=True).rstrip("* ").strip(), ""
+        status_text = status_text.lower()
+        # "unavailable" contains "available", so test the negative first.
+        if "uppselt" in status_text or "unavailable" in classes:
+            status = "sold_out"
+        elif "eint" in status_text:  # "fá eintök" — a few left
+            status = "limited"
+        elif "lager" in status_text or "available" in classes:
+            status = "in_stock"
+        else:
+            continue
+        # Bold red asterisk = item lives at the Reykjavík warehouse.
+        from_warehouse = any(
+            "*" in span.get_text()
+            and "d91a00" in (span.get("style") or "").lower().replace(" ", "")
+            for span in li.find_all("span")
+        )
+        if name and name not in seen:
+            seen.add(name)
+            out.append(
+                {"store": name, "status": status, "from_warehouse": from_warehouse}
+            )
+    return out
+
+
+def _parse_jysk_original_price(html: str) -> float | None:
+    """JYSK 'was' price — the strike-through offer price shown when on sale.
+
+    On a discounted JYSK product the price box renders the current price in
+    red and the pre-sale price struck through in
+    ``product-price__offer-price`` ("99.990 kr."), alongside a percentage
+    sticker. The page's JSON-LD only carries the current price, so we read
+    the strike-through value here to drive the card's sale badge. Returns the
+    original price (ISK, dot = thousands separator) or None when not on sale.
+    """
+    if "product-price__offer-price" not in html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    el = soup.find(class_="product-price__offer-price")
+    if el is None:
+        return None
+    digits = re.sub(r"[^\d]", "", el.get_text(strip=True))
+    if not digits:
+        return None
+    try:
+        return float(digits)
+    except ValueError:
+        return None
+
+
+def _parse_jysk_sizes(html: str, base_url: str | None) -> list[dict[str, Any]] | None:
+    """JYSK 'Stærðir' size options — each a SEPARATE product page.
+
+    JYSK renders sibling sizes (300x300, 300x400, …) as
+    ``size-option-item`` elements, each linking to that size's own product
+    URL, with the current size carrying a ``selected`` class. Unlike an
+    on-page variant (Byko/Wix), switching size means tracking a different
+    page — so we surface ``{label, url, selected}`` and the panel swaps the
+    tracked listing's URL.
+
+    Relative hrefs are resolved against ``base_url``. Returns None when the
+    page has no size picker or only a single size (nothing to switch to).
+    """
+    if "size-option-item" not in html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    container = soup.find(class_="size-options")
+    if container is None:
+        return None
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in container.find_all(class_="size-option-item"):
+        label = item.get_text(strip=True)
+        href = (item.get("href") or "").strip()
+        if not label or not href or label in seen:
+            continue
+        seen.add(label)
+        url = urljoin(base_url, href) if base_url else href
+        classes = " ".join(item.get("class") or [])
+        out.append(
+            {"label": label, "url": url, "selected": "selected" in classes.split()}
+        )
+    # A lone size isn't a picker — nothing to switch to.
+    return out if len(out) > 1 else None
 
 
 def _ci_get(d: dict[str, Any], key: str) -> Any:
@@ -1359,15 +1494,34 @@ async def extract_product(
         if stock_count is None:
             stock_count = guess_stock_count(html)
         image_url = jsonld.get("image_url") or find_meta_image(html)
+        # Per-store stock (JYSK / Húsa). When present it's the most
+        # authoritative in-stock signal — in stock only if SOME store has it.
+        store_avail = _parse_store_availability(html)
+        in_stock_val = jsonld.get("in_stock", True)
+        if store_avail:
+            in_stock_val = any(
+                s["status"] in ("in_stock", "limited") for s in store_avail
+            )
+        # Sale 'was' price (JYSK strikethrough). JSON-LD only has the current
+        # price; the sensor turns a higher original_price into the sale badge.
+        original_price = jsonld.get("original_price") or _parse_jysk_original_price(
+            html
+        )
+        # Sibling size pages (JYSK "Stærðir") — the panel uses these to swap
+        # the tracked URL between sizes.
+        size_options = _parse_jysk_sizes(html, url)
         return ExtractionResult(
             title=jsonld["title"],
             price=jsonld["price"],
             currency=jsonld.get("currency", ""),
-            in_stock=jsonld.get("in_stock", True),
+            in_stock=in_stock_val,
             stock_count=stock_count,
             image_url=image_url,
             sku=jsonld.get("sku"),
             retailer=jsonld.get("retailer"),
+            original_price=original_price,
+            store_availability=store_avail,
+            size_options=size_options,
             content_hash=content_hash,
             cost_usd=0.0,
             method="jsonld",

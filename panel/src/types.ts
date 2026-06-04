@@ -191,11 +191,20 @@ export interface TrackedProduct {
   onSale: boolean;
   originalPrice: number | null;
   discountPercent: number | null;
-  // Per-physical-store stock, when the retailer exposes it (Húsa). Full list
-  // plus a convenience list of stores that actually have it. null when not
-  // applicable.
-  storeAvailability: { store: string; status: string }[] | null;
+  // Per-physical-store stock, when the retailer exposes it (Húsa / JYSK).
+  // Full list plus a convenience list of stores that actually have it. null
+  // when not applicable. JYSK rows carry `fromWarehouse` (red-asterisk stock
+  // that's at the Reykjavík warehouse, not physically in that store).
+  storeAvailability:
+    | { store: string; status: string; fromWarehouse?: boolean }[]
+    | null;
   availableStores: string[] | null;
+  // True when every in-stock store is warehouse-sourced (JYSK) — the item
+  // can't be picked up locally without ordering it in.
+  stockFromWarehouse: boolean;
+  // Sibling size pages (JYSK "Stærðir"), each its own product URL. The
+  // current size is `selected`. null when the retailer has no size picker.
+  sizeOptions: { label: string; url: string; selected: boolean }[] | null;
   // Whether polling is currently paused for this product (set via the
   // options flow or the price_watch.set_paused service). Surfaced on the
   // price sensor's attributes so the panel can render the inline pause

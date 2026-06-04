@@ -433,10 +433,26 @@ export function buildProducts(
           ? attrs.discount_percent
           : null,
       storeAvailability: Array.isArray(attrs.store_availability)
-        ? (attrs.store_availability as { store: string; status: string }[])
+        ? (attrs.store_availability as {
+            store: string;
+            status: string;
+            from_warehouse?: boolean;
+          }[]).map((s) => ({
+            store: s.store,
+            status: s.status,
+            fromWarehouse: s.from_warehouse === true,
+          }))
         : null,
       availableStores: Array.isArray(attrs.available_stores)
         ? (attrs.available_stores as string[])
+        : null,
+      stockFromWarehouse: attrs.stock_from_warehouse === true,
+      sizeOptions: Array.isArray(attrs.size_options)
+        ? (attrs.size_options as {
+            label: string;
+            url: string;
+            selected: boolean;
+          }[])
         : null,
       paused: attrs.paused === true,
 
