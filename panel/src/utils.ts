@@ -425,6 +425,13 @@ export function buildProducts(
       targetDiff: null,
       targetPrice:
         typeof attrs.target_price === "number" ? attrs.target_price : null,
+      onSale: attrs.on_sale === true,
+      originalPrice:
+        typeof attrs.original_price === "number" ? attrs.original_price : null,
+      discountPercent:
+        typeof attrs.discount_percent === "number"
+          ? attrs.discount_percent
+          : null,
       paused: attrs.paused === true,
 
       inStock: null,

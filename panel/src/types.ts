@@ -185,6 +185,12 @@ export interface TrackedProduct {
   highest: number | null;
   targetDiff: number | null;
   targetPrice: number | null;
+  // On-sale signals from the price sensor. onSale true when the retailer
+  // shows a struck-through "was" price above the current one; originalPrice
+  // is that was-price and discountPercent is the rounded % off.
+  onSale: boolean;
+  originalPrice: number | null;
+  discountPercent: number | null;
   // Whether polling is currently paused for this product (set via the
   // options flow or the price_watch.set_paused service). Surfaced on the
   // price sensor's attributes so the panel can render the inline pause

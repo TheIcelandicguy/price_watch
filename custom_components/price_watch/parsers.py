@@ -384,6 +384,23 @@ def apply_custom_parser(body: str, parser: dict[str, Any]) -> dict[str, Any]:
         except ValueError as err:
             raise ParserError(f"Could not coerce price to float: {data['price']}") from err
 
+    # Optional original ("was") price for on-sale items. Unlike price it's
+    # never required — a parser that doesn't extract it (or a product that
+    # isn't on sale) simply leaves it absent. Coerce when present; drop it
+    # rather than fail if it's junk or not above the current price (a
+    # "was-price" at or below the sale price isn't a real discount).
+    if data.get("original_price") not in (None, ""):
+        ov = data["original_price"]
+        if not isinstance(ov, (int, float)):
+            try:
+                ov = float(str(ov).replace(",", "."))
+            except ValueError:
+                ov = None
+        if ov is not None and ov > float(data["price"]):
+            data["original_price"] = ov
+        else:
+            data.pop("original_price", None)
+
     # Optional sanity bound: parsers can declare a min_price (and/or
     # max_price) to reject obviously-wrong matches. When the regex
     # pattern picks up a sponsored-ad price or a per-unit field

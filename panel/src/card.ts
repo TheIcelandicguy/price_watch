@@ -883,6 +883,20 @@ export class PriceWatchCard extends LitElement {
           <div class="price-block">
             <div class="price">${formatPrice(value, currency)}</div>
             ${
+              product.onSale && product.originalPrice != null
+                ? html`<div class="price-sale">
+                    <span class="price-was"
+                      >${formatPrice(product.originalPrice, currency)}</span
+                    >
+                    ${product.discountPercent != null
+                      ? html`<span class="price-off"
+                          >−${product.discountPercent}%</span
+                        >`
+                      : nothing}
+                  </div>`
+                : nothing
+            }
+            ${
               // Delta placement depends on whether we're showing a
               // separate source-currency line. With FX (sub != nothing),
               // the delta goes inside .price-sub so it sits next to the
@@ -1102,6 +1116,25 @@ export class PriceWatchCard extends LitElement {
       display: inline-flex;
       align-items: baseline;
       gap: 6px;
+    }
+    /* On-sale: struck "was" price + a red "−N%" pill next to the headline. */
+    .price-sale {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .price-was {
+      font-size: 0.85rem;
+      color: var(--secondary-text-color, #9e9e9e);
+      text-decoration: line-through;
+    }
+    .price-off {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: rgba(244, 67, 54, 0.16);
+      color: var(--error-color, #f44336);
     }
 
     /* Price-movement indicator: red ↑ for an increase, green ↓ for

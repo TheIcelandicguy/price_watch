@@ -355,6 +355,19 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
             ),
         }
 
+        # On-sale / discount signals, derived from result.original_price (the
+        # struck-through "was" price). `price` is what you pay now; when the
+        # original is higher, the item is on sale. The panel shows a "−N%"
+        # badge from these.
+        if result.original_price and result.original_price > result.price:
+            attrs["on_sale"] = True
+            attrs["original_price"] = result.original_price
+            attrs["discount_percent"] = round(
+                (1 - result.price / result.original_price) * 100
+            )
+        else:
+            attrs["on_sale"] = False
+
         # Per-listing shipping signal, reusing the same heuristic that
         # decides this for AI alternatives. There's no AI guess for a
         # user-tracked listing, so we pass ai_guess=None and let the

@@ -130,6 +130,10 @@ class ExtractionResult:
     content_hash: str = ""
     cost_usd: float = 0.0
     method: str = "unknown"
+    # Pre-discount ("was") price when the item is on sale. None when not on
+    # sale / unknown. `price` always holds what the shopper pays NOW; this is
+    # the struck-through original. on_sale is derived (original_price > price).
+    original_price: float | None = None
     raw: dict[str, Any] = field(default_factory=dict)
     # Set True when the AI determines the product has been permanently
     # removed from the retailer's catalog. When True:
@@ -1054,6 +1058,7 @@ async def extract_product(
             image_url=image_url,
             sku=data.get("sku"),
             retailer=data.get("retailer"),
+            original_price=data.get("original_price"),
             content_hash=content_hash,
             cost_usd=0.0,
             method="custom",

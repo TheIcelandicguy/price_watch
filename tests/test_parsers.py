@@ -182,6 +182,56 @@ def test_price_clean_euro_format():
     assert _apply_transforms("€1.299,99", "price_clean") == 1299.99
 
 
+def test_custom_parser_original_price_on_sale():
+    """An on-sale item: original ('was') price extracted alongside price."""
+    html = '<title>X</title><span class="now">5564</span><span class="was">7418</span>'
+    parser = {
+        "type": "regex",
+        "selectors": {
+            "title": r"<title>([^<]+)",
+            "price": r'class="now">([0-9]+)',
+            "original_price": r'class="was">([0-9]+)',
+        },
+        "transforms": {"price": "float", "original_price": "float"},
+    }
+    result = apply_custom_parser(html, parser)
+    assert result["price"] == 5564
+    assert result["original_price"] == 7418
+
+
+def test_custom_parser_original_price_dropped_when_not_a_real_discount():
+    """A 'was' price at/below the current price isn't a discount → dropped."""
+    html = '<title>X</title><span class="now">5564</span><span class="was">5000</span>'
+    parser = {
+        "type": "regex",
+        "selectors": {
+            "title": r"<title>([^<]+)",
+            "price": r'class="now">([0-9]+)',
+            "original_price": r'class="was">([0-9]+)',
+        },
+        "transforms": {"price": "float", "original_price": "float"},
+    }
+    result = apply_custom_parser(html, parser)
+    assert "original_price" not in result
+
+
+def test_custom_parser_no_original_price_when_absent():
+    """Not on sale (no was-price element) → original_price simply absent."""
+    html = '<title>X</title><span class="now">100</span>'
+    parser = {
+        "type": "regex",
+        "selectors": {
+            "title": r"<title>([^<]+)",
+            "price": r'class="now">([0-9]+)',
+            "original_price": r'class="was">([0-9]+)',
+        },
+        "transforms": {"price": "float", "original_price": "float"},
+    }
+    result = apply_custom_parser(html, parser)
+    assert result["price"] == 100
+    assert "original_price" not in result
+
+
 def test_default_currency_and_retailer_applied():
     html = "<html><body><h1>P</h1><span class='p'>10</span></body></html>"
     parser = {
