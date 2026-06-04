@@ -897,11 +897,12 @@ async def ws_list_variants(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Enumerate a product's selectable Wix variants for the panel picker.
+    """Enumerate a product's selectable variants for the panel picker.
 
     Fetches the listing page, parses the embedded option groups + combos
-    via ``extractor.list_wix_variants``, and returns them along with the
-    variant currently pinned (so the panel pre-selects it).
+    via ``extractor.list_variants`` (Wix product options or byko.is size
+    variants), and returns them along with the variant currently pinned (so
+    the panel pre-selects it).
 
     Reply shape:
         {
@@ -912,11 +913,11 @@ async def ws_list_variants(
           "current": ["1xIR Remote", "5-48V"],
           "currency": "USD"
         }
-    When the page isn't a Wix variant page, replies {"supported": false}.
+    When the page has no recognizable variants, replies {"supported": false}.
     On fetch failure sends a typed WS error.
     """
     from .coordinator import PriceWatchCoordinator
-    from .extractor import _normalize_cookies, fetch_html, list_wix_variants
+    from .extractor import _normalize_cookies, fetch_html, list_variants
 
     entry_id = (msg.get("entry_id") or "").strip()
     listing_id = (msg.get("listing_id") or "").strip()
@@ -960,7 +961,7 @@ async def ws_list_variants(
         )
         return
 
-    data = list_wix_variants(html)
+    data = list_variants(html)
     if not data:
         connection.send_result(msg["id"], {"supported": False})
         return

@@ -8,7 +8,10 @@ from custom_components.price_watch import extractor as extractor_mod
 from custom_components.price_watch.extractor import (
     _normalize_cookies,
     extract_product,
+    list_byko_variants,
+    list_variants,
     preprocess_html,
+    try_byko_variant,
     try_jsonld,
 )
 
@@ -335,3 +338,123 @@ async def test_real_css_parser_still_uses_custom_path(monkeypatch):
     )
     assert result.method == "custom"
     assert result.price == 19.99
+
+
+# --- byko.is size/length variant picker (Next.js __NEXT_DATA__) -------------
+
+import json as _json  # noqa: E402
+
+
+def _byko_html(variants: list[dict] | None = None, base: str = "FURA ALHEF 45X95 AB-GAGNV") -> str:
+    """A minimal byko.is page: __NEXT_DATA__ with a product + size variants."""
+    if variants is None:
+        variants = [
+            {"sku": "0058504::300:", "name": f"{base} 300",
+             "price": {"net": 1764, "gross": 2187, "currency": "ISK"},
+             "inStock": True, "webstoreInStock": False,
+             "firstImage": {"image": {"productGallery": "https://img/300.jpg"}}},
+            {"sku": "0058504::480:", "name": f"{base} 480",
+             "price": {"net": 2946, "gross": 3653, "currency": "ISK"},
+             "inStock": True, "webstoreInStock": True,
+             "firstImage": {"image": {"productGallery": "https://img/480.jpg"}}},
+            {"sku": "0058504::660:", "name": f"{base} 660",
+             "price": {"net": 4051, "gross": 5023, "currency": "ISK"},
+             "inStock": False, "webstoreInStock": False},
+        ]
+    data = {"props": {"pageProps": {"product": {
+        "name": base, "sku": None, "defaultVariant": None, "variants": variants,
+    }}}}
+    return (
+        '<html><head><title>Byko</title></head><body>'
+        f'<script id="__NEXT_DATA__" type="application/json">{_json.dumps(data)}</script>'
+        '</body></html>'
+    )
+
+
+def test_list_byko_variants_enumerates_lengths():
+    data = list_byko_variants(_byko_html())
+    assert data is not None
+    # One option group titled "Length"; choices are bare lengths, sorted asc.
+    assert len(data["options"]) == 1
+    assert data["options"][0]["title"] == "Length"
+    assert data["options"][0]["choices"] == ["300", "480", "660"]
+    assert data["currency"] == "ISK"
+    # Each combo carries its gross price + stock flag.
+    by_label = {v["labels"][0]: v for v in data["variants"]}
+    assert by_label["480"]["price"] == 3653
+    assert by_label["480"]["in_stock"] is True
+    assert by_label["660"]["in_stock"] is False
+
+
+def test_list_byko_variants_sorts_numerically_not_lexically():
+    """120 must precede 1500 — numeric sort, not string sort."""
+    base = "BOARD"
+    variants = [
+        {"sku": f"x::{n}:", "name": f"{base} {n}",
+         "price": {"gross": n, "currency": "ISK"}, "inStock": True}
+        for n in (1500, 120, 180)
+    ]
+    data = list_byko_variants(_byko_html(variants=variants, base=base))
+    assert data["options"][0]["choices"] == ["120", "180", "1500"]
+
+
+def test_list_variants_dispatches_to_byko():
+    """The generic dispatcher recognizes a byko page (no Wix data)."""
+    data = list_variants(_byko_html())
+    assert data is not None
+    assert data["options"][0]["title"] == "Length"
+
+
+def test_try_byko_variant_resolves_pinned_length():
+    res = try_byko_variant(_byko_html(), ["480"])
+    assert res is not None
+    assert res["price"] == 3653
+    assert res["title"] == "FURA ALHEF 45X95 AB-GAGNV 480"
+    assert res["in_stock"] is True
+    assert res["retailer"] == "BYKO"
+    assert res["method"] == "byko_variant"
+    assert res["image_url"] == "https://img/480.jpg"
+
+
+def test_try_byko_variant_matches_via_sku_segment():
+    """An out-of-stock length still resolves (price tracked even when 0 stock)."""
+    res = try_byko_variant(_byko_html(), ["660"])
+    assert res is not None
+    assert res["price"] == 5023
+    assert res["in_stock"] is False
+
+
+def test_try_byko_variant_no_match_returns_none():
+    assert try_byko_variant(_byko_html(), ["999"]) is None
+
+
+def test_try_byko_variant_empty_options_returns_none():
+    assert try_byko_variant(_byko_html(), []) is None
+
+
+def test_byko_variant_helpers_ignore_non_byko_html():
+    assert list_byko_variants(SAMPLE_NO_JSONLD) is None
+    assert try_byko_variant(SAMPLE_NO_JSONLD, ["480"]) is None
+
+
+@pytest.mark.asyncio
+async def test_extract_product_byko_variant_drives_title_and_price(monkeypatch):
+    """End-to-end: variant_options on a byko page (no JSON-LD, no AI) yields the
+    pinned length's price AND its full name as the title."""
+
+    async def fake_fetch_html(url, session=None, cookies=None):
+        return _byko_html()
+
+    monkeypatch.setattr(extractor_mod, "fetch_html", fake_fetch_html)
+
+    result = await extract_product(
+        url="https://byko.is/vara/fura-alhef-45-x95-ab-gagnv-248063",
+        session=None,
+        ai_provider=None,
+        variant_options=["480"],
+    )
+    assert result.method == "byko_variant"
+    assert result.price == 3653
+    assert result.title == "FURA ALHEF 45X95 AB-GAGNV 480"
+    assert result.currency == "ISK"
+    assert result.retailer == "BYKO"

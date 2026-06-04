@@ -753,6 +753,193 @@ def list_wix_variants(html: str) -> dict[str, Any] | None:
     return {"options": groups, "variants": variants, "currency": currency}
 
 
+def _byko_product(html: str) -> dict[str, Any] | None:
+    """Pull byko.is's Next.js ``product`` object (with its variant list).
+
+    byko renders on Next.js, embedding the full product — every size
+    variant, each with its own price and stock flag — in a
+    ``<script id="__NEXT_DATA__">`` JSON blob. Returns that ``product`` dict
+    (guaranteed to carry a ``variants`` list) or None when the page isn't a
+    byko product page.
+    """
+    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+    if not m:
+        return None
+    try:
+        data = json.loads(m.group(1))
+    except (json.JSONDecodeError, ValueError):
+        return None
+    try:
+        prod = data["props"]["pageProps"]["product"]
+    except (KeyError, TypeError):
+        return None
+    if not isinstance(prod, dict) or not isinstance(prod.get("variants"), list):
+        return None
+    return prod
+
+
+def _byko_variant_label(name: str, base: str) -> str:
+    """The distinguishing tail of a byko variant name (e.g. the length).
+
+    Variant names repeat the product name plus a trailing size token
+    ("FURA ALHEF 45X95 AB-GAGNV" + " 480"). Strip the shared prefix so the
+    picker shows just "480" rather than the whole repeated name. Falls back
+    to the full name when it doesn't start with the base.
+    """
+    name = (name or "").strip()
+    base = (base or "").strip()
+    if base and name.lower().startswith(base.lower()):
+        rest = name[len(base):].strip(" -–— ")
+        if rest:
+            return rest
+    return name
+
+
+def _byko_in_stock(v: dict[str, Any]) -> bool:
+    """A byko variant counts as in stock if it's in a store OR the webstore."""
+    return bool(v.get("inStock") or v.get("webstoreInStock"))
+
+
+def _byko_variant_image(v: dict[str, Any]) -> str | None:
+    """Best image URL for a byko variant (gallery render), if any."""
+    img = (v.get("firstImage") or {}).get("image") or {}
+    if isinstance(img, dict):
+        for key in ("productGallery2x", "productGallery", "productList"):
+            url = img.get(key)
+            if url:
+                return str(url)
+    return None
+
+
+def list_byko_variants(html: str) -> dict[str, Any] | None:
+    """Enumerate a byko.is product's size/length variants.
+
+    The byko analogue of ``list_wix_variants``: every size of a product
+    (e.g. lumber lengths 120-660 cm) ships in ``__NEXT_DATA__`` as
+    ``product.variants[]`` with its own gross price and stock flag. Returns
+    the SAME unified ``{options, variants, currency}`` shape so the panel's
+    variant picker renders byko exactly like a Wix multi-option product —
+    one option group ("Length", or "Variant" for non-numeric sizes).
+
+    None when the page isn't a byko variant page.
+    """
+    prod = _byko_product(html)
+    if prod is None:
+        return None
+    base = str(prod.get("name") or "")
+
+    currency = ""
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for v in prod.get("variants") or []:
+        if not isinstance(v, dict):
+            continue
+        price = v.get("price") or {}
+        gross = _coerce_price(price.get("gross"))
+        if not gross or gross <= 0:
+            continue
+        label = _byko_variant_label(str(v.get("name") or ""), base)
+        if not label or label.lower() in seen:
+            continue
+        seen.add(label.lower())
+        cur = str(price.get("currency") or "").upper()
+        if not currency:
+            currency = cur
+        rows.append(
+            {
+                "labels": [label],
+                "price": float(gross),
+                "currency": cur or currency,
+                "in_stock": _byko_in_stock(v),
+            }
+        )
+    if not rows:
+        return None
+
+    # Sort numerically when every choice is a bare size (120, 150, … 660),
+    # else lexically — so the dropdown never reads 120, 1500, 180.
+    def _key(r: dict[str, Any]) -> tuple[int, Any]:
+        lab = r["labels"][0]
+        return (0, int(lab)) if lab.isdigit() else (1, lab.lower())
+
+    rows.sort(key=_key)
+    choices = [r["labels"][0] for r in rows]
+    title = "Length" if all(c.isdigit() for c in choices) else "Variant"
+
+    return {
+        "options": [{"title": title, "choices": choices}],
+        "variants": rows,
+        "currency": currency,
+    }
+
+
+def try_byko_variant(
+    html: str, variant_options: list[str]
+) -> dict[str, Any] | None:
+    """Resolve a pinned byko.is variant's price + title by its size label.
+
+    The byko analogue of ``try_wix_variant``: given the pinned label(s)
+    (e.g. ``["480"]``), find the matching ``product.variants[]`` entry and
+    return its gross price, full name (so the tile title follows the chosen
+    size), stock flag and image. byko pages carry no JSON-LD, so the variant
+    itself is the only source of the title here.
+
+    Returns ``{price, currency, in_stock, matched, title, sku, image_url,
+    retailer, method}`` or None when the page isn't byko or nothing matches.
+    """
+    wanted = [
+        str(v).strip().lower() for v in (variant_options or []) if str(v).strip()
+    ]
+    if not wanted:
+        return None
+    prod = _byko_product(html)
+    if prod is None:
+        return None
+    base = str(prod.get("name") or "")
+
+    for v in prod.get("variants") or []:
+        if not isinstance(v, dict):
+            continue
+        name = str(v.get("name") or "")
+        label = _byko_variant_label(name, base).lower()
+        sku = str(v.get("sku") or "")
+        sku_mid = sku.split("::", 1)[1].strip(": ").lower() if "::" in sku else ""
+        # Match the pinned value against the size token, the sku's middle
+        # segment, or a trailing-token fallback.
+        if not any(
+            w == label or w == sku_mid or name.lower().endswith(" " + w)
+            for w in wanted
+        ):
+            continue
+        gross = _coerce_price((v.get("price") or {}).get("gross"))
+        if not gross or gross <= 0:
+            return None
+        currency = str((v.get("price") or {}).get("currency") or "").upper()
+        return {
+            "price": float(gross),
+            "currency": currency,
+            "in_stock": _byko_in_stock(v),
+            "matched": [label] if label else list(wanted),
+            "title": name,
+            "sku": sku or None,
+            "image_url": _byko_variant_image(v),
+            "retailer": "BYKO",
+            "method": "byko_variant",
+        }
+    return None
+
+
+def list_variants(html: str) -> dict[str, Any] | None:
+    """Enumerate a page's variant options, whatever the platform.
+
+    Tries each platform-specific enumerator (Wix, then byko.is) and returns
+    the first hit in the unified ``{options, variants, currency}`` shape the
+    panel's variant picker consumes. None when the page has no recognizable
+    variant data.
+    """
+    return list_wix_variants(html) or list_byko_variants(html)
+
+
 async def _fetch_with_curl_cffi(
     url: str,
     method: str = "GET",
@@ -1137,25 +1324,31 @@ async def extract_product(
     # Falls through to JSON-LD/AI if the page isn't a Wix variant page or no
     # combo matches.
     if variant_options:
-        variant = try_wix_variant(html, variant_options, url=url)
+        variant = try_wix_variant(html, variant_options, url=url) or try_byko_variant(
+            html, variant_options
+        )
         if variant and variant.get("price"):
+            # byko pages have no JSON-LD, so the variant supplies the title /
+            # image / sku itself; Wix variants borrow them from JSON-LD.
             base = try_jsonld(html, url=url) or {}
             return ExtractionResult(
-                title=base.get("title", "") or "",
+                title=variant.get("title") or base.get("title", "") or "",
                 price=variant["price"],
                 currency=variant.get("currency") or base.get("currency", ""),
                 in_stock=variant.get("in_stock", True),
                 stock_count=base.get("stock_count"),
-                image_url=base.get("image_url") or find_meta_image(html),
-                sku=base.get("sku"),
-                retailer=base.get("retailer"),
+                image_url=variant.get("image_url")
+                or base.get("image_url")
+                or find_meta_image(html),
+                sku=variant.get("sku") or base.get("sku"),
+                retailer=variant.get("retailer") or base.get("retailer"),
                 content_hash=content_hash,
                 cost_usd=0.0,
-                method="wix_variant",
+                method=variant.get("method", "wix_variant"),
                 raw={"variant_options": list(variant_options), **variant},
             )
         _LOGGER.warning(
-            "variant_options=%r set but no matching Wix variant found at "
+            "variant_options=%r set but no matching variant found at "
             "%s; falling back to default extraction",
             variant_options, url,
         )
