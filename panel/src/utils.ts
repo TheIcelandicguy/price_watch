@@ -432,6 +432,12 @@ export function buildProducts(
         typeof attrs.discount_percent === "number"
           ? attrs.discount_percent
           : null,
+      storeAvailability: Array.isArray(attrs.store_availability)
+        ? (attrs.store_availability as { store: string; status: string }[])
+        : null,
+      availableStores: Array.isArray(attrs.available_stores)
+        ? (attrs.available_stores as string[])
+        : null,
       paused: attrs.paused === true,
 
       inStock: null,

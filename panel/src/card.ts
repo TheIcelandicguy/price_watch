@@ -489,6 +489,34 @@ export class PriceWatchCard extends LitElement {
     this.onRefreshAlternatives?.(this.product);
   };
 
+  /**
+   * Per-physical-store stock line (retailers like Húsa that expose it).
+   * Shows "In stock at N/M: store, store…" in green, or "Sold out at all
+   * M stores" in red. Hidden when the retailer has no per-store data.
+   */
+  private renderStoreAvailability() {
+    const sa = this.product.storeAvailability;
+    if (!sa || sa.length === 0) return nothing;
+    const total = new Set(sa.map((s) => s.store)).size;
+    const inStock = this.product.availableStores ?? [];
+    if (inStock.length === 0) {
+      return html`<div class="stores stores--out" title="Sold out at every store">
+        <ha-icon icon="mdi:store-off-outline"></ha-icon>
+        <span>Sold out at all ${total} stores</span>
+      </div>`;
+    }
+    return html`<div
+      class="stores stores--in"
+      title=${`In stock at: ${inStock.join(", ")}`}
+    >
+      <ha-icon icon="mdi:store-check-outline"></ha-icon>
+      <span
+        ><strong>${inStock.length}/${total}</strong> stores:
+        ${inStock.join(", ")}</span
+      >
+    </div>`;
+  }
+
   private renderStatRow() {
     const { product } = this;
     const cells: ReturnType<typeof html>[] = [];
@@ -911,6 +939,7 @@ export class PriceWatchCard extends LitElement {
 
           ${this.renderSparkline()}
           ${this.renderStatRow()}
+          ${this.renderStoreAvailability()}
           ${this.renderListings()}
           ${this.renderAlternatives()}
 
@@ -1134,6 +1163,30 @@ export class PriceWatchCard extends LitElement {
       padding: 1px 6px;
       border-radius: 999px;
       background: rgba(244, 67, 54, 0.16);
+      color: var(--error-color, #f44336);
+    }
+    /* Per-store availability line */
+    .stores {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      margin-top: 4px;
+      min-width: 0;
+    }
+    .stores ha-icon {
+      --mdc-icon-size: 18px;
+      flex: 0 0 auto;
+    }
+    .stores span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stores--in {
+      color: var(--success-color, #4caf50);
+    }
+    .stores--out {
       color: var(--error-color, #f44336);
     }
 

@@ -244,6 +244,42 @@ def test_normalize_cookies_empty_and_garbage():
     assert _normalize_cookies(42) is None
 
 
+def test_parse_store_availability_husa():
+    """Per-store stock parsed from a Húsa-style availability section."""
+    from custom_components.price_watch.extractor import _parse_store_availability
+
+    html = """
+    <div class="product-availability-section">
+      <div class="row">
+        <div class="col-md-3"><span class="availability-label">Til á lager</span></div>
+        <div class="col-md-9"><strong><a href="#">Selfoss</a>, </strong>
+          <strong><a href="#">Borgarnes</a></strong></div>
+      </div>
+      <div class="row">
+        <div class="col-md-3"><span class="availability-label">Fá eintök</span></div>
+        <div class="col-md-9"><strong>Hafnarfjörður</strong></div>
+      </div>
+      <div class="row">
+        <div class="col-md-3"><span class="availability-label">Uppselt</span></div>
+        <div class="col-md-9"><strong>Akureyri</strong></div>
+      </div>
+    </div>
+    """
+    res = _parse_store_availability(html)
+    assert res is not None
+    by_store = {r["store"]: r["status"] for r in res}
+    assert by_store["Selfoss"] == "in_stock"
+    assert by_store["Borgarnes"] == "in_stock"
+    assert by_store["Hafnarfjörður"] == "limited"
+    assert by_store["Akureyri"] == "sold_out"
+
+
+def test_parse_store_availability_absent_returns_none():
+    from custom_components.price_watch.extractor import _parse_store_availability
+
+    assert _parse_store_availability("<html><body>nothing here</body></html>") is None
+
+
 # --- cookies-only parser must fetch WITH cookies, then use JSON-LD ---
 # Regression: a parser carrying only request_cookies (no selectors) used to be
 # forced down the CSS path, which raised "did not extract a title" and — with

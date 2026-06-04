@@ -191,6 +191,11 @@ export interface TrackedProduct {
   onSale: boolean;
   originalPrice: number | null;
   discountPercent: number | null;
+  // Per-physical-store stock, when the retailer exposes it (Húsa). Full list
+  // plus a convenience list of stores that actually have it. null when not
+  // applicable.
+  storeAvailability: { store: string; status: string }[] | null;
+  availableStores: string[] | null;
   // Whether polling is currently paused for this product (set via the
   // options flow or the price_watch.set_paused service). Surfaced on the
   // price sensor's attributes so the panel can render the inline pause

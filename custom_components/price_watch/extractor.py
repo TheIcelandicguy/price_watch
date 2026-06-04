@@ -134,6 +134,11 @@ class ExtractionResult:
     # sale / unknown. `price` always holds what the shopper pays NOW; this is
     # the struck-through original. on_sale is derived (original_price > price).
     original_price: float | None = None
+    # Per-physical-store stock, when the retailer exposes it (e.g. Húsa lists
+    # each store as Til á lager / Fá eintök / Uppselt). List of
+    # {"store": name, "status": "in_stock"|"limited"|"sold_out"}. None when
+    # the page has no such breakdown.
+    store_availability: list[dict[str, Any]] | None = None
     raw: dict[str, Any] = field(default_factory=dict)
     # Set True when the AI determines the product has been permanently
     # removed from the retailer's catalog. When True:
@@ -245,6 +250,46 @@ def find_meta_image(html: str) -> str | None:
     if link and link.get("href"):
         return link["href"]
     return None
+
+
+def _parse_store_availability(html: str) -> list[dict[str, Any]] | None:
+    """Parse per-physical-store stock from a Húsa-style availability block.
+
+    Húsasmiðjan renders a ``product-availability-section`` with one row per
+    stock status — Til á lager (in stock) / Fá eintök (a few left) / Uppselt
+    (sold out) — each listing the stores in that state. Returns a flat list
+    of ``{"store": name, "status": "in_stock"|"limited"|"sold_out"}``, or
+    None when the page has no such section (i.e. every other site). The
+    string fast-path keeps bs4 off the hot path for non-Húsa pages.
+    """
+    if "product-availability-section" not in html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    section = soup.find(class_="product-availability-section")
+    if section is None:
+        return None
+    out: list[dict[str, Any]] = []
+    for row in section.find_all(class_="row"):
+        label = row.find(class_="availability-label")
+        col = row.find(class_=lambda c: bool(c) and "col-md-9" in c)
+        if label is None or col is None:
+            continue
+        text = label.get_text(" ", strip=True).lower()
+        if "uppselt" in text:
+            status = "sold_out"
+        elif "eint" in text:  # "fá eintök" — a few left
+            status = "limited"
+        elif "lager" in text:  # "til á lager" — in stock
+            status = "in_stock"
+        else:
+            continue
+        seen: set[str] = set()
+        for element in col.find_all(["a", "strong"]):
+            name = element.get_text(strip=True).rstrip(",").strip()
+            if name and name not in seen:
+                seen.add(name)
+                out.append({"store": name, "status": status})
+    return out or None
 
 
 def _ci_get(d: dict[str, Any], key: str) -> Any:
@@ -1049,16 +1094,27 @@ async def extract_product(
         image_url = data.get("image_url")
         if not image_url and custom_parser.get("type") != "raw_json":
             image_url = find_meta_image(body)
+        # Per-store stock (Húsa-style). When present it's also the most
+        # authoritative in-stock signal: in stock only if SOME store has it
+        # (in_stock/limited), overriding the parser's default.
+        store_avail = _parse_store_availability(body)
+        in_stock_val = data.get("in_stock", True)
+        if store_avail:
+            in_stock_val = any(
+                s["status"] in ("in_stock", "limited") for s in store_avail
+            )
+
         return ExtractionResult(
             title=data["title"],
             price=data["price"],
             currency=data.get("currency", ""),
-            in_stock=data.get("in_stock", True),
+            in_stock=in_stock_val,
             stock_count=stock_count,
             image_url=image_url,
             sku=data.get("sku"),
             retailer=data.get("retailer"),
             original_price=data.get("original_price"),
+            store_availability=store_avail,
             content_hash=content_hash,
             cost_usd=0.0,
             method="custom",

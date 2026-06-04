@@ -368,6 +368,17 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
         else:
             attrs["on_sale"] = False
 
+        # Per-physical-store stock (Húsa-style). Surface the full list plus a
+        # convenience list of stores that actually have it, so the panel can
+        # show "in stock at: …" without re-deriving the statuses.
+        if result.store_availability:
+            attrs["store_availability"] = result.store_availability
+            attrs["available_stores"] = [
+                s["store"]
+                for s in result.store_availability
+                if s.get("status") in ("in_stock", "limited")
+            ]
+
         # Per-listing shipping signal, reusing the same heuristic that
         # decides this for AI alternatives. There's no AI guess for a
         # user-tracked listing, so we pass ai_guess=None and let the
