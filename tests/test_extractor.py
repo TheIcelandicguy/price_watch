@@ -81,6 +81,47 @@ def test_jsonld_graph_format():
     assert result["in_stock"] is False
 
 
+def test_jsonld_productgroup_uses_own_offer():
+    """A ProductGroup with its OWN top-level offer (JYSK.ie shape) is read
+    from the wrapper — its variants omit `name` and prefix the price with a
+    currency symbol ("€475") the old path couldn't parse, so it returned None.
+    """
+    html = """
+    <script type="application/ld+json">
+    {"@context":"https://schema.org/","@type":"ProductGroup",
+     "name":"Gazebo NORDMARKA W3xL4xH2.78m grey",
+     "image":["https://cdn/247872"],
+     "brand":{"@type":"Brand","name":"JYSK"},
+     "offers":{"@type":"Offer","priceCurrency":"EUR","price":"475",
+               "availability":"https://schema.org/InStock"},
+     "hasVariant":[
+       {"@type":"Product","color":"Grey","size":"300x400",
+        "offers":{"@type":"Offer","priceCurrency":"EUR","price":"€475"}}]}
+    </script>
+    """
+    result = try_jsonld(html)
+    assert result is not None
+    assert result["title"] == "Gazebo NORDMARKA W3xL4xH2.78m grey"
+    assert result["price"] == 475.0
+    assert result["currency"] == "EUR"
+    assert result["in_stock"] is True
+
+
+def test_jsonld_productgroup_variant_only_price_with_symbol():
+    """ProductGroup whose price lives ONLY in a variant, formatted '€475',
+    still parses (currency symbol stripped in _offer_price)."""
+    html = """
+    <script type="application/ld+json">
+    {"@type":"ProductGroup","name":"X",
+     "hasVariant":[{"@type":"Product","name":"X 300x400",
+        "offers":{"@type":"Offer","priceCurrency":"EUR","price":"€475"}}]}
+    </script>
+    """
+    result = try_jsonld(html)
+    assert result is not None
+    assert result["price"] == 475.0
+
+
 def test_jsonld_returns_none_when_absent():
     assert try_jsonld(SAMPLE_NO_JSONLD) is None
 

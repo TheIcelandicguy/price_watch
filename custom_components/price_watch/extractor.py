@@ -464,8 +464,12 @@ def _offer_price(offers: dict[str, Any]) -> float | None:
         raw = _ci_get(offers, key)
         if raw in (None, ""):
             continue
+        # Strip a currency symbol/letters/whitespace some sites prefix or
+        # suffix onto the price ("€475", "475 kr."), keeping only the numeric
+        # part, before the comma→dot normalization.
+        cleaned = re.sub(r"[^0-9.,\-]", "", str(raw))
         try:
-            val = float(str(raw).replace(",", "."))
+            val = float(cleaned.replace(",", "."))
         except (ValueError, TypeError):
             continue
         if val > 0:
@@ -537,20 +541,30 @@ def try_jsonld(html: str, url: str | None = None) -> dict[str, Any] | None:
             )
             if is_product_group:
                 variants = item.get("hasVariant")
-                if isinstance(variants, list):
+                has_variants = isinstance(variants, list)
+                # A ProductGroup may carry its OWN canonical offer at the top
+                # level (JYSK: the clean price plus the group's name/image),
+                # while the per-variant Products omit `name` and may prefix
+                # the price with a currency symbol. Keep the wrapper FIRST so
+                # it's the preferred candidate, then the variants as fallbacks.
+                if _ci_get(item, "offers"):
+                    expanded.append(item)
+                if has_variants:
                     for v in variants:
                         if isinstance(v, dict):
                             expanded.append(v)
-                    continue  # Drop the wrapper itself; only variants count
+                if _ci_get(item, "offers") or has_variants:
+                    continue  # already appended above; don't double-add
             expanded.append(item)
 
         for item in expanded:
             if not isinstance(item, dict):
                 continue
             type_ = item.get("@type")
-            if type_ != "Product" and (
-                not isinstance(type_, list) or "Product" not in type_
-            ):
+            types = type_ if isinstance(type_, list) else [type_]
+            # Accept a real Product or a ProductGroup that carries its own
+            # offer (the latter only reaches here when it had offers above).
+            if "Product" not in types and "ProductGroup" not in types:
                 continue
 
             offers = _ci_get(item, "offers")
