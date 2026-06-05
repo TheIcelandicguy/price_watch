@@ -245,6 +245,7 @@ class AlternativesMixin:
         user_region: str
         _state: dict[str, Any]
         _ai_provider: AIProvider | None
+        _ai_fallback_only: bool
         _search_provider: SearchProvider | None
 
         async def async_load(self) -> None: ...
@@ -346,18 +347,20 @@ class AlternativesMixin:
             return self._search_provider
 
         ai_provider = self._ai_provider
-        if ai_provider is None:
-            # "Free" mode — no AI. Fall back to raw DuckDuckGo search,
-            # matching the panel live-search free path. async_find_-
-            # alternatives detects this provider type and maps raw hits
-            # straight to Alternatives (DuckDuckGoSearchProvider.find_-
-            # alternatives intentionally raises).
+        if ai_provider is None or self._ai_fallback_only:
+            # Raw DuckDuckGo search (same path the panel live-search uses).
+            # Either no AI at all ("Free" mode), OR the user chose
+            # "fallback only" — keep discovery free and reserve the AI for
+            # failed price extractions. async_find_alternatives detects this
+            # provider type and maps raw hits straight to Alternatives
+            # (DuckDuckGoSearchProvider.find_alternatives intentionally raises).
             session = async_get_clientsession(self.hass)
             self._search_provider = DuckDuckGoSearchProvider(session=session)
             _LOGGER.debug(
-                "%s: no AI provider — using DuckDuckGoSearchProvider "
-                "(raw hits) for alternatives",
+                "%s: %s — using DuckDuckGoSearchProvider (raw hits) for "
+                "alternatives",
                 self.entry.entry_id,
+                "AI fallback-only" if ai_provider else "no AI provider",
             )
             return self._search_provider
 

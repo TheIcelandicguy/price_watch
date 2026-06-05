@@ -121,6 +121,9 @@ interface ProviderSettings {
   // alternatives/search result. Returned normalized (bare lowercase
   // hosts); sent back as a list on save.
   excluded_domains: string[];
+  // When true, the AI is used only as a price-fetch fallback (search stays
+  // on free DuckDuckGo). Only meaningful when a provider is configured.
+  ai_fallback_only: boolean;
 }
 
 // set_provider_settings adds a count of product entries scheduled for
@@ -385,6 +388,8 @@ export class PriceWatchPanel extends LitElement {
   // split back into a list on save. Applies to every product's
   // alternatives search, not just one.
   @state() private _pExcludedDomains = "";
+  // "Use AI only as a price-fetch fallback" — keep search on free DDG.
+  @state() private _pFallbackOnly = false;
   // Whether a key is already stored (drives the "leave blank to keep"
   // placeholder). Never the key itself.
   @state() private _providerHasKey = false;
@@ -1604,6 +1609,7 @@ export class PriceWatchPanel extends LitElement {
     this._pForceJson = !!s.force_json_mode;
     this._pExtraHeaders = s.extra_headers ?? "";
     this._pExcludedDomains = (s.excluded_domains ?? []).join("\n");
+    this._pFallbackOnly = !!s.ai_fallback_only;
   }
 
   /**
@@ -1690,6 +1696,9 @@ export class PriceWatchPanel extends LitElement {
     // Global blocklist — independent of the provider, so always sent.
     // The backend splits on newlines/commas and normalizes each host.
     payload.excluded_domains = this._pExcludedDomains;
+    // Fallback-only flag — only meaningful with a provider, but always sent
+    // so toggling it off persists too.
+    payload.ai_fallback_only = this._pFallbackOnly;
 
     try {
       const s = await this._conn.sendMessagePromise<SetProviderResponse>({
@@ -2299,6 +2308,8 @@ export class PriceWatchPanel extends LitElement {
           ? this._renderOpenAIFields()
           : null}
 
+        ${this._pProvider !== "none" ? this._renderFallbackOnly() : null}
+
         ${this._renderExcludedDomains()}
 
         ${this._providerError
@@ -2327,6 +2338,31 @@ export class PriceWatchPanel extends LitElement {
             ${this._providerSaving ? "Saving…" : "Save & apply"}
           </button>
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * "Fallback-only" toggle: keep alternatives search on free DuckDuckGo and
+   * use the configured AI ONLY when free/JSON-LD price extraction can't read
+   * a price. Lets a user run fast/free search with an AI safety net for odd
+   * product pages. Shown only when an AI provider is selected.
+   */
+  private _renderFallbackOnly() {
+    return html`
+      <label class="ship-toggle provider__check">
+        <input
+          type="checkbox"
+          .checked=${this._pFallbackOnly}
+          @change=${(e: Event) =>
+            (this._pFallbackOnly = (e.target as HTMLInputElement).checked)}
+        />
+        <span>Use AI only as a price-fetch fallback</span>
+      </label>
+      <div class="trackform__hint">
+        Alternatives search stays on free DuckDuckGo; the AI is used only when
+        free price extraction can't read a price. Leave off to also use the AI
+        for richer alternative search.
       </div>
     `;
   }

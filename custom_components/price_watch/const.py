@@ -91,6 +91,13 @@ CONF_USER_REGION: Final = "user_region"
 # heuristic: this removes the result entirely rather than flagging it.
 CONF_EXCLUDED_DOMAINS: Final = "excluded_domains"
 
+# When True, a configured AI provider is used ONLY as a price-extraction
+# fallback (when JSON-LD/free parsing can't read a price). Alternatives
+# discovery stays on free DuckDuckGo instead of the AI search path. Lets a
+# user keep search free/fast while still having an AI safety net for odd
+# product pages. Default False = AI used for both discovery and extraction.
+CONF_AI_FALLBACK_ONLY: Final = "ai_fallback_only"
+
 # Approximate fallback: when CONF_USER_REGION is not set, derive a
 # country code from the home_currency. Covers the common case where
 # a user configures their currency but doesn't know to set this

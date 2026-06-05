@@ -48,6 +48,7 @@ from .const import (
     CONF_AI_PROVIDER,
     CONF_API_KEY,
     CONF_BASE_URL,
+    CONF_AI_FALLBACK_ONLY,
     CONF_EXCLUDED_DOMAINS,
     CONF_EXTRA_HEADERS,
     CONF_FORCE_JSON_MODE,
@@ -359,6 +360,7 @@ def _current_provider_state(entry: ConfigEntry | None) -> dict[str, Any]:
             "extra_headers": "",
             "anthropic_models": models,
             "excluded_domains": [],
+            "ai_fallback_only": False,
         }
 
     provider_type = _read_setting(entry, CONF_AI_PROVIDER, PROVIDER_ANTHROPIC)
@@ -393,6 +395,7 @@ def _current_provider_state(entry: ConfigEntry | None) -> dict[str, Any]:
         "extra_headers": extra_headers_str,
         "anthropic_models": models,
         "excluded_domains": _read_excluded_domains(entry),
+        "ai_fallback_only": bool(_read_setting(entry, CONF_AI_FALLBACK_ONLY, False)),
     }
 
 
@@ -429,6 +432,10 @@ async def ws_get_provider_settings(
         # to drop from every alternatives search. Independent of the
         # provider choice, so it's preserved across provider switches.
         vol.Optional("excluded_domains"): vol.Any(None, str, [str]),
+        # When True, AI is used only as a price-extraction fallback; search
+        # stays on free DuckDuckGo. Independent of provider, like the
+        # blocklist above.
+        vol.Optional("ai_fallback_only"): bool,
     }
 )
 @websocket_api.async_response
@@ -629,6 +636,11 @@ async def ws_set_provider_settings(
                 seen.add(norm)
                 cleaned.append(norm)
         new_options[CONF_EXCLUDED_DOMAINS] = cleaned
+
+    # AI fallback-only flag — persisted only when the panel sent it (so a
+    # provider-only save doesn't reset it). Independent of provider choice.
+    if "ai_fallback_only" in msg:
+        new_options[CONF_AI_FALLBACK_ONLY] = bool(msg.get("ai_fallback_only"))
 
     # Persist. async_update_entry mutates settings.options in place, so the
     # _current_provider_state() call below reflects the new values.

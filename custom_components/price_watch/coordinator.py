@@ -73,7 +73,7 @@ from .coordinator_events import EventsMixin
 from .coordinator_fx import FxMixin
 from .coordinator_storage import StorageMixin
 from .coordinator_update import UpdateMixin
-from .provider_config import build_ai_provider
+from .provider_config import build_ai_provider, read_ai_fallback_only
 from .store import PriceWatchStore, derive_listing_id, empty_listing_state
 
 _LOGGER = logging.getLogger(__name__)
@@ -115,6 +115,11 @@ class PriceWatchCoordinator(
         # we operate in no-AI mode: JSON-LD-only or custom-parser-only.
         # extract_product accepts None for ai_provider.
         self._ai_provider: AIProvider | None = build_ai_provider(hass, entry)
+        # When True, the AI is reserved for price-extraction fallback only;
+        # alternatives discovery stays on free DuckDuckGo (see
+        # _build_search_provider). Re-read on every reload, so toggling it in
+        # settings takes effect after the reload set_provider_settings fires.
+        self._ai_fallback_only: bool = read_ai_fallback_only(hass, entry)
 
         # custom_parser is stored as a JSON string in entry.options (so the
         # value can survive HA's config_entry serialization). Parse it once

@@ -24,6 +24,7 @@ from .ai import (
     get_provider,
 )
 from .const import (
+    CONF_AI_FALLBACK_ONLY,
     CONF_AI_PROVIDER,
     CONF_API_KEY,
     CONF_BASE_URL,
@@ -38,6 +39,33 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _find_settings_entry(
+    hass: HomeAssistant, domain: str
+) -> ConfigEntry | None:
+    """The shared Price Watch settings entry, or None if not set up yet."""
+    for other in hass.config_entries.async_entries(domain):
+        if other.data.get("entry_type") == ENTRY_TYPE_SETTINGS:
+            return other
+    return None
+
+
+def read_ai_fallback_only(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Whether the AI should be used ONLY as a price-extraction fallback.
+
+    When True, alternatives discovery stays on free DuckDuckGo (no AI search)
+    and the configured AI provider is reserved for reading a price when
+    free/JSON-LD extraction fails. Global flag on the settings entry; a
+    product entry may override. Default False.
+    """
+    for candidate in (entry, _find_settings_entry(hass, entry.domain)):
+        if candidate is None:
+            continue
+        for src in (candidate.options, candidate.data):
+            if CONF_AI_FALLBACK_ONLY in src:
+                return bool(src[CONF_AI_FALLBACK_ONLY])
+    return False
 
 
 def build_ai_provider(
@@ -90,11 +118,7 @@ def resolve_provider_config(
     uses. Empty-string and None are treated the same.
     """
     # Look up settings entry once, used as fallback throughout.
-    settings_entry: ConfigEntry | None = None
-    for other in hass.config_entries.async_entries(entry.domain):
-        if other.data.get("entry_type") == ENTRY_TYPE_SETTINGS:
-            settings_entry = other
-            break
+    settings_entry = _find_settings_entry(hass, entry.domain)
 
     # AI-config keys are read differently than product-specific keys
     # (url, target_price, custom_parser, cookies, etc.). For AI config,
