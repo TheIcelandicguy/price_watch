@@ -26,9 +26,11 @@ import hashlib
 import json
 import logging
 import re
+import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup, Comment
@@ -80,6 +82,66 @@ async def _get_persistent_session() -> Any:
             if _persistent_session is None:
                 _persistent_session = _cffi_requests.AsyncSession(impersonate="chrome")
     return _persistent_session
+
+
+# --- Fetch throttle -------------------------------------------------------
+# Protects the tracked retailers (and us) from a request burst when many
+# products refresh at once — the worst case being an HA restart, where every
+# coordinator's first poll fires together. Two limits, both module-global so
+# they span ALL coordinators:
+#   1. a cap on TOTAL concurrent fetches, and
+#   2. a politeness gap between requests to the SAME host, so e.g. 20 Byko
+#      products don't hammer byko.is back-to-back (which reads as a scrape and
+#      invites CAPTCHA / rate-limiting).
+# Different hosts still fetch in parallel (each has its own lock); only
+# same-host requests serialize and space out.
+_MAX_CONCURRENT_FETCHES = 5
+_HOST_MIN_INTERVAL = 3.0  # seconds between same-host requests
+_fetch_semaphore: asyncio.Semaphore | None = None
+_host_locks: dict[str, asyncio.Lock] = {}
+_host_last_fetch: dict[str, float] = {}
+
+
+def _fetch_sem() -> asyncio.Semaphore:
+    """Lazily build the global fetch semaphore on the running loop."""
+    global _fetch_semaphore
+    if _fetch_semaphore is None:
+        _fetch_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_FETCHES)
+    return _fetch_semaphore
+
+
+def _host_of(url: str) -> str:
+    try:
+        return urlparse(url).netloc.lower().removeprefix("www.")
+    except (ValueError, TypeError):
+        return ""
+
+
+@asynccontextmanager
+async def _fetch_slot(url: str, politeness: bool = True):
+    """Acquire a fetch slot: global concurrency cap + (optional) per-host gap.
+
+    With ``politeness`` (the default, for page fetches) same-host requests
+    serialize and are spaced ``_HOST_MIN_INTERVAL`` apart; the politeness wait
+    happens BEFORE taking a concurrency slot so a sleeping request doesn't
+    occupy one. Images pass ``politeness=False`` — they hit CDNs, not the
+    bot-guarded product pages, so they only need the global cap.
+    """
+    if not politeness:
+        async with _fetch_sem():
+            yield
+        return
+    host = _host_of(url)
+    host_lock = _host_locks.setdefault(host, asyncio.Lock())
+    async with host_lock:
+        wait = _HOST_MIN_INTERVAL - (time.monotonic() - _host_last_fetch.get(host, 0.0))
+        if wait > 0:
+            await asyncio.sleep(wait)
+        async with _fetch_sem():
+            try:
+                yield
+            finally:
+                _host_last_fetch[host] = time.monotonic()
 
 
 async def shutdown_persistent_session() -> None:
@@ -1284,15 +1346,21 @@ async def fetch_html(
     extra_headers: dict[str, str] | None = None,
     cookies: dict[str, str] | None = None,
 ) -> str:
-    """Fetch URL, preferring curl_cffi (Chrome TLS impersonation) over aiohttp."""
-    html = await _fetch_with_curl_cffi(
-        url, method=method, body=body, extra_headers=extra_headers, cookies=cookies
-    )
-    if html is not None:
-        return html
-    return await _fetch_with_aiohttp(
-        url, session, method=method, body=body, extra_headers=extra_headers, cookies=cookies
-    )
+    """Fetch URL, preferring curl_cffi (Chrome TLS impersonation) over aiohttp.
+
+    Goes through the global fetch throttle (concurrency cap + per-host
+    politeness gap) so a fleet of tracked products doesn't burst-hit stores.
+    """
+    async with _fetch_slot(url):
+        html = await _fetch_with_curl_cffi(
+            url, method=method, body=body, extra_headers=extra_headers, cookies=cookies
+        )
+        if html is not None:
+            return html
+        return await _fetch_with_aiohttp(
+            url, session, method=method, body=body, extra_headers=extra_headers,
+            cookies=cookies,
+        )
 
 
 async def fetch_image_bytes(
@@ -1306,35 +1374,39 @@ async def fetch_image_bytes(
     if not url:
         return None
 
-    cffi_session = await _get_persistent_session()
-    if cffi_session is not None:
-        try:
-            response = await cffi_session.get(
-                url, timeout=HTTP_TIMEOUT, allow_redirects=True
-            )
-            if response.status_code < 400 and response.content:
-                ct = response.headers.get("content-type", "image/jpeg")
-                ct = ct.split(";")[0].strip()
-                return bytes(response.content), ct
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("curl_cffi image fetch failed for %s: %s", url, err)
+    # Image CDNs aren't the bot-guarded product pages, so only the global
+    # concurrency cap applies (no per-host gap) — it still keeps images out
+    # of the restart fetch burst.
+    async with _fetch_slot(url, politeness=False):
+        cffi_session = await _get_persistent_session()
+        if cffi_session is not None:
+            try:
+                response = await cffi_session.get(
+                    url, timeout=HTTP_TIMEOUT, allow_redirects=True
+                )
+                if response.status_code < 400 and response.content:
+                    ct = response.headers.get("content-type", "image/jpeg")
+                    ct = ct.split(";")[0].strip()
+                    return bytes(response.content), ct
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("curl_cffi image fetch failed for %s: %s", url, err)
 
-    # Fall back to aiohttp
-    timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT, connect=10)
-    try:
-        async with session.get(
-            url, headers=BROWSER_HEADERS, timeout=timeout, allow_redirects=True,
-        ) as response:
-            if response.status >= 400:
-                return None
-            data = await response.read()
-            if not data:
-                return None
-            ct = response.headers.get("content-type", "image/jpeg").split(";")[0].strip()
-            return data, ct
-    except (asyncio.TimeoutError, aiohttp.ClientError) as err:
-        _LOGGER.debug("aiohttp image fetch failed for %s: %s", url, err)
-        return None
+        # Fall back to aiohttp
+        timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT, connect=10)
+        try:
+            async with session.get(
+                url, headers=BROWSER_HEADERS, timeout=timeout, allow_redirects=True,
+            ) as response:
+                if response.status >= 400:
+                    return None
+                data = await response.read()
+                if not data:
+                    return None
+                ct = response.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+                return data, ct
+        except (asyncio.TimeoutError, aiohttp.ClientError) as err:
+            _LOGGER.debug("aiohttp image fetch failed for %s: %s", url, err)
+            return None
 
 
 async def _extract_via_provider(

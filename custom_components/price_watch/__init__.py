@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import random
 import secrets
 from typing import Any
 
@@ -26,6 +28,7 @@ from .const import (
     CONF_TARGET_PRICE,
     CONF_URL,
     DOMAIN,
+    STARTUP_REFRESH_JITTER_SECONDS,
     STORAGE_VERSION,
 )
 from .coordinator import PriceWatchCoordinator
@@ -193,29 +196,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Stop the polling loop so the coordinator doesn't tick.
         coordinator.update_interval = None
     else:
-        # Initial fetch — but DON'T hard-fail setup if it errors. A product
-        # whose page can't be read yet (a free-mode page with no JSON-LD, a
-        # cookie/CAPTCHA wall, or a custom parser the user hasn't configured
-        # yet) must still appear in the panel as a card so the user can open
-        # the ✎ editor and attach a price selector or cookies. Raising
-        # ConfigEntryNotReady here drops the entry into setup_retry with NO
-        # entities and NO card — hiding the very product that needs fixing,
-        # with no way to reach the tools that would fix it.
-        #
-        # Instead, set it up in an unavailable state. The coordinator keeps
-        # polling on its normal interval, so the card recovers on its own
-        # once the page becomes readable (or the user attaches a parser).
-        # async_refresh() (unlike async_config_entry_first_refresh) records
-        # the failure on the coordinator without raising.
-        await coordinator.async_refresh()
-        if not coordinator.last_update_success:
-            _LOGGER.warning(
-                "%s: initial fetch failed (%s); setting up anyway so the "
-                "product stays visible and editable in the panel. It will "
-                "keep retrying on the normal interval.",
-                entry.entry_id,
-                coordinator.last_exception,
-            )
+        # Initial fetch — deferred to a JITTERED BACKGROUND task rather than
+        # awaited inline. Two reasons:
+        #  - With many tracked products, awaiting the first fetch would block
+        #    setup behind the fetch-layer throttle (concurrency cap + per-host
+        #    spacing) — entries could miss HA's setup timeout. Backgrounding it
+        #    lets setup finish immediately; the card appears (unavailable) and
+        #    fills in once the refresh lands.
+        #  - A random 0–STARTUP_REFRESH_JITTER_SECONDS delay spreads the fleet's
+        #    first polls so an HA restart doesn't fire 50 fetches at once (and
+        #    keeps the steady-state schedule from re-aligning).
+        # We DON'T hard-fail setup if the fetch errors: a product whose page
+        # can't be read yet (no JSON-LD + free mode, a cookie/CAPTCHA wall, an
+        # unconfigured parser) must still show as a card so the user can reach
+        # the ✎ editor. async_refresh() records the failure without raising.
+        # Scale the jitter to fleet size: a 1-5 product install barely waits
+        # (snappy after a restart), while a big fleet gets the full spread.
+        product_count = sum(
+            1
+            for e in hass.config_entries.async_entries(DOMAIN)
+            if e.data.get("entry_type") != ENTRY_TYPE_SETTINGS
+        )
+        jitter_max = min(STARTUP_REFRESH_JITTER_SECONDS, max(1, product_count) * 1.5)
+
+        async def _jittered_initial_refresh() -> None:
+            await asyncio.sleep(random.uniform(0, jitter_max))
+            await coordinator.async_refresh()
+            if not coordinator.last_update_success:
+                _LOGGER.warning(
+                    "%s: initial fetch failed (%s); the product stays visible "
+                    "and editable in the panel and keeps retrying on the "
+                    "normal interval.",
+                    entry.entry_id,
+                    coordinator.last_exception,
+                )
+
+        entry.async_create_background_task(
+            hass, _jittered_initial_refresh(), f"pw_initial_refresh_{entry.entry_id}"
+        )
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

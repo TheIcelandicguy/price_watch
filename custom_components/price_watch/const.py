@@ -159,6 +159,13 @@ DEFAULT_MONTHLY_BUDGET: Final = 5.00
 MIN_SCAN_INTERVAL_MINUTES: Final = 15
 MAX_HISTORY_ENTRIES: Final = 30
 
+# Max random delay before a product's FIRST poll after setup/restart. Spreads
+# the initial refresh across the fleet (combined with the fetch-layer
+# concurrency cap) so many tracked products don't all fetch at once on an HA
+# restart. The staggered completion times also keep the steady-state poll
+# schedule from re-aligning.
+STARTUP_REFRESH_JITTER_SECONDS: Final = 60
+
 # Storage
 STORAGE_VERSION: Final = 2
 STORAGE_KEY_PREFIX: Final = "price_watch"

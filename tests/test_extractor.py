@@ -318,6 +318,53 @@ def test_parse_store_availability_husa():
     assert by_store["Akureyri"] == "sold_out"
 
 
+import asyncio as _asyncio  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_fetch_slot_caps_global_concurrency(monkeypatch):
+    """The global semaphore caps concurrent fetches across DIFFERENT hosts."""
+    monkeypatch.setattr(extractor_mod, "_HOST_MIN_INTERVAL", 0.0)
+    monkeypatch.setattr(extractor_mod, "_fetch_semaphore", None)
+    monkeypatch.setattr(extractor_mod, "_MAX_CONCURRENT_FETCHES", 2)
+
+    active = 0
+    peak = 0
+
+    async def worker(i: int) -> None:
+        nonlocal active, peak
+        async with extractor_mod._fetch_slot(f"https://h{i}.example/x"):
+            active += 1
+            peak = max(peak, active)
+            await _asyncio.sleep(0.02)
+            active -= 1
+
+    await _asyncio.gather(*[worker(i) for i in range(6)])
+    assert peak == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_slot_serializes_same_host(monkeypatch):
+    """The per-host lock fully serializes fetches to the SAME host."""
+    monkeypatch.setattr(extractor_mod, "_HOST_MIN_INTERVAL", 0.0)
+    monkeypatch.setattr(extractor_mod, "_fetch_semaphore", None)
+    monkeypatch.setattr(extractor_mod, "_MAX_CONCURRENT_FETCHES", 5)
+
+    active = 0
+    peak = 0
+
+    async def worker() -> None:
+        nonlocal active, peak
+        async with extractor_mod._fetch_slot("https://same.example/x"):
+            active += 1
+            peak = max(peak, active)
+            await _asyncio.sleep(0.02)
+            active -= 1
+
+    await _asyncio.gather(*[worker() for _ in range(4)])
+    assert peak == 1
+
+
 def test_match_offer_link_host_suffix():
     from custom_components.price_watch.provider_config import match_offer_link
 
