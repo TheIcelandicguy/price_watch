@@ -318,6 +318,67 @@ def test_parse_store_availability_husa():
     assert by_store["Akureyri"] == "sold_out"
 
 
+def test_is_on_sale():
+    from custom_components.price_watch.extractor import ExtractionResult, is_on_sale
+
+    def r(price, original):
+        return ExtractionResult(
+            title="x", price=price, currency="ISK", original_price=original
+        )
+
+    assert is_on_sale(r(80, 100)) is True          # struck-through original > price
+    assert is_on_sale(r(100, None)) is False        # no original = not on sale
+    assert is_on_sale(r(100, 100)) is False         # equal = not a discount
+    assert is_on_sale(r(100, 90)) is False          # original below price = not on sale
+    assert is_on_sale(None) is False                # no result
+
+
+def test_extract_product_meta_husa():
+    from custom_components.price_watch.extractor import _extract_product_meta
+
+    html = (
+        '<p><span class="vnr">Vörunúmer: </span>'
+        '<span class="main-sku">50300</span></p>'
+        '<div><span class="product-description"> ÞAKBRÚNALISTI FURA FRÆSTUR </span></div>'
+    )
+    assert _extract_product_meta(html) == {
+        "product_number": "50300",
+        "description_name": "ÞAKBRÚNALISTI FURA FRÆSTUR",
+    }
+
+
+def test_extract_product_meta_byko_uses_shortdescription_and_variant_sku():
+    from custom_components.price_watch.extractor import _extract_product_meta
+
+    import json as _json
+    data = {"props": {"pageProps": {"product": {
+        "name": "FURA ALHEF 45X95 AB-GAGNV",
+        "shortDescription": {"is": "Alhefluð Gagnvarin Fura 45x95", "en": ""},
+        "variants": [{"sku": "0058504::300:", "name": "x",
+                      "price": {"gross": 2187, "currency": "ISK"}}],
+    }}}}
+    html = (
+        '<script id="__NEXT_DATA__" type="application/json">'
+        f"{_json.dumps(data)}</script>"
+    )
+    # Without a pinned sku → first variant's sku.
+    assert _extract_product_meta(html) == {
+        "description_name": "Alhefluð Gagnvarin Fura 45x95",
+        "product_number": "0058504::300",
+    }
+    # With the tracked variant's sku → that sku (trailing colon dropped).
+    assert _extract_product_meta(html, variant_sku="0058504::480:") == {
+        "description_name": "Alhefluð Gagnvarin Fura 45x95",
+        "product_number": "0058504::480",
+    }
+
+
+def test_extract_product_meta_absent_returns_empty():
+    from custom_components.price_watch.extractor import _extract_product_meta
+
+    assert _extract_product_meta("<html><body>nothing</body></html>") == {}
+
+
 def test_parse_store_availability_absent_returns_none():
     from custom_components.price_watch.extractor import _parse_store_availability
 

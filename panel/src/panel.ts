@@ -268,12 +268,17 @@ interface NotifyTarget {
   label: string; // e.g. "Davids Simi"
 }
 
-// The three alert triggers, mapped to the integration's bus events.
-type AlertTrigger = "back_in_stock" | "below_target" | "price_drop";
+// The alert triggers, mapped to the integration's bus events.
+type AlertTrigger =
+  | "back_in_stock"
+  | "below_target"
+  | "price_drop"
+  | "on_sale";
 const ALERT_EVENT: Record<AlertTrigger, string> = {
   back_in_stock: "price_watch_back_in_stock",
   below_target: "price_watch_target_hit",
   price_drop: "price_watch_price_drop",
+  on_sale: "price_watch_discount",
 };
 
 declare global {
@@ -1826,6 +1831,11 @@ export class PriceWatchPanel extends LitElement {
         title: "Price drop",
         body: "{{ trigger.event.data.title }}: {{ trigger.event.data.price }} {{ trigger.event.data.currency }} (was {{ trigger.event.data.previous_price }})",
       },
+      on_sale: {
+        emoji: "🏷️",
+        title: "On sale!",
+        body: "{{ trigger.event.data.title }} is on sale — {{ trigger.event.data.price }} {{ trigger.event.data.currency }} (was {{ trigger.event.data.original_price }}), −{{ trigger.event.data.discount_percent }}%",
+      },
     };
     const copy = COPY[trigger];
     const action = services.map((svc) => ({
@@ -2764,6 +2774,11 @@ export class PriceWatchPanel extends LitElement {
         key: "price_drop",
         label: "Any price drop",
         hint: "Every time the price drops",
+      },
+      {
+        key: "on_sale",
+        label: "Goes on sale",
+        hint: "When the retailer puts it on sale (a discount appears)",
       },
     ];
     return html`

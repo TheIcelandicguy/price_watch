@@ -144,6 +144,14 @@ class ExtractionResult:
     # product URLs (e.g. JYSK's "Stærðir" 300x300 / 300x400). List of
     # {"label", "url", "selected"}. None when the page has no size picker.
     size_options: list[dict[str, Any]] | None = None
+    # Retailer's product number / SKU as shown to shoppers (Húsa "Vörunúmer",
+    # Byko "VNR"). None when the page doesn't expose one.
+    product_number: str | None = None
+    # A fuller human-readable name beyond the short title — Húsa's
+    # ".product-description" line, Byko's shortDescription (which expands the
+    # coded variant name, e.g. "Alhefluð Gagnvarin Fura 45x95"). None when
+    # absent.
+    description_name: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
     # Set True when the AI determines the product has been permanently
     # removed from the retailer's catalog. When True:
@@ -425,6 +433,76 @@ def _parse_jysk_sizes(html: str, base_url: str | None) -> list[dict[str, Any]] |
         )
     # A lone size isn't a picker — nothing to switch to.
     return out if len(out) > 1 else None
+
+
+def is_on_sale(result: "ExtractionResult | None") -> bool:
+    """Whether an extraction shows the retailer's own sale flag.
+
+    True when a struck-through original price is present and strictly above
+    the current price. The coordinator edge-triggers EVENT_DISCOUNT on a
+    False→True transition of this.
+    """
+    return bool(
+        result
+        and result.original_price
+        and result.original_price > result.price
+    )
+
+
+def _extract_product_meta(
+    html: str, variant_sku: str | None = None
+) -> dict[str, str]:
+    """Retailer product number + a fuller description name, when exposed.
+
+    Two layouts so far (cheap string fast-path gates bs4/JSON off the hot
+    path for every other site):
+
+    - **Húsasmiðjan** — ``<span class="main-sku">50300</span>`` (Vörunúmer)
+      and ``<span class="product-description">…</span>`` (the descriptive
+      name, distinct from the short page title).
+    - **Byko** — the variant ``sku`` ("0058504::480") as the product number
+      and ``__NEXT_DATA__`` ``product.shortDescription.is`` as the readable
+      name (it expands the coded variant name). ``variant_sku`` lets the
+      caller pass the specific tracked variant's sku; otherwise the first
+      variant's is used.
+
+    Returns a dict with optional ``product_number`` / ``description_name``
+    keys (only those actually found).
+    """
+    out: dict[str, str] = {}
+
+    if "main-sku" in html or 'class="product-description"' in html:
+        soup = BeautifulSoup(html, "html.parser")
+        sku = soup.find(class_="main-sku")
+        if sku and sku.get_text(strip=True):
+            out["product_number"] = sku.get_text(strip=True)
+        desc = soup.find(class_="product-description")
+        if desc and desc.get_text(strip=True):
+            out["description_name"] = desc.get_text(strip=True)
+        if out:
+            return out
+
+    if "__NEXT_DATA__" in html:
+        prod = _byko_product(html)
+        if prod is not None:
+            short = prod.get("shortDescription")
+            name = ""
+            if isinstance(short, dict):
+                name = str(short.get("is") or short.get("en") or "").strip()
+            elif isinstance(short, str):
+                name = short.strip()
+            if name:
+                out["description_name"] = name
+            sku = variant_sku
+            if not sku:
+                variants = prod.get("variants") or []
+                if variants and isinstance(variants[0], dict):
+                    sku = variants[0].get("sku")
+            if sku:
+                # "0058504::480:" → "0058504::480" (drop the trailing colon)
+                out["product_number"] = str(sku).rstrip(":")
+
+    return out
 
 
 def _ci_get(d: dict[str, Any], key: str) -> Any:
@@ -1439,6 +1517,7 @@ async def extract_product(
             in_stock_val = any(
                 s["status"] in ("in_stock", "limited") for s in store_avail
             )
+        meta = _extract_product_meta(body)
 
         return ExtractionResult(
             title=data["title"],
@@ -1451,6 +1530,8 @@ async def extract_product(
             retailer=data.get("retailer"),
             original_price=data.get("original_price"),
             store_availability=store_avail,
+            product_number=meta.get("product_number"),
+            description_name=meta.get("description_name"),
             content_hash=content_hash,
             cost_usd=0.0,
             method="custom",
@@ -1480,6 +1561,7 @@ async def extract_product(
             # byko pages have no JSON-LD, so the variant supplies the title /
             # image / sku itself; Wix variants borrow them from JSON-LD.
             base = try_jsonld(html, url=url) or {}
+            meta = _extract_product_meta(html, variant_sku=variant.get("sku"))
             return ExtractionResult(
                 title=variant.get("title") or base.get("title", "") or "",
                 price=variant["price"],
@@ -1491,6 +1573,8 @@ async def extract_product(
                 or find_meta_image(html),
                 sku=variant.get("sku") or base.get("sku"),
                 retailer=variant.get("retailer") or base.get("retailer"),
+                product_number=meta.get("product_number"),
+                description_name=meta.get("description_name"),
                 content_hash=content_hash,
                 cost_usd=0.0,
                 method=variant.get("method", "wix_variant"),
@@ -1524,6 +1608,7 @@ async def extract_product(
         # Sibling size pages (JYSK "Stærðir") — the panel uses these to swap
         # the tracked URL between sizes.
         size_options = _parse_jysk_sizes(html, url)
+        meta = _extract_product_meta(html)
         return ExtractionResult(
             title=jsonld["title"],
             price=jsonld["price"],
@@ -1536,6 +1621,8 @@ async def extract_product(
             original_price=original_price,
             store_availability=store_avail,
             size_options=size_options,
+            product_number=meta.get("product_number"),
+            description_name=meta.get("description_name"),
             content_hash=content_hash,
             cost_usd=0.0,
             method="jsonld",

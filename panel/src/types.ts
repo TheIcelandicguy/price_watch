@@ -205,6 +205,11 @@ export interface TrackedProduct {
   // Sibling size pages (JYSK "Stærðir"), each its own product URL. The
   // current size is `selected`. null when the retailer has no size picker.
   sizeOptions: { label: string; url: string; selected: boolean }[] | null;
+  // Retailer product number (Húsa "Vörunúmer", Byko "VNR") and a fuller
+  // description name beyond the short title, shown under the title. null
+  // when the retailer doesn't expose them.
+  productNumber: string | null;
+  descriptionName: string | null;
   // Whether polling is currently paused for this product (set via the
   // options flow or the price_watch.set_paused service). Surfaced on the
   // price sensor's attributes so the panel can render the inline pause

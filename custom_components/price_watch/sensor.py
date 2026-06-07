@@ -393,6 +393,13 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
         if result.size_options:
             attrs["size_options"] = result.size_options
 
+        # Retailer product number + fuller description name (Húsa / Byko),
+        # shown under the title on the card.
+        if result.product_number:
+            attrs["product_number"] = result.product_number
+        if result.description_name:
+            attrs["description_name"] = result.description_name
+
         # Per-listing shipping signal, reusing the same heuristic that
         # decides this for AI alternatives. There's no AI guess for a
         # user-tracked listing, so we pass ai_guess=None and let the

@@ -1039,6 +1039,20 @@ export class PriceWatchCard extends LitElement {
           ${this.renderImage()}
           <header class="header">
             <h3 class="title">${product.title}</h3>
+            ${product.descriptionName || product.productNumber
+              ? html`<div class="subtitle">
+                  ${product.descriptionName
+                    ? html`<span class="subtitle__name"
+                        >${product.descriptionName}</span
+                      >`
+                    : nothing}
+                  ${product.productNumber
+                    ? html`<span class="subtitle__num"
+                        >Vörunúmer ${product.productNumber}</span
+                      >`
+                    : nothing}
+                </div>`
+              : nothing}
             ${this.renderStatusChips()}
           </header>
         </div>
@@ -1185,6 +1199,22 @@ export class PriceWatchCard extends LitElement {
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+    /* Fuller description name + product number, under the title */
+    .subtitle {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      margin-top: -2px;
+    }
+    .subtitle__name {
+      font-size: 0.82rem;
+      color: var(--secondary-text-color, #757575);
+    }
+    .subtitle__num {
+      font-size: 0.72rem;
+      color: var(--secondary-text-color, #9e9e9e);
+      font-variant-numeric: tabular-nums;
     }
 
     .chips {

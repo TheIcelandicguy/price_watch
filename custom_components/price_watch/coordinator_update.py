@@ -35,6 +35,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     EVENT_BACK_IN_STOCK,
     EVENT_DISCONTINUED,
+    EVENT_DISCOUNT,
     EVENT_NEW_LOW,
     EVENT_PRICE_DROP,
     MAX_HISTORY_ENTRIES,
@@ -44,6 +45,7 @@ from .extractor import (
     ExtractionResult,
     extract_product,
     fetch_image_bytes,
+    is_on_sale,
 )
 
 if TYPE_CHECKING:
@@ -294,7 +296,9 @@ class UpdateMixin:
         if listing.get("highest") is None or result.price > listing["highest"]:
             listing["highest"] = result.price
 
-        # Transition events
+        # Transition events. Guarded on a known `previous` so none of these
+        # fire on the first poll (incl. the first poll after an HA restart,
+        # when the in-memory previous is empty) — avoids spurious pings.
         if previous is not None:
             if result.price < previous.price:
                 self._fire_event_with_extra(
@@ -303,6 +307,23 @@ class UpdateMixin:
             if not previous.in_stock and result.in_stock:
                 self._fire_event_with_extra(
                     EVENT_BACK_IN_STOCK, result, previous, extra=event_extra_base
+                )
+            # Discount appeared: the retailer's own sale flag (original_price
+            # > price) went from absent to present. Distinct from a price
+            # drop — fires once, when the sale starts.
+            if is_on_sale(result) and not is_on_sale(previous):
+                discount_percent = round(
+                    (1 - result.price / result.original_price) * 100
+                )
+                self._fire_event_with_extra(
+                    EVENT_DISCOUNT,
+                    result,
+                    previous,
+                    extra={
+                        **event_extra_base,
+                        "original_price": result.original_price,
+                        "discount_percent": discount_percent,
+                    },
                 )
 
         # Target hit — target_price is product-level, so only check

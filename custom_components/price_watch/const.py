@@ -156,6 +156,11 @@ EVENT_PRICE_DROP: Final = "price_watch_price_drop"
 EVENT_TARGET_HIT: Final = "price_watch_target_hit"
 EVENT_NEW_LOW: Final = "price_watch_new_low"
 EVENT_BACK_IN_STOCK: Final = "price_watch_back_in_stock"
+# Fired when a product's on-sale flag flips off→on (the retailer's own
+# strikethrough/discount appears). Distinct from EVENT_PRICE_DROP (any
+# decrease) — this means a sale specifically started. Payload adds
+# original_price + discount_percent.
+EVENT_DISCOUNT: Final = "price_watch_discount"
 EVENT_DISCONTINUED: Final = "price_watch_discontinued"
 
 # Sensor attributes

@@ -447,6 +447,14 @@ export function buildProducts(
         ? (attrs.available_stores as string[])
         : null,
       stockFromWarehouse: attrs.stock_from_warehouse === true,
+      productNumber:
+        typeof attrs.product_number === "string" && attrs.product_number
+          ? attrs.product_number
+          : null,
+      descriptionName:
+        typeof attrs.description_name === "string" && attrs.description_name
+          ? attrs.description_name
+          : null,
       sizeOptions: Array.isArray(attrs.size_options)
         ? (attrs.size_options as {
             label: string;
