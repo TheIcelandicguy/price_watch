@@ -50,6 +50,8 @@ from .const import (
     CONF_BASE_URL,
     CONF_AI_FALLBACK_ONLY,
     CONF_EXCLUDED_DOMAINS,
+    CONF_STORE_OFFER_LINKS,
+    DEFAULT_STORE_OFFER_LINKS,
     CONF_EXTRA_HEADERS,
     CONF_FORCE_JSON_MODE,
     CONF_INPUT_COST_PER_MTOK,
@@ -361,6 +363,7 @@ def _current_provider_state(entry: ConfigEntry | None) -> dict[str, Any]:
             "anthropic_models": models,
             "excluded_domains": [],
             "ai_fallback_only": False,
+            "store_offer_links": [dict(x) for x in DEFAULT_STORE_OFFER_LINKS],
         }
 
     provider_type = _read_setting(entry, CONF_AI_PROVIDER, PROVIDER_ANTHROPIC)
@@ -396,6 +399,11 @@ def _current_provider_state(entry: ConfigEntry | None) -> dict[str, Any]:
         "anthropic_models": models,
         "excluded_domains": _read_excluded_domains(entry),
         "ai_fallback_only": bool(_read_setting(entry, CONF_AI_FALLBACK_ONLY, False)),
+        "store_offer_links": (
+            raw_offer_links
+            if isinstance(raw_offer_links := _read_setting(entry, CONF_STORE_OFFER_LINKS), list)
+            else [dict(x) for x in DEFAULT_STORE_OFFER_LINKS]
+        ),
     }
 
 
@@ -436,6 +444,9 @@ async def ws_get_provider_settings(
         # stays on free DuckDuckGo. Independent of provider, like the
         # blocklist above.
         vol.Optional("ai_fallback_only"): bool,
+        # Per-retailer offers-page links. A "host | url" per line string, or
+        # a list of {host, url}. Independent of provider.
+        vol.Optional("store_offer_links"): vol.Any(None, str, list),
     }
 )
 @websocket_api.async_response
@@ -641,6 +652,31 @@ async def ws_set_provider_settings(
     # provider-only save doesn't reset it). Independent of provider choice.
     if "ai_fallback_only" in msg:
         new_options[CONF_AI_FALLBACK_ONLY] = bool(msg.get("ai_fallback_only"))
+
+    # Per-retailer offers-page links — "host | url" per line, or a list of
+    # {host, url}. Normalize the host and require an http(s) URL.
+    if "store_offer_links" in msg:
+        raw_links = msg.get("store_offer_links")
+        rows: list[Any] = []
+        if isinstance(raw_links, str):
+            for line in raw_links.splitlines():
+                line = line.strip()
+                if "|" in line:
+                    rows.append(line.split("|", 1))
+        elif isinstance(raw_links, list):
+            rows = raw_links
+        links: list[dict[str, str]] = []
+        for row in rows:
+            if isinstance(row, list):
+                host, url = row[0].strip(), row[1].strip()
+            elif isinstance(row, dict):
+                host, url = str(row.get("host", "")).strip(), str(row.get("url", "")).strip()
+            else:
+                continue
+            host = _normalize_domain(host) or host.lower()
+            if host and url.startswith("http"):
+                links.append({"host": host, "url": url})
+        new_options[CONF_STORE_OFFER_LINKS] = links
 
     # Persist. async_update_entry mutates settings.options in place, so the
     # _current_provider_state() call below reflects the new values.

@@ -318,6 +318,25 @@ def test_parse_store_availability_husa():
     assert by_store["Akureyri"] == "sold_out"
 
 
+def test_match_offer_link_host_suffix():
+    from custom_components.price_watch.provider_config import match_offer_link
+
+    links = [
+        {"host": "byko.is", "url": "https://byko.is/tilbod"},
+        {"host": "jysk.is", "url": "https://jysk.is/tilbodsvorur/"},
+    ]
+    # bare + www + path all match the bare host
+    assert match_offer_link("https://byko.is/vara/x", links) == "https://byko.is/tilbod"
+    assert match_offer_link("https://www.byko.is/vara/x", links) == "https://byko.is/tilbod"
+    assert (
+        match_offer_link("https://jysk.is/stok-vara/y", links)
+        == "https://jysk.is/tilbodsvorur/"
+    )
+    # unknown host / empty
+    assert match_offer_link("https://amazon.de/dp/z", links) is None
+    assert match_offer_link("", links) is None
+
+
 def test_is_on_sale():
     from custom_components.price_watch.extractor import ExtractionResult, is_on_sale
 

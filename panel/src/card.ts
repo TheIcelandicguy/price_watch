@@ -775,6 +775,21 @@ export class PriceWatchCard extends LitElement {
             ${formatRelative(listing.lastCheck)}
           </span>
         </span>
+        ${listing.offerPageUrl
+          ? html`<span
+              class="listings__offers"
+              role="link"
+              tabindex="0"
+              title=${`Sjá tilboð hjá ${listing.retailer ?? "versluninni"}`}
+              @click=${(e: Event) =>
+                this.openOffers(e, listing.offerPageUrl as string)}
+              @keydown=${(e: KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ")
+                  this.openOffers(e, listing.offerPageUrl as string);
+              }}
+              >🏷️ Tilboð hjá ${listing.retailer ?? "versluninni"}</span
+            >`
+          : nothing}
       </div>
       <div class="listings__price">
         ${formatPrice(listing.price, listing.currency || null)}
@@ -1007,6 +1022,18 @@ export class PriceWatchCard extends LitElement {
     // link does its own thing.
     if ((event.target as HTMLElement).closest("a")) return;
     this.onOpen?.(this.product);
+  }
+
+  /**
+   * Open a retailer's seasonal-offers page in a new tab. Implemented as a
+   * span+window.open (not a nested <a>, which would be invalid inside the
+   * listing row's anchor); preventDefault stops that anchor from also
+   * navigating to the product URL.
+   */
+  private openOffers(event: Event, url: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    window.open(url, "_blank", "noopener");
   }
 
   private handleKeydown(event: KeyboardEvent) {
@@ -1881,6 +1908,27 @@ export class PriceWatchCard extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
       min-width: 0;
+    }
+    /* "Tilboð hjá <store>" link — its own line under the listing meta, so it
+       never squeezes the retailer name out of the row above. */
+    .listings__offers {
+      align-self: flex-start;
+      max-width: 100%;
+      font-size: 0.72rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      color: var(--primary-color, #03a9f4);
+      text-decoration: none;
+    }
+    .listings__offers:hover {
+      text-decoration: underline;
+    }
+    .listings__offers:focus-visible {
+      outline: 2px solid var(--primary-color, #03a9f4);
+      outline-offset: 1px;
+      border-radius: 3px;
     }
     .listings__badge {
       flex: 0 0 auto;

@@ -138,6 +138,10 @@ export interface Listing {
   // is never sent to the frontend). Drives the "cookies set" hint in the
   // editor; the cookie box stays write-only.
   hasCookies: boolean;
+  // Retailer's seasonal-offers landing page for this listing's host, when
+  // configured (Store offer links). Drives the "Tilboð hjá <store>" link
+  // after the retailer name. null when the store has no configured page.
+  offerPageUrl: string | null;
   // Entity IDs for this listing's sensors. Used for service-call
   // targeting and cross-references. Always populated with the price
   // entity (the listing wouldn't exist without it); others optional.

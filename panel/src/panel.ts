@@ -124,6 +124,9 @@ interface ProviderSettings {
   // When true, the AI is used only as a price-fetch fallback (search stays
   // on free DuckDuckGo). Only meaningful when a provider is configured.
   ai_fallback_only: boolean;
+  // Per-retailer seasonal-offers links (host → offers page URL). Drives the
+  // "Tilboð hjá <store>" link on cards; editable here.
+  store_offer_links: { host: string; url: string }[];
 }
 
 // set_provider_settings adds a count of product entries scheduled for
@@ -395,6 +398,8 @@ export class PriceWatchPanel extends LitElement {
   @state() private _pExcludedDomains = "";
   // "Use AI only as a price-fetch fallback" — keep search on free DDG.
   @state() private _pFallbackOnly = false;
+  // Store offer links, edited as "host | url" lines.
+  @state() private _pStoreOfferLinks = "";
   // Whether a key is already stored (drives the "leave blank to keep"
   // placeholder). Never the key itself.
   @state() private _providerHasKey = false;
@@ -1615,6 +1620,9 @@ export class PriceWatchPanel extends LitElement {
     this._pExtraHeaders = s.extra_headers ?? "";
     this._pExcludedDomains = (s.excluded_domains ?? []).join("\n");
     this._pFallbackOnly = !!s.ai_fallback_only;
+    this._pStoreOfferLinks = (s.store_offer_links ?? [])
+      .map((l) => `${l.host} | ${l.url}`)
+      .join("\n");
   }
 
   /**
@@ -1704,6 +1712,8 @@ export class PriceWatchPanel extends LitElement {
     // Fallback-only flag — only meaningful with a provider, but always sent
     // so toggling it off persists too.
     payload.ai_fallback_only = this._pFallbackOnly;
+    // Store offer links — "host | url" lines; backend parses + normalizes.
+    payload.store_offer_links = this._pStoreOfferLinks;
 
     try {
       const s = await this._conn.sendMessagePromise<SetProviderResponse>({
@@ -2321,6 +2331,7 @@ export class PriceWatchPanel extends LitElement {
         ${this._pProvider !== "none" ? this._renderFallbackOnly() : null}
 
         ${this._renderExcludedDomains()}
+        ${this._renderStoreOfferLinks()}
 
         ${this._providerError
           ? html`<div class="modal__status modal__status--error">
@@ -2373,6 +2384,35 @@ export class PriceWatchPanel extends LitElement {
         Alternatives search stays on free DuckDuckGo; the AI is used only when
         free price extraction can't read a price. Leave off to also use the AI
         for richer alternative search.
+      </div>
+    `;
+  }
+
+  /**
+   * "Store offer links" editor — one "host | url" per line. A card whose
+   * listing host matches gets a "Tilboð hjá <store>" link. Editable so a
+   * store's offers page (e.g. Húsa's rotating seasonal campaign) can be
+   * updated, or new stores added, without a code change.
+   */
+  private _renderStoreOfferLinks() {
+    return html`
+      <label class="trackform__field">
+        <span>Store offer links</span>
+        <textarea
+          class="provider__textarea"
+          rows="3"
+          placeholder="One per line: host | url&#10;byko.is | https://byko.is/tilbod"
+          .value=${this._pStoreOfferLinks}
+          @input=${(e: Event) =>
+            (this._pStoreOfferLinks = (e.target as HTMLTextAreaElement).value)}
+        ></textarea>
+      </label>
+      <div class="trackform__hint">
+        Cards from these stores show a <strong>Tilboð hjá …</strong> link to
+        the store's seasonal-offers page. Format
+        <code>host | url</code> per line (e.g.
+        <code>jysk.is | https://jysk.is/tilbodsvorur/</code>). Update Húsa's
+        when the seasonal campaign changes.
       </div>
     `;
   }

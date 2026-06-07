@@ -51,6 +51,51 @@ def _find_settings_entry(
     return None
 
 
+def read_store_offer_links(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> list[dict[str, str]]:
+    """The per-retailer offers-page links (settings entry, else defaults).
+
+    A list of ``{"host", "url"}``. Returns the built-in defaults when the
+    settings entry has none stored, so the feature works out of the box.
+    """
+    from .const import CONF_STORE_OFFER_LINKS, DEFAULT_STORE_OFFER_LINKS
+
+    settings = _find_settings_entry(hass, entry.domain)
+    for src in (
+        (settings.options, settings.data) if settings is not None else ()
+    ):
+        raw = src.get(CONF_STORE_OFFER_LINKS)
+        if isinstance(raw, list):
+            out = [
+                {"host": str(x["host"]).strip(), "url": str(x["url"]).strip()}
+                for x in raw
+                if isinstance(x, dict) and x.get("host") and x.get("url")
+            ]
+            return out
+    return [dict(x) for x in DEFAULT_STORE_OFFER_LINKS]
+
+
+def match_offer_link(url: str, links: list[dict[str, str]]) -> str | None:
+    """The offers-page URL for a product URL's host, or None.
+
+    Host match is suffix-based (``byko.is`` also matches ``www.byko.is``),
+    mirroring the excluded-domains matcher.
+    """
+    from urllib.parse import urlparse
+
+    if not url:
+        return None
+    host = urlparse(url).netloc.lower().removeprefix("www.")
+    if not host:
+        return None
+    for link in links or []:
+        h = str(link.get("host") or "").lower().removeprefix("www.")
+        if h and (host == h or host.endswith("." + h)):
+            return link.get("url") or None
+    return None
+
+
 def read_ai_fallback_only(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Whether the AI should be used ONLY as a price-extraction fallback.
 

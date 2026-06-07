@@ -98,6 +98,19 @@ CONF_EXCLUDED_DOMAINS: Final = "excluded_domains"
 # product pages. Default False = AI used for both discovery and extraction.
 CONF_AI_FALLBACK_ONLY: Final = "ai_fallback_only"
 
+# Per-retailer "seasonal offers" landing pages. Global, on the settings
+# entry — a list of {"host", "url"}. A card whose listing host matches one
+# gets a "Tilboð hjá <store>" link. Editable in the panel so a store's
+# offers URL (e.g. Húsa's rotating seasonal campaign) can be updated without
+# a code change. DEFAULTS are the verified pages as of 2026-06; Húsa has no
+# stable offers URL so it points at the current seasonal campaign.
+CONF_STORE_OFFER_LINKS: Final = "store_offer_links"
+DEFAULT_STORE_OFFER_LINKS: Final = [
+    {"host": "byko.is", "url": "https://byko.is/tilbod"},
+    {"host": "jysk.is", "url": "https://jysk.is/tilbodsvorur/"},
+    {"host": "husa.is", "url": "https://www.husa.is/sumarhatid/"},
+]
+
 # Approximate fallback: when CONF_USER_REGION is not set, derive a
 # country code from the home_currency. Covers the common case where
 # a user configures their currency but doesn't know to set this

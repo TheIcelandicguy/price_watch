@@ -306,6 +306,10 @@ function buildListing(
         ? attrs.ships_to_user_region
         : null,
     hasCookies: attrs.has_cookies === true,
+    offerPageUrl:
+      typeof attrs.offer_page_url === "string" && attrs.offer_page_url
+        ? attrs.offer_page_url
+        : null,
     entityIds: { price: priceEntity },
   };
 

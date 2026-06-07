@@ -73,7 +73,12 @@ from .coordinator_events import EventsMixin
 from .coordinator_fx import FxMixin
 from .coordinator_storage import StorageMixin
 from .coordinator_update import UpdateMixin
-from .provider_config import build_ai_provider, read_ai_fallback_only
+from .provider_config import (
+    build_ai_provider,
+    match_offer_link,
+    read_ai_fallback_only,
+    read_store_offer_links,
+)
 from .store import PriceWatchStore, derive_listing_id, empty_listing_state
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,6 +125,9 @@ class PriceWatchCoordinator(
         # _build_search_provider). Re-read on every reload, so toggling it in
         # settings takes effect after the reload set_provider_settings fires.
         self._ai_fallback_only: bool = read_ai_fallback_only(hass, entry)
+        # Per-retailer "seasonal offers" links (re-read on each reload, so
+        # edits in settings apply after the set_provider_settings reload).
+        self._store_offer_links = read_store_offer_links(hass, entry)
 
         # custom_parser is stored as a JSON string in entry.options (so the
         # value can survive HA's config_entry serialization). Parse it once
@@ -485,6 +493,14 @@ class PriceWatchCoordinator(
         preserving HA's entity registry history for existing entities.
         """
         return self._primary_listing_id
+
+    def offer_page_url_for(self, url: str | None) -> str | None:
+        """The retailer's seasonal-offers page for a listing URL, or None.
+
+        Matches the URL's host against the configured store-offer links so
+        the panel can show a "Tilboð hjá <store>" link on that card.
+        """
+        return match_offer_link(url or "", self._store_offer_links)
 
     def get_listing_state(self, listing_id: str) -> dict[str, Any] | None:
         """Return the listing's runtime state dict.

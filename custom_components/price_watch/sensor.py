@@ -309,6 +309,9 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
         # Listing URL: prefer the listing config's URL; fall back to
         # the coordinator's product-level URL (primary listing).
         product_url = config.get("url") or self.coordinator.url
+        # Retailer's seasonal-offers page for this listing's host (config-
+        # based, so it's available even when extraction has failed).
+        offer_page_url = self.coordinator.offer_page_url_for(product_url)
         result = self._result
         if result is None:
             # Extraction hasn't succeeded yet (first fetch failed: no
@@ -317,11 +320,14 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
             # panel renders the card and the ✎ editor's "Test on live page"
             # button has a URL to act on — otherwise the user can't reach
             # the tools that would fix this very listing.
-            return {
+            minimal = {
                 ATTR_TITLE: self.coordinator.entry.title or "",
                 ATTR_PRODUCT_URL: product_url,
                 ATTR_RETAILER: config.get("retailer"),
             }
+            if offer_page_url:
+                minimal["offer_page_url"] = offer_page_url
+            return minimal
         state = self._listing_state
 
         attrs: dict[str, Any] = {
@@ -399,6 +405,10 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
             attrs["product_number"] = result.product_number
         if result.description_name:
             attrs["description_name"] = result.description_name
+
+        # Retailer's seasonal-offers page → "Tilboð hjá <store>" link.
+        if offer_page_url:
+            attrs["offer_page_url"] = offer_page_url
 
         # Per-listing shipping signal, reusing the same heuristic that
         # decides this for AI alternatives. There's no AI guess for a
