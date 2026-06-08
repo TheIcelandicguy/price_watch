@@ -427,6 +427,11 @@ export class PriceWatchPanel extends LitElement {
   // Editable form fields.
   @state() private _selPriceSelector = "";
   @state() private _selTitleSelector = "";
+  // Manual price-per-unit: quantity the price covers + its unit label (e.g.
+  // 4.8 + "m" → kr/m). Blank = leave unchanged; "0" = clear. Start blank (the
+  // current value, if any, shows as kr/m on the card).
+  @state() private _selUnitQty = "";
+  @state() private _selUnitLabel = "";
   // Request cookies (Cookie-header string). Write-only: we never surface
   // the stored value to the frontend (cookies are session secrets), so the
   // field starts blank and an empty value means "leave existing cookies
@@ -837,6 +842,8 @@ export class PriceWatchPanel extends LitElement {
     this._selListing = listing;
     this._selPriceSelector = "";
     this._selTitleSelector = "";
+    this._selUnitQty = "";
+    this._selUnitLabel = "";
     this._selCookies = "";
     this._selTestResult = null;
     this._selTestError = null;
@@ -925,8 +932,10 @@ export class PriceWatchPanel extends LitElement {
     if (!this._conn || !this._selProduct || !this._selListing) return;
     const priceSelector = this._selPriceSelector.trim();
     const cookies = this._selCookies.trim();
-    if (!priceSelector && !cookies) {
-      this._selSaveError = "Enter a price selector or cookies first.";
+    const unitQty = this._selUnitQty.trim();
+    if (!priceSelector && !cookies && !unitQty) {
+      this._selSaveError =
+        "Enter a price selector, cookies, or a unit quantity first.";
       return;
     }
     const serviceData: Record<string, unknown> = {
@@ -943,6 +952,10 @@ export class PriceWatchPanel extends LitElement {
     }
     if (cookies) {
       serviceData.request_cookies = cookies;
+    }
+    if (unitQty) {
+      serviceData.unit_quantity = unitQty;
+      serviceData.unit_label = this._selUnitLabel.trim() || "m";
     }
     this._selSaving = true;
     this._selSaveError = null;
@@ -3197,6 +3210,33 @@ export class PriceWatchPanel extends LitElement {
               />
             </label>
 
+            <label class="trackform__field">
+              <span>Price per unit <em>(optional — e.g. 4.8 m → kr/m)</em></span>
+              <div class="sel__unit-row">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  .value=${this._selUnitQty}
+                  @input=${(e: Event) =>
+                    (this._selUnitQty = (e.target as HTMLInputElement).value)}
+                  placeholder="quantity (e.g. 4.8)"
+                />
+                <input
+                  type="text"
+                  .value=${this._selUnitLabel}
+                  @input=${(e: Event) =>
+                    (this._selUnitLabel = (e.target as HTMLInputElement).value)}
+                  placeholder="unit (m, L, kg…)"
+                />
+              </div>
+              <div class="trackform__hint">
+                Shows “≈ kr/unit” on the card (price ÷ quantity) — for pages
+                priced for a quantity (e.g. a board sold by the meter, or a
+                length range). Blank = leave unchanged; enter 0 to clear.
+              </div>
+            </label>
+
             <div class="sel__test-row">
               <button
                 class="sel__test-btn"
@@ -3813,6 +3853,18 @@ export class PriceWatchPanel extends LitElement {
       padding: 4px 8px;
       background: var(--primary-background-color, #f5f5f5);
       border-radius: 6px;
+    }
+    .sel__unit-row {
+      display: flex;
+      gap: 8px;
+    }
+    .sel__unit-row input:first-child {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .sel__unit-row input:last-child {
+      flex: 0 0 9rem;
+      min-width: 0;
     }
     .sel__test-row {
       display: flex;

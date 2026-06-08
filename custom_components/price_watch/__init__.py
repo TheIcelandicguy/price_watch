@@ -901,6 +901,32 @@ async def _register_services(hass: HomeAssistant) -> None:
         if "retailer" in call.data and call.data.get("retailer"):
             target["retailer"] = call.data["retailer"]
 
+        # Manual price-per-unit: a quantity + unit label (e.g. 4.8 + "m") so a
+        # listing whose price covers a quantity gets a kr/<unit> figure on the
+        # card. Present-and-empty clears. Used when extraction can't derive it
+        # (e.g. Bauhaus lumber priced for a 3-4.2m range).
+        if "unit_quantity" in call.data:
+            raw_q = call.data.get("unit_quantity")
+            if raw_q in (None, "", 0):
+                target.pop("unit_quantity", None)
+            else:
+                try:
+                    q = float(raw_q)
+                except (ValueError, TypeError) as err:
+                    raise HomeAssistantError(
+                        "unit_quantity must be a number"
+                    ) from err
+                if q <= 0:
+                    target.pop("unit_quantity", None)
+                else:
+                    target["unit_quantity"] = q
+        if "unit_label" in call.data:
+            label = (call.data.get("unit_label") or "").strip()
+            if label:
+                target["unit_label"] = label
+            else:
+                target.pop("unit_label", None)
+
         if "request_cookies" in call.data:
             raw_cookies = call.data.get("request_cookies")
             cookie_str = _cookies_to_header_str(raw_cookies)
@@ -1051,6 +1077,8 @@ async def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("currency"): str,
                 vol.Optional("retailer"): str,
                 vol.Optional("request_cookies"): vol.Any(str, dict, list),
+                vol.Optional("unit_quantity"): vol.Any(None, str, vol.Coerce(float)),
+                vol.Optional("unit_label"): vol.Any(None, str),
             }
         ),
     )

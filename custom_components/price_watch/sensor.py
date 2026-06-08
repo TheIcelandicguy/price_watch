@@ -431,10 +431,20 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
                     (result.price - typical) / typical * 100
                 )
 
-        # Price-per-unit (e.g. kr/m for Byko lumber), when known.
+        # Price-per-unit. Extraction may supply it (Byko kr/m). Otherwise a
+        # manual per-listing quantity + label (e.g. Bauhaus "4.8 m", set via
+        # edit_listing) yields one from the current price.
         if result.unit_price and result.unit_label:
             attrs["unit_price"] = result.unit_price
             attrs["unit_label"] = result.unit_label
+        elif config.get("unit_quantity"):
+            try:
+                q = float(config["unit_quantity"])
+            except (ValueError, TypeError):
+                q = 0.0
+            if q > 0 and result.price:
+                attrs["unit_price"] = round(result.price / q)
+                attrs["unit_label"] = (config.get("unit_label") or "unit").strip()
 
         # Per-listing shipping signal, reusing the same heuristic that
         # decides this for AI alternatives. There's no AI guess for a
