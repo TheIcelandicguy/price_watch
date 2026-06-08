@@ -32,9 +32,9 @@
       },
       "settings_openai": {
         "title": "OpenAI-samhæfð þjónusta",
-        "description": "Bendir á hvaða þjónustu sem talar OpenAI chat-completions API: OpenAI, Ollama (ókeypis/staðbundið), Groq, OpenRouter, LM Studio, Together, Fireworks o.fl.\n\nFylltu base URL (t.d. `https://api.openai.com/v1` eða `http://localhost:11434/v1`) og líkan. Skildu API lykil eftir auðan fyrir staðbundna þjóna.",
+        "description": "Bendir á hvaða þjónustu sem talar OpenAI chat-completions API: OpenAI, Ollama (ókeypis/staðbundið), Groq, OpenRouter, LM Studio, Together, Fireworks o.fl.\n\nFylltu base URL og líkan. Skildu API lykil eftir auðan fyrir staðbundna þjóna.",
         "data": {
-          "base_url": "Base URL (t.d. https://api.openai.com/v1 eða http://localhost:11434/v1)",
+          "base_url": "Base URL OpenAI-samhæfðs endapunkts (OpenAI, eða staðbundinn Ollama/LM Studio þjónn)",
           "model_openai": "Líkansheiti (t.d. gpt-4o-mini, llama3.3, qwen-coder)",
           "api_key": "API lykill (sk-… — skildu autt fyrir staðbundna þjóna)",
           "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
@@ -88,10 +88,10 @@
       "invalid_key": "API lykill er ógildur.",
       "validation_error": "Gat ekki staðfest API lykil. Athugaðu netnotkun.",
       "invalid_region_code": "Landskóði verður að vera 2 stafir (t.d. IS, US, GB).",
-      "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur (t.d. https://api.openai.com/v1).",
+      "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
       "model_required": "Líkansheiti er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
       "openai_compat_unreachable": "Gat ekki náð í OpenAI-samhæfða þjónustu. Athugaðu URL, net, og að þjónninn sé í gangi. Ef þjónninn styður ekki tool calls, prófaðu 'Force JSON mode'.",
-      "extra_headers_invalid_json": "Aukahöfuð verða að vera gilt JSON (t.d. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_invalid_json": "Aukahöfuð verða að vera gilt JSON — hlutur með lykla/gildi pörum, t.d. HTTP-Referer haus.",
       "extra_headers_not_object": "Aukahöfuð verða að vera JSON hlutur (lykill/gildi), ekki listi eða strengur.",
       "custom_parser_invalid_json": "Eigin þáttari verður að vera gilt JSON.",
       "custom_parser_not_object": "Eigin þáttari verður að vera JSON hlutur (lykill/gildi), ekki listi eða strengur.",
@@ -145,7 +145,7 @@
         "title": "OpenAI-samhæfð þjónusta",
         "description": "Bendir á hvaða þjónustu sem talar OpenAI chat-completions API: OpenAI, Ollama (ókeypis/staðbundið), Groq, OpenRouter, LM Studio o.fl. Skildu API lykil eftir auðan fyrir staðbundna þjóna.",
         "data": {
-          "base_url": "Base URL (t.d. https://api.openai.com/v1 eða http://localhost:11434/v1)",
+          "base_url": "Base URL OpenAI-samhæfðs endapunkts (OpenAI, eða staðbundinn Ollama/LM Studio þjónn)",
           "model_openai": "Líkansheiti (t.d. gpt-4o-mini, llama3.3, qwen-coder)",
           "api_key": "API lykill (sk-… — skildu autt fyrir staðbundna þjóna)",
           "input_cost_per_mtok": "Inntakskostnaður á milljón tókena (USD, 0 = ókeypis/óvíst)",
@@ -172,7 +172,7 @@
       },
       "parser": {
         "title": "Þáttari",
-        "description": "Vafrakökur eru geymdar inni í þáttarastillingum; ekki snerta þáttara sjálfan nema þú vitir hvað þú ert að gera.\n\n**Vafrakökur** — settu Cookie höfuð gildi (DevTools → Network → endurhlaða → document → Headers → afritaðu `Cookie:` gildið).\n\n**Eigin þáttari** — JSON, t.d. `{\"type\": \"regex\", \"price\": \"\\\\$([\\\\d.,]+)\", \"request_cookies\": \"...\"}`. Skildu autt til að nota sjálfvirkan preset.",
+        "description": "Vafrakökur eru geymdar inni í þáttarastillingum; ekki snerta þáttara sjálfan nema þú vitir hvað þú ert að gera.\n\n**Vafrakökur** — settu Cookie höfuð gildi (DevTools → Network → endurhlaða → document → Headers → afritaðu `Cookie:` gildið).\n\n**Eigin þáttari** — JSON: regex tegund með verðmynstri og valfrjálsum request_cookies. Skildu autt til að nota sjálfvirkan preset.",
         "data": {
           "cookies": "Vafrakökur (einnar línu höfuðgildi)",
           "custom_parser": "Eigin þáttari (JSON, fyrir lengra komna)",
@@ -211,10 +211,10 @@
       "invalid_key": "API lykill er ógildur.",
       "validation_error": "Gat ekki staðfest API lykil. Athugaðu netnotkun.",
       "invalid_region_code": "Landskóði verður að vera 2 stafir (t.d. IS, US, GB).",
-      "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur (t.d. https://api.openai.com/v1).",
+      "base_url_required": "Base URL er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
       "model_required": "Líkansheiti er nauðsynlegt fyrir OpenAI-samhæfðar þjónustur.",
       "openai_compat_unreachable": "Gat ekki náð í OpenAI-samhæfða þjónustu. Athugaðu URL, net, og að þjónninn sé í gangi. Ef þjónninn styður ekki tool calls, prófaðu 'Force JSON mode'.",
-      "extra_headers_invalid_json": "Aukahöfuð verða að vera gilt JSON (t.d. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_invalid_json": "Aukahöfuð verða að vera gilt JSON — hlutur með lykla/gildi pörum, t.d. HTTP-Referer haus.",
       "extra_headers_not_object": "Aukahöfuð verða að vera JSON hlutur (lykill/gildi), ekki listi eða strengur.",
       "custom_parser_invalid_json": "Eigin þáttari verður að vera gilt JSON.",
       "custom_parser_not_object": "Eigin þáttari verður að vera JSON hlutur (lykill/gildi)."

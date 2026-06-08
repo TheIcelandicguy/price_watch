@@ -32,9 +32,9 @@
       },
       "settings_openai": {
         "title": "OpenAI-compatible provider",
-        "description": "Point at any service speaking OpenAI's chat-completions API: OpenAI, Ollama (free/local), Groq, OpenRouter, LM Studio, Together, Fireworks, etc.\n\nFill in the base URL (e.g. `https://api.openai.com/v1` or `http://localhost:11434/v1`) and model. Leave the API key blank for local servers.",
+        "description": "Point at any service speaking OpenAI's chat-completions API: OpenAI, Ollama (free/local), Groq, OpenRouter, LM Studio, Together, Fireworks, etc.\n\nFill in the base URL and model. Leave the API key blank for local servers.",
         "data": {
-          "base_url": "Base URL (e.g. https://api.openai.com/v1 or http://localhost:11434/v1)",
+          "base_url": "Base URL of the OpenAI-compatible endpoint (OpenAI, or a local Ollama/LM Studio server)",
           "model_openai": "Model name (e.g. gpt-4o-mini, llama3.3, qwen-coder)",
           "api_key": "API key (sk-… — leave blank for local servers)",
           "input_cost_per_mtok": "Input cost per million tokens (USD, 0 = free/unknown)",
@@ -88,7 +88,7 @@
       "invalid_key": "API key is invalid.",
       "validation_error": "Could not validate the API key. Check your network connection.",
       "invalid_region_code": "Country code must be 2 letters (e.g. IS, US, GB).",
-      "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
+      "base_url_required": "Base URL is required for OpenAI-compatible providers.",
       "model_required": "Model name is required for OpenAI-compatible providers.",
       "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
       "extra_headers_invalid_json": "Extra headers must be valid JSON — a JSON object of key/value pairs, e.g. an HTTP-Referer header set to your app URL.",
@@ -145,7 +145,7 @@
         "title": "OpenAI-compatible provider",
         "description": "Point at any service speaking OpenAI's chat-completions API: OpenAI, Ollama (free/local), Groq, OpenRouter, LM Studio, etc. Leave the API key blank for local servers.",
         "data": {
-          "base_url": "Base URL (e.g. https://api.openai.com/v1 or http://localhost:11434/v1)",
+          "base_url": "Base URL of the OpenAI-compatible endpoint (OpenAI, or a local Ollama/LM Studio server)",
           "model_openai": "Model name (e.g. gpt-4o-mini, llama3.3, qwen-coder)",
           "api_key": "API key (sk-… — leave blank for local servers)",
           "input_cost_per_mtok": "Input cost per million tokens (USD, 0 = free/unknown)",
@@ -211,7 +211,7 @@
       "invalid_key": "API key is invalid.",
       "validation_error": "Could not validate the API key. Check your network connection.",
       "invalid_region_code": "Country code must be 2 letters (e.g. IS, US, GB).",
-      "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
+      "base_url_required": "Base URL is required for OpenAI-compatible providers.",
       "model_required": "Model name is required for OpenAI-compatible providers.",
       "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
       "extra_headers_invalid_json": "Extra headers must be valid JSON — a JSON object of key/value pairs, e.g. an HTTP-Referer header set to your app URL.",
