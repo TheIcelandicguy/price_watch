@@ -7,11 +7,6 @@ secrets.yaml
 # Claude Code local settings (machine-specific)
 .claude/settings.local.json
 
-# CI workflow temporarily excluded: gh token lacks `workflow` scope.
-# To re-add: run `gh auth refresh -h github.com -s workflow`, then remove this
-# line and `git add .github/workflows/validate.yml`.
-.github/workflows/validate.yml
-
 # Prior chat transcript export (bulky, may contain pasted keys)
 This is a copy of a chat between Claude and Davíð.txt
 *.transcript.txt

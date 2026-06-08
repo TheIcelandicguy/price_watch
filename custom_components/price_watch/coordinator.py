@@ -10,13 +10,12 @@ One coordinator instance per tracked product. Handles:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import (
     TimestampDataUpdateCoordinator,
 )
@@ -24,49 +23,24 @@ from homeassistant.util import dt as dt_util
 
 from .ai import (
     AIProvider,
-    PROVIDER_ANTHROPIC,
-    PROVIDER_OPENAI_COMPATIBLE,
-    get_provider,
 )
 from .const import (
-    ALTERNATIVES_REFRESH_HOURS,
-    CONF_AI_PROVIDER,
-    CONF_ALTERNATIVES_REGION,
     CONF_USER_REGION,
     CURRENCY_TO_COUNTRY,
-    CONF_API_KEY,
-    CONF_BASE_URL,
     CONF_CUSTOM_PARSER,
-    CONF_DAILY_ALTERNATIVES,
-    CONF_EXTRA_HEADERS,
     CONF_FORCE_DISCONTINUED,
-    CONF_FORCE_JSON_MODE,
-    CONF_INPUT_COST_PER_MTOK,
-    CONF_MAX_ALTERNATIVES,
-    CONF_MAX_HTML_CHARS,
-    CONF_MODEL,
-    CONF_OUTPUT_COST_PER_MTOK,
     CONF_PAUSED,
     CONF_SCAN_INTERVAL,
     CONF_TARGET_PRICE,
     CONF_URL,
-    DEFAULT_MAX_ALTERNATIVES,
-    DEFAULT_MODEL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    ENTRY_TYPE_SETTINGS,
     EVENT_DISCONTINUED,
-    STORAGE_VERSION,
 )
 from .extractor import ExtractionResult
 from .fx import FxRates
 from .search import (
-    AISynthesizerSearchProvider,
-    Alternative,
-    AnthropicNativeSearchProvider,
     SearchProvider,
-    SearchProviderError,
-    SearchQuery,
 )
 from .coordinator_alternatives import AlternativesMixin
 from .coordinator_events import EventsMixin
