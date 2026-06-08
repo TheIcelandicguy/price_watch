@@ -32,6 +32,7 @@ from .base import (
     SearchQuery,
 )
 from .duckduckgo import DuckDuckGoSearchProvider, RawSearchHit
+from .searxng import SearxngSearchProvider
 
 # Search provider type identifiers — what gets stored if/when we ever
 # expose a per-product "search provider override" option. For now,
@@ -58,4 +59,5 @@ __all__ = [
     "SearchProviderError",
     "SearchProviderUnavailable",
     "SearchQuery",
+    "SearxngSearchProvider",
 ]

@@ -365,6 +365,53 @@ async def test_fetch_slot_serializes_same_host(monkeypatch):
     assert peak == 1
 
 
+def test_searxng_normalizes_base_url():
+    from custom_components.price_watch.search.searxng import SearxngSearchProvider
+
+    assert SearxngSearchProvider("http://x:8080/")._base_url == "http://x:8080"
+    assert SearxngSearchProvider("http://x:8080/search")._base_url == "http://x:8080"
+    assert SearxngSearchProvider("http://x:8080/search/")._base_url == "http://x:8080"
+
+
+@pytest.mark.asyncio
+async def test_searxng_parses_results(monkeypatch):
+    from custom_components.price_watch.search.searxng import SearxngSearchProvider
+
+    p = SearxngSearchProvider("http://searx.local", session=object())
+
+    async def fake_fetch(_query):
+        return {
+            "results": [
+                {"url": "https://shop.is/a", "title": "Widget A", "content": "buy"},
+                {"url": "", "title": "no url"},  # dropped: no url
+                {"url": "https://searx.local/x", "title": "self"},  # dropped: self host
+                {"url": "https://shop2.is/b", "title": "Widget B", "content": ""},
+            ]
+        }
+
+    monkeypatch.setattr(p, "_fetch_json", fake_fetch)
+    hits = await p.search("widget", max_results=10)
+    assert [h.url for h in hits] == ["https://shop.is/a", "https://shop2.is/b"]
+    assert hits[0].title == "Widget A"
+    assert hits[0].snippet == "buy"
+
+
+@pytest.mark.asyncio
+async def test_searxng_respects_max_results(monkeypatch):
+    from custom_components.price_watch.search.searxng import SearxngSearchProvider
+
+    p = SearxngSearchProvider("http://searx.local", session=object())
+
+    async def fake_fetch(_query):
+        return {"results": [
+            {"url": f"https://s{i}.is/x", "title": f"T{i}"} for i in range(10)
+        ]}
+
+    monkeypatch.setattr(p, "_fetch_json", fake_fetch)
+    hits = await p.search("q", max_results=3)
+    assert len(hits) == 3
+
+
 def test_match_offer_link_host_suffix():
     from custom_components.price_watch.provider_config import match_offer_link
 

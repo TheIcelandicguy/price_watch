@@ -77,6 +77,7 @@ from .provider_config import (
     build_ai_provider,
     match_offer_link,
     read_ai_fallback_only,
+    read_searxng_url,
     read_store_offer_links,
 )
 from .store import PriceWatchStore, derive_listing_id, empty_listing_state
@@ -128,6 +129,9 @@ class PriceWatchCoordinator(
         # Per-retailer "seasonal offers" links (re-read on each reload, so
         # edits in settings apply after the set_provider_settings reload).
         self._store_offer_links = read_store_offer_links(hass, entry)
+        # Optional SearXNG instance — replaces DuckDuckGo as the raw search
+        # source for alternatives discovery when set.
+        self._searxng_url: str | None = read_searxng_url(hass, entry)
 
         # custom_parser is stored as a JSON string in entry.options (so the
         # value can survive HA's config_entry serialization). Parse it once

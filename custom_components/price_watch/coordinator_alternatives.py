@@ -61,6 +61,7 @@ from .search import (
     DuckDuckGoSearchProvider,
     SearchProvider,
     SearchProviderError,
+    SearxngSearchProvider,
     SearchQuery,
 )
 
@@ -346,21 +347,29 @@ class AlternativesMixin:
         if self._search_provider is not None:
             return self._search_provider
 
+        session = async_get_clientsession(self.hass)
+        # A configured SearXNG instance replaces DuckDuckGo as the raw search
+        # source (free path + AI synthesizer); Anthropic's native web_search
+        # is unaffected.
+        raw_source = (
+            SearxngSearchProvider(self._searxng_url, session=session)
+            if self._searxng_url
+            else DuckDuckGoSearchProvider(session=session)
+        )
+
         ai_provider = self._ai_provider
         if ai_provider is None or self._ai_fallback_only:
-            # Raw DuckDuckGo search (same path the panel live-search uses).
-            # Either no AI at all ("Free" mode), OR the user chose
-            # "fallback only" — keep discovery free and reserve the AI for
-            # failed price extractions. async_find_alternatives detects this
-            # provider type and maps raw hits straight to Alternatives
-            # (DuckDuckGoSearchProvider.find_alternatives intentionally raises).
-            session = async_get_clientsession(self.hass)
-            self._search_provider = DuckDuckGoSearchProvider(session=session)
+            # Raw search (same path the panel live-search uses). Either no AI
+            # at all ("Free" mode), OR the user chose "fallback only" — keep
+            # discovery free and reserve the AI for failed price extractions.
+            # async_find_alternatives detects a raw provider and maps its hits
+            # straight to Alternatives (find_alternatives intentionally raises).
+            self._search_provider = raw_source
             _LOGGER.debug(
-                "%s: %s — using DuckDuckGoSearchProvider (raw hits) for "
-                "alternatives",
+                "%s: %s — using %s (raw hits) for alternatives",
                 self.entry.entry_id,
                 "AI fallback-only" if ai_provider else "no AI provider",
+                raw_source.name,
             )
             return self._search_provider
 
@@ -393,14 +402,14 @@ class AlternativesMixin:
             )
             return self._search_provider
 
-        # Default: AI synthesizer over DuckDuckGo. Works for any
-        # AIProvider that implements call_with_tool (OpenAI-compat
-        # does; we added it as part of this feature).
-        session = async_get_clientsession(self.hass)
+        # Default: AI synthesizer over the raw source (DuckDuckGo, or SearXNG
+        # when configured). Works for any AIProvider that implements
+        # call_with_tool (OpenAI-compat does).
         try:
             self._search_provider = AISynthesizerSearchProvider(
                 ai_provider=ai_provider,
                 session=session,
+                raw_source=raw_source,
             )
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning(
@@ -559,10 +568,10 @@ class AlternativesMixin:
         alternatives: list[Alternative] = []
         error: str | None = None
         try:
-            if isinstance(provider, DuckDuckGoSearchProvider):
-                # No-AI path: DDG returns raw hits, not Alternatives.
-                # Map them directly using the product title as the query
-                # (best we can do without AI same-SKU filtering).
+            if isinstance(provider, (DuckDuckGoSearchProvider, SearxngSearchProvider)):
+                # No-AI path: raw hits, not Alternatives. Map them directly
+                # using the product title as the query (best we can do
+                # without AI same-SKU filtering).
                 hits = await provider.search(
                     query.title, max_results=query.max_results
                 )

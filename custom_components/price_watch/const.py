@@ -98,6 +98,13 @@ CONF_EXCLUDED_DOMAINS: Final = "excluded_domains"
 # product pages. Default False = AI used for both discovery and extraction.
 CONF_AI_FALLBACK_ONLY: Final = "ai_fallback_only"
 
+# Optional self-hosted SearXNG instance base URL. When set, it replaces
+# DuckDuckGo as the raw search source for alternatives discovery and the
+# panel's live "Search & add" — both the free path (raw hits) and the
+# AI-synthesizer path (hits handed to the AI). Empty = use DuckDuckGo.
+# (Anthropic's native web_search is unaffected.)
+CONF_SEARXNG_URL: Final = "searxng_url"
+
 # Per-retailer "seasonal offers" landing pages. Global, on the settings
 # entry — a list of {"host", "url"}. A card whose listing host matches one
 # gets a "Tilboð hjá <store>" link. Editable in the panel so a store's

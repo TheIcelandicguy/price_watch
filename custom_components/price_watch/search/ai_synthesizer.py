@@ -180,6 +180,7 @@ class AISynthesizerSearchProvider:
         self,
         ai_provider: AIProvider,
         session: aiohttp.ClientSession,
+        raw_source: Any | None = None,
     ) -> None:
         if ai_provider is None:
             raise ValueError(
@@ -187,7 +188,11 @@ class AISynthesizerSearchProvider:
             )
         self._ai = ai_provider
         self._session = session
-        self._ddg = DuckDuckGoSearchProvider(session=session)
+        # The raw search source whose hits the AI structures. Defaults to
+        # DuckDuckGo; a SearxngSearchProvider can be injected to use a
+        # self-hosted metasearch instance instead. Either exposes
+        # ``search(query, max_results) -> list[RawSearchHit]``.
+        self._raw = raw_source or DuckDuckGoSearchProvider(session=session)
 
     async def find_alternatives(self, query: SearchQuery) -> list[Alternative]:
         """Two-step: DDG search, then AI synthesis."""
@@ -200,7 +205,7 @@ class AISynthesizerSearchProvider:
             ddg_query += f" {query.region}"
 
         try:
-            hits = await self._ddg.search(ddg_query, max_results=_MAX_HITS_FOR_AI)
+            hits = await self._raw.search(ddg_query, max_results=_MAX_HITS_FOR_AI)
         except SearchProviderError:
             # Bubble up — caller wraps for user-facing reporting.
             raise

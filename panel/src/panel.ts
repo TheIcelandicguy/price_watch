@@ -81,7 +81,12 @@ interface SearchResult {
 
 // Reply envelope from price_watch/search.
 interface SearchResponse {
-  engine: "anthropic_native" | "ai_synthesizer" | "duckduckgo" | "none";
+  engine:
+    | "anthropic_native"
+    | "ai_synthesizer"
+    | "duckduckgo"
+    | "searxng"
+    | "none";
   results: SearchResult[];
 }
 
@@ -92,6 +97,7 @@ const ENGINE_LABELS: Record<SearchResponse["engine"], string> = {
   anthropic_native: "AI web search",
   ai_synthesizer: "AI + web search",
   duckduckgo: "Web results (no AI)",
+  searxng: "SearXNG (no AI)",
   none: "",
 };
 
@@ -127,6 +133,9 @@ interface ProviderSettings {
   // Per-retailer seasonal-offers links (host → offers page URL). Drives the
   // "Tilboð hjá <store>" link on cards; editable here.
   store_offer_links: { host: string; url: string }[];
+  // Optional SearXNG instance base URL — replaces DuckDuckGo as the raw
+  // search source when set. Empty = DuckDuckGo.
+  searxng_url: string;
 }
 
 // set_provider_settings adds a count of product entries scheduled for
@@ -400,6 +409,8 @@ export class PriceWatchPanel extends LitElement {
   @state() private _pFallbackOnly = false;
   // Store offer links, edited as "host | url" lines.
   @state() private _pStoreOfferLinks = "";
+  // SearXNG instance base URL (blank = DuckDuckGo).
+  @state() private _pSearxngUrl = "";
   // Whether a key is already stored (drives the "leave blank to keep"
   // placeholder). Never the key itself.
   @state() private _providerHasKey = false;
@@ -1623,6 +1634,7 @@ export class PriceWatchPanel extends LitElement {
     this._pStoreOfferLinks = (s.store_offer_links ?? [])
       .map((l) => `${l.host} | ${l.url}`)
       .join("\n");
+    this._pSearxngUrl = s.searxng_url ?? "";
   }
 
   /**
@@ -1714,6 +1726,8 @@ export class PriceWatchPanel extends LitElement {
     payload.ai_fallback_only = this._pFallbackOnly;
     // Store offer links — "host | url" lines; backend parses + normalizes.
     payload.store_offer_links = this._pStoreOfferLinks;
+    // SearXNG URL — backend validates reachability before saving.
+    payload.searxng_url = this._pSearxngUrl.trim();
 
     try {
       const s = await this._conn.sendMessagePromise<SetProviderResponse>({
@@ -2330,6 +2344,7 @@ export class PriceWatchPanel extends LitElement {
 
         ${this._pProvider !== "none" ? this._renderFallbackOnly() : null}
 
+        ${this._renderSearxng()}
         ${this._renderExcludedDomains()}
         ${this._renderStoreOfferLinks()}
 
@@ -2384,6 +2399,33 @@ export class PriceWatchPanel extends LitElement {
         Alternatives search stays on free DuckDuckGo; the AI is used only when
         free price extraction can't read a price. Leave off to also use the AI
         for richer alternative search.
+      </div>
+    `;
+  }
+
+  /**
+   * SearXNG instance URL — when set, replaces DuckDuckGo as the raw search
+   * source for both free mode and the AI synthesizer. Validated on save.
+   */
+  private _renderSearxng() {
+    return html`
+      <label class="trackform__field">
+        <span>SearXNG URL <em>(optional)</em></span>
+        <input
+          type="url"
+          .value=${this._pSearxngUrl}
+          @input=${(e: Event) =>
+            (this._pSearxngUrl = (e.target as HTMLInputElement).value)}
+          placeholder="http://192.168.0.92:8080"
+        />
+      </label>
+      <div class="trackform__hint">
+        Point this at your own SearXNG instance to replace DuckDuckGo for
+        alternatives search (free mode and AI both). More reliable than
+        scraping DDG — no rate-limits, aggregates many engines. The instance
+        needs the <code>json</code> format enabled in <code>settings.yml</code>.
+        Leave blank to use DuckDuckGo. (Anthropic's own web search is
+        unaffected.)
       </div>
     `;
   }

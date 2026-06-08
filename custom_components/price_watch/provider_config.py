@@ -96,6 +96,23 @@ def match_offer_link(url: str, links: list[dict[str, str]]) -> str | None:
     return None
 
 
+def read_searxng_url(hass: HomeAssistant, entry: ConfigEntry) -> str | None:
+    """Configured SearXNG base URL (settings entry), or None when unset.
+
+    When set, SearXNG replaces DuckDuckGo as the raw search source.
+    """
+    from .const import CONF_SEARXNG_URL
+
+    for candidate in (entry, _find_settings_entry(hass, entry.domain)):
+        if candidate is None:
+            continue
+        for src in (candidate.options, candidate.data):
+            val = src.get(CONF_SEARXNG_URL)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    return None
+
+
 def read_ai_fallback_only(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Whether the AI should be used ONLY as a price-extraction fallback.
 

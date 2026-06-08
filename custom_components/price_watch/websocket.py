@@ -50,6 +50,7 @@ from .const import (
     CONF_BASE_URL,
     CONF_AI_FALLBACK_ONLY,
     CONF_EXCLUDED_DOMAINS,
+    CONF_SEARXNG_URL,
     CONF_STORE_OFFER_LINKS,
     DEFAULT_STORE_OFFER_LINKS,
     CONF_EXTRA_HEADERS,
@@ -78,6 +79,7 @@ from .search.base import (
     SearchQuery,
 )
 from .search.duckduckgo import DuckDuckGoSearchProvider
+from .search.searxng import SearxngSearchProvider
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -244,9 +246,17 @@ async def ws_search(
     # at all falls back to raw DDG hits.
     provider: Any
     engine: str
+    # A configured SearXNG instance replaces DuckDuckGo as the raw source for
+    # both the free path and the AI synthesizer (Anthropic native unaffected).
+    searxng_url = _read_setting(settings, CONF_SEARXNG_URL)
+    raw_source = (
+        SearxngSearchProvider(searxng_url, session=session)
+        if isinstance(searxng_url, str) and searxng_url.strip()
+        else DuckDuckGoSearchProvider(session=session)
+    )
     if ai_provider is None:
-        provider = DuckDuckGoSearchProvider(session=session)
-        engine = "duckduckgo"
+        provider = raw_source
+        engine = raw_source.name  # "searxng" or "duckduckgo"
     elif type(ai_provider).__name__ == "AnthropicProvider":
         provider = AnthropicNativeSearchProvider(
             api_key=_read_setting(settings, CONF_API_KEY),
@@ -255,12 +265,12 @@ async def ws_search(
         engine = "anthropic_native"
     else:
         provider = AISynthesizerSearchProvider(
-            ai_provider=ai_provider, session=session
+            ai_provider=ai_provider, session=session, raw_source=raw_source
         )
         engine = "ai_synthesizer"
 
     try:
-        if engine == "duckduckgo":
+        if isinstance(provider, (DuckDuckGoSearchProvider, SearxngSearchProvider)):
             hits = await provider.search(query_text, max_results=max_results)
             results = []
             for hit in hits:
@@ -364,6 +374,7 @@ def _current_provider_state(entry: ConfigEntry | None) -> dict[str, Any]:
             "excluded_domains": [],
             "ai_fallback_only": False,
             "store_offer_links": [dict(x) for x in DEFAULT_STORE_OFFER_LINKS],
+            "searxng_url": "",
         }
 
     provider_type = _read_setting(entry, CONF_AI_PROVIDER, PROVIDER_ANTHROPIC)
@@ -399,6 +410,7 @@ def _current_provider_state(entry: ConfigEntry | None) -> dict[str, Any]:
         "anthropic_models": models,
         "excluded_domains": _read_excluded_domains(entry),
         "ai_fallback_only": bool(_read_setting(entry, CONF_AI_FALLBACK_ONLY, False)),
+        "searxng_url": _read_setting(entry, CONF_SEARXNG_URL, "") or "",
         "store_offer_links": (
             raw_offer_links
             if isinstance(raw_offer_links := _read_setting(entry, CONF_STORE_OFFER_LINKS), list)
@@ -447,6 +459,9 @@ async def ws_get_provider_settings(
         # Per-retailer offers-page links. A "host | url" per line string, or
         # a list of {host, url}. Independent of provider.
         vol.Optional("store_offer_links"): vol.Any(None, str, list),
+        # Optional SearXNG instance base URL (replaces DuckDuckGo as the raw
+        # search source). Empty string clears it.
+        vol.Optional("searxng_url"): vol.Any(None, str),
     }
 )
 @websocket_api.async_response
@@ -478,18 +493,98 @@ async def ws_set_provider_settings(
     # alternatives, etc.) — only the AI-config keys are overwritten.
     new_options = dict(settings.options)
 
+    # --- Provider-INDEPENDENT settings: persisted FIRST, on their own, so a
+    # provider switch that fails validation below can NEVER drop them. (The
+    # bug this fixes: on "Anthropic, no key" every save failed the key check
+    # and early-returned, so the blocklist / offer links / SearXNG URL — sent
+    # in the same payload — were never saved and looked provider-scoped.)
+    indep_in_msg = any(
+        k in msg
+        for k in (
+            "excluded_domains",
+            "ai_fallback_only",
+            "store_offer_links",
+            "searxng_url",
+        )
+    )
+    if "excluded_domains" in msg:
+        raw_excl = msg.get("excluded_domains")
+        if raw_excl is None:
+            raw_excl = []
+        elif isinstance(raw_excl, str):
+            raw_excl = re.split(r"[\n,]+", raw_excl)
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in raw_excl:
+            norm = _normalize_domain(str(item))
+            if norm and norm not in seen:
+                seen.add(norm)
+                cleaned.append(norm)
+        new_options[CONF_EXCLUDED_DOMAINS] = cleaned
+
+    if "ai_fallback_only" in msg:
+        new_options[CONF_AI_FALLBACK_ONLY] = bool(msg.get("ai_fallback_only"))
+
+    if "store_offer_links" in msg:
+        raw_links = msg.get("store_offer_links")
+        rows: list[Any] = []
+        if isinstance(raw_links, str):
+            for line in raw_links.splitlines():
+                line = line.strip()
+                if "|" in line:
+                    rows.append(line.split("|", 1))
+        elif isinstance(raw_links, list):
+            rows = raw_links
+        links: list[dict[str, str]] = []
+        for row in rows:
+            if isinstance(row, list):
+                host, url = row[0].strip(), row[1].strip()
+            elif isinstance(row, dict):
+                host = str(row.get("host", "")).strip()
+                url = str(row.get("url", "")).strip()
+            else:
+                continue
+            host = _normalize_domain(host) or host.lower()
+            if host and url.startswith("http"):
+                links.append({"host": host, "url": url})
+        new_options[CONF_STORE_OFFER_LINKS] = links
+
+    if "searxng_url" in msg:
+        searxng_url = (msg.get("searxng_url") or "").strip()
+        if searxng_url:
+            probe = SearxngSearchProvider(
+                searxng_url, session=async_get_clientsession(hass)
+            )
+            try:
+                await probe.search("test", max_results=1)
+            except Exception as err:  # noqa: BLE001  (incl. SearchProviderError)
+                # Persist the other independent edits before reporting, so a
+                # bad SearXNG URL doesn't also drop the blocklist etc.
+                hass.config_entries.async_update_entry(settings, options=new_options)
+                connection.send_error(
+                    msg["id"], "searxng_unreachable", f"SearXNG check failed: {err}"
+                )
+                return
+        new_options[CONF_SEARXNG_URL] = searxng_url
+
+    if indep_in_msg:
+        # Persist independents up-front (no product reload — they're read
+        # fresh per search). Provider validation below can early-return now
+        # without losing them.
+        hass.config_entries.async_update_entry(settings, options=new_options)
+        settings = _settings_entry(hass) or settings
+        new_options = dict(settings.options)
+
     if provider == _PANEL_PROVIDER_NONE:
+        # Free mode = Anthropic provider with a null key. Leave the
+        # OpenAI-compat fields (base_url / model / costs / headers) in storage
+        # UNTOUCHED so a configured Ollama endpoint survives a switch to Free
+        # and back — Free reads neither base_url nor model, so keeping them is
+        # harmless and saves re-typing.
         new_options.update(
             {
                 CONF_AI_PROVIDER: PROVIDER_ANTHROPIC,
                 CONF_API_KEY: None,
-                CONF_MODEL: DEFAULT_MODEL,
-                CONF_BASE_URL: None,
-                CONF_INPUT_COST_PER_MTOK: 0.0,
-                CONF_OUTPUT_COST_PER_MTOK: 0.0,
-                CONF_MAX_HTML_CHARS: _DEFAULT_MAX_HTML_CHARS,
-                CONF_FORCE_JSON_MODE: False,
-                CONF_EXTRA_HEADERS: None,
             }
         )
 
@@ -529,17 +624,16 @@ async def ws_set_provider_settings(
             _LOGGER.exception("Anthropic validation error")
             connection.send_error(msg["id"], "validation_error", str(err))
             return
+        # Set the Anthropic model; leave the OpenAI-compat base_url / costs /
+        # headers in storage (Anthropic ignores them) so an Ollama endpoint
+        # isn't wiped by a round-trip through Anthropic. (CONF_MODEL is shared,
+        # so the Ollama *model* is still overwritten here — a separate key
+        # would be needed to preserve it across an Anthropic detour.)
         new_options.update(
             {
                 CONF_AI_PROVIDER: PROVIDER_ANTHROPIC,
                 CONF_API_KEY: api_key,
                 CONF_MODEL: model,
-                CONF_BASE_URL: None,
-                CONF_INPUT_COST_PER_MTOK: 0.0,
-                CONF_OUTPUT_COST_PER_MTOK: 0.0,
-                CONF_MAX_HTML_CHARS: _DEFAULT_MAX_HTML_CHARS,
-                CONF_FORCE_JSON_MODE: False,
-                CONF_EXTRA_HEADERS: None,
             }
         )
 
@@ -629,56 +723,8 @@ async def ws_set_provider_settings(
             }
         )
 
-    # Global domain blocklist — independent of provider, persisted only
-    # when the panel actually sent the field (so a provider-only save
-    # doesn't wipe it). Accept a list or a newline/comma-delimited string;
-    # normalize to bare lowercase hosts and de-dupe (order preserved).
-    if "excluded_domains" in msg:
-        raw_excl = msg.get("excluded_domains")
-        if raw_excl is None:
-            raw_excl = []
-        elif isinstance(raw_excl, str):
-            raw_excl = re.split(r"[\n,]+", raw_excl)
-        cleaned: list[str] = []
-        seen: set[str] = set()
-        for item in raw_excl:
-            norm = _normalize_domain(str(item))
-            if norm and norm not in seen:
-                seen.add(norm)
-                cleaned.append(norm)
-        new_options[CONF_EXCLUDED_DOMAINS] = cleaned
-
-    # AI fallback-only flag — persisted only when the panel sent it (so a
-    # provider-only save doesn't reset it). Independent of provider choice.
-    if "ai_fallback_only" in msg:
-        new_options[CONF_AI_FALLBACK_ONLY] = bool(msg.get("ai_fallback_only"))
-
-    # Per-retailer offers-page links — "host | url" per line, or a list of
-    # {host, url}. Normalize the host and require an http(s) URL.
-    if "store_offer_links" in msg:
-        raw_links = msg.get("store_offer_links")
-        rows: list[Any] = []
-        if isinstance(raw_links, str):
-            for line in raw_links.splitlines():
-                line = line.strip()
-                if "|" in line:
-                    rows.append(line.split("|", 1))
-        elif isinstance(raw_links, list):
-            rows = raw_links
-        links: list[dict[str, str]] = []
-        for row in rows:
-            if isinstance(row, list):
-                host, url = row[0].strip(), row[1].strip()
-            elif isinstance(row, dict):
-                host, url = str(row.get("host", "")).strip(), str(row.get("url", "")).strip()
-            else:
-                continue
-            host = _normalize_domain(host) or host.lower()
-            if host and url.startswith("http"):
-                links.append({"host": host, "url": url})
-        new_options[CONF_STORE_OFFER_LINKS] = links
-
-    # Persist. async_update_entry mutates settings.options in place, so the
+    # Persist the provider config (the independents were already saved above).
+    # async_update_entry mutates settings.options in place, so the
     # _current_provider_state() call below reflects the new values.
     hass.config_entries.async_update_entry(settings, options=new_options)
 
