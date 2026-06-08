@@ -121,6 +121,7 @@ class StorageMixin:
                 continue
             loaded[listing_id] = {
                 "history": list(ls.get("price_history") or []),
+                "daily_history": list(ls.get("daily_history") or []),
                 "lowest": ls.get("lowest"),
                 "highest": ls.get("highest"),
                 "last_hash": ls.get("last_hash"),
@@ -312,6 +313,7 @@ class StorageMixin:
             history = list(listing.get("history") or listing.get("price_history") or [])
             listings_out[listing_id] = {
                 "price_history": history,
+                "daily_history": list(listing.get("daily_history") or []),
                 "lowest": listing.get("lowest"),
                 "highest": listing.get("highest"),
                 "last_hash": listing.get("last_hash"),

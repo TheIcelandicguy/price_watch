@@ -14,6 +14,7 @@ product-level in Phase 2 (see coordinator._update_price_local).
 
 from __future__ import annotations
 
+import statistics
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -409,6 +410,31 @@ class PriceWatchMonetarySensor(_BasePriceWatchSensor):
         # Retailer's seasonal-offers page → "Tilboð hjá <store>" link.
         if offer_page_url:
             attrs["offer_page_url"] = offer_page_url
+
+        # "Good price?" context for the card verdict. lowest is all-time
+        # (cheap, meaningful after a couple of polls); typical is the median of
+        # daily closes, only once there's enough history to be meaningful.
+        lowest = state.get("lowest")
+        if isinstance(lowest, (int, float)):
+            attrs["price_lowest_ever"] = lowest
+            attrs["is_at_low"] = result.price <= lowest
+        closes = [
+            d["last"]
+            for d in (state.get("daily_history") or [])
+            if isinstance(d, dict) and isinstance(d.get("last"), (int, float))
+        ]
+        if len(closes) >= 3:
+            typical = statistics.median(closes)
+            if typical:
+                attrs["price_typical"] = round(typical)
+                attrs["pct_vs_typical"] = round(
+                    (result.price - typical) / typical * 100
+                )
+
+        # Price-per-unit (e.g. kr/m for Byko lumber), when known.
+        if result.unit_price and result.unit_label:
+            attrs["unit_price"] = result.unit_price
+            attrs["unit_label"] = result.unit_label
 
         # Per-listing shipping signal, reusing the same heuristic that
         # decides this for AI alternatives. There's no AI guess for a

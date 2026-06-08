@@ -792,6 +792,9 @@ def test_try_byko_variant_resolves_pinned_length():
     assert res["retailer"] == "BYKO"
     assert res["method"] == "byko_variant"
     assert res["image_url"] == "https://img/480.jpg"
+    # kr/m = gross 3653 ÷ (480cm / 100) = 761
+    assert res["unit_price"] == 761
+    assert res["unit_label"] == "kr/m"
 
 
 def test_try_byko_variant_matches_via_sku_segment():

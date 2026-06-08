@@ -214,6 +214,18 @@ export interface TrackedProduct {
   // when the retailer doesn't expose them.
   productNumber: string | null;
   descriptionName: string | null;
+  // "Good price?" context. priceLowestEver = all-time low; priceTypical =
+  // median of daily closes (null until enough history); pctVsTypical = how
+  // far the current price is above/below typical; isAtLow = at/below the
+  // all-time low right now.
+  priceLowestEver: number | null;
+  priceTypical: number | null;
+  pctVsTypical: number | null;
+  isAtLow: boolean;
+  // Normalized price-per-unit (e.g. "kr/m" for Byko lumber). null when no
+  // unit is known for this product.
+  unitPrice: number | null;
+  unitLabel: string | null;
   // Whether polling is currently paused for this product (set via the
   // options flow or the price_watch.set_paused service). Surfaced on the
   // price sensor's attributes so the panel can render the inline pause

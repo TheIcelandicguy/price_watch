@@ -459,6 +459,20 @@ export function buildProducts(
         typeof attrs.description_name === "string" && attrs.description_name
           ? attrs.description_name
           : null,
+      priceLowestEver:
+        typeof attrs.price_lowest_ever === "number"
+          ? attrs.price_lowest_ever
+          : null,
+      priceTypical:
+        typeof attrs.price_typical === "number" ? attrs.price_typical : null,
+      pctVsTypical:
+        typeof attrs.pct_vs_typical === "number" ? attrs.pct_vs_typical : null,
+      isAtLow: attrs.is_at_low === true,
+      unitPrice: typeof attrs.unit_price === "number" ? attrs.unit_price : null,
+      unitLabel:
+        typeof attrs.unit_label === "string" && attrs.unit_label
+          ? attrs.unit_label
+          : null,
       sizeOptions: Array.isArray(attrs.size_options)
         ? (attrs.size_options as {
             label: string;

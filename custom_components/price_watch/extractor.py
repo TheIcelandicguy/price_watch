@@ -214,6 +214,11 @@ class ExtractionResult:
     # coded variant name, e.g. "Alhefluð Gagnvarin Fura 45x95"). None when
     # absent.
     description_name: str | None = None
+    # Normalized price-per-unit (e.g. Byko lumber kr/m = gross ÷ length) +
+    # its label ("kr/m"). Lets the card show an apples-to-apples figure across
+    # sizes. None when no unit is known.
+    unit_price: float | None = None
+    unit_label: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
     # Set True when the AI determines the product has been permanently
     # removed from the retailer's catalog. When True:
@@ -1204,6 +1209,16 @@ def try_byko_variant(
         if not gross or gross <= 0:
             return None
         currency = str((v.get("price") or {}).get("currency") or "").upper()
+        # Price-per-meter: byko lumber names/skus end in the length in cm
+        # (…AB-GAGNV 480). kr/m = gross ÷ (length_cm / 100).
+        unit_price = None
+        unit_label = None
+        len_match = re.search(r"(\d{2,4})\s*$", name)
+        if len_match:
+            length_cm = int(len_match.group(1))
+            if length_cm > 0:
+                unit_price = round(gross / (length_cm / 100))
+                unit_label = "kr/m"
         return {
             "price": float(gross),
             "currency": currency,
@@ -1212,6 +1227,8 @@ def try_byko_variant(
             "title": name,
             "sku": sku or None,
             "image_url": _byko_variant_image(v),
+            "unit_price": unit_price,
+            "unit_label": unit_label,
             "retailer": "BYKO",
             "method": "byko_variant",
         }
@@ -1647,6 +1664,8 @@ async def extract_product(
                 retailer=variant.get("retailer") or base.get("retailer"),
                 product_number=meta.get("product_number"),
                 description_name=meta.get("description_name"),
+                unit_price=variant.get("unit_price"),
+                unit_label=variant.get("unit_label"),
                 content_hash=content_hash,
                 cost_usd=0.0,
                 method=variant.get("method", "wix_variant"),

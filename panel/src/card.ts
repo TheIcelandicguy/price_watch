@@ -638,6 +638,60 @@ export class PriceWatchCard extends LitElement {
     </div>`;
   }
 
+  /**
+   * "Is this a good price?" verdict — current price vs its own history.
+   * At/below the all-time low → green "Lowest seen"; otherwise, once there's
+   * enough history, how far above/below the typical (median) price it is.
+   * Offers a one-tap "set target to the low" when no target is set yet.
+   */
+  private renderPriceVerdict() {
+    const p = this.product;
+    if (p.price == null) return nothing;
+
+    const setLow =
+      p.priceLowestEver != null && p.targetPrice == null && this.onSetTarget
+        ? html`<button
+            class="verdict__settarget"
+            type="button"
+            title="Set your target price to the lowest seen"
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this.onSetTarget?.(p, p.priceLowestEver as number);
+            }}
+          >
+            🎯 target ${formatPrice(p.priceLowestEver as number, p.currency)}
+          </button>`
+        : nothing;
+
+    if (p.isAtLow) {
+      return html`<div class="verdict verdict--good">
+        <ha-icon icon="mdi:trophy-variant-outline"></ha-icon>
+        <span>Lowest seen</span>
+      </div>`;
+    }
+    if (p.pctVsTypical != null) {
+      const pct = p.pctVsTypical;
+      const cls =
+        pct <= -3 ? "verdict--good" : pct >= 8 ? "verdict--high" : "verdict--mid";
+      const typical =
+        p.priceTypical != null
+          ? ` (typ. ${formatPrice(p.priceTypical, p.currency)})`
+          : "";
+      const text =
+        pct <= -3
+          ? `${Math.abs(pct)}% below typical${typical}`
+          : Math.abs(pct) < 3
+          ? `around its typical price${typical}`
+          : `${pct}% above typical${typical}`;
+      return html`<div class="verdict ${cls}">
+        <ha-icon icon="mdi:chart-line-variant"></ha-icon>
+        <span>${text}</span>
+        ${setLow}
+      </div>`;
+    }
+    return nothing; // not enough history yet
+  }
+
   private renderStatRow() {
     const { product } = this;
     const cells: ReturnType<typeof html>[] = [];
@@ -1088,6 +1142,14 @@ export class PriceWatchCard extends LitElement {
 
           <div class="price-block">
             <div class="price">${formatPrice(value, currency)}</div>
+            ${product.unitPrice != null && product.unitLabel
+              ? html`<div class="unit-price" title="Price per unit">
+                  ≈ ${formatPrice(product.unitPrice, currency)}/${product.unitLabel.replace(
+                    /^kr\//,
+                    ""
+                  )}
+                </div>`
+              : nothing}
             ${
               product.onSale && product.originalPrice != null
                 ? html`<div class="price-sale">
@@ -1115,6 +1177,7 @@ export class PriceWatchCard extends LitElement {
             }
           </div>
 
+          ${this.renderPriceVerdict()}
           ${this.renderSparkline()}
           ${this.renderStatRow()}
           ${this.renderStoreAvailability()}
@@ -1348,6 +1411,50 @@ export class PriceWatchCard extends LitElement {
       font-size: 1.5rem;
       font-weight: 600;
       color: var(--primary-text-color, #212121);
+    }
+    /* Price-per-unit (kr/m etc.) next to the headline price */
+    .unit-price {
+      font-size: 0.8rem;
+      color: var(--secondary-text-color, #9e9e9e);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    /* "Good price?" verdict line */
+    .verdict {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.82rem;
+      margin-top: -2px;
+    }
+    .verdict ha-icon {
+      --mdc-icon-size: 17px;
+      flex: 0 0 auto;
+    }
+    .verdict--good {
+      color: var(--success-color, #2e7d32);
+      font-weight: 600;
+    }
+    .verdict--mid {
+      color: var(--secondary-text-color, #757575);
+    }
+    .verdict--high {
+      color: var(--warning-color, #e67e22);
+    }
+    .verdict__settarget {
+      font: inherit;
+      font-size: 0.74rem;
+      cursor: pointer;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 999px;
+      padding: 1px 8px;
+      background: transparent;
+      color: var(--primary-color, #03a9f4);
+      white-space: nowrap;
+    }
+    .verdict__settarget:hover {
+      border-color: var(--primary-color, #03a9f4);
     }
     .price-sub {
       font-size: 0.875rem;

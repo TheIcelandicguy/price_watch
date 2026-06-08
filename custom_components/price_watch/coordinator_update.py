@@ -38,6 +38,7 @@ from .const import (
     EVENT_DISCOUNT,
     EVENT_NEW_LOW,
     EVENT_PRICE_DROP,
+    MAX_DAILY_HISTORY_DAYS,
     MAX_HISTORY_ENTRIES,
 )
 from .extractor import (
@@ -284,6 +285,28 @@ class UpdateMixin:
         )
         if len(history) > MAX_HISTORY_ENTRIES:
             listing["history"] = history[-MAX_HISTORY_ENTRIES:]
+
+        # Daily-downsampled long history for "good price?" context. One bucket
+        # per UTC date {date, min, max, last}; today's bucket keeps the day's
+        # min/max and latest. Capped at MAX_DAILY_HISTORY_DAYS.
+        daily: list[dict[str, Any]] = listing.setdefault("daily_history", [])
+        today = now.date().isoformat()
+        if daily and daily[-1].get("date") == today:
+            bucket = daily[-1]
+            bucket["min"] = min(bucket.get("min", result.price), result.price)
+            bucket["max"] = max(bucket.get("max", result.price), result.price)
+            bucket["last"] = result.price
+        else:
+            daily.append(
+                {
+                    "date": today,
+                    "min": result.price,
+                    "max": result.price,
+                    "last": result.price,
+                }
+            )
+        if len(daily) > MAX_DAILY_HISTORY_DAYS:
+            listing["daily_history"] = daily[-MAX_DAILY_HISTORY_DAYS:]
 
         # Per-listing extremes (lowest/highest of THIS listing's history)
         if listing.get("lowest") is None or result.price < listing["lowest"]:

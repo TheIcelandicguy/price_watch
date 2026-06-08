@@ -165,6 +165,11 @@ DEFAULT_DAILY_BUDGET: Final = 0.50
 DEFAULT_MONTHLY_BUDGET: Final = 5.00
 MIN_SCAN_INTERVAL_MINUTES: Final = 15
 MAX_HISTORY_ENTRIES: Final = 30
+# Daily-downsampled price history (one {date, min, max, last} bucket per day),
+# kept alongside the fine-grained history so "is this a good price?" context
+# (historical low / typical) spans months, not the ~7.5 days the 30-point
+# fine history covers. 180 daily points is tiny in storage.
+MAX_DAILY_HISTORY_DAYS: Final = 180
 
 # Max random delay before a product's FIRST poll after setup/restart. Spreads
 # the initial refresh across the fleet (combined with the fetch-layer
