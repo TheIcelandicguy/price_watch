@@ -91,9 +91,9 @@
       "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
       "model_required": "Model name is required for OpenAI-compatible providers.",
       "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
-      "extra_headers_invalid_json": "Extra headers must be valid JSON (e.g. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_invalid_json": "Extra headers must be valid JSON — a JSON object of key/value pairs, e.g. an HTTP-Referer header set to your app URL.",
       "extra_headers_not_object": "Extra headers must be a JSON object (key/value pairs), not an array or string.",
-      "custom_parser_invalid_json": "Custom parser must be valid JSON (e.g. {\"type\": \"regex\", \"price\": \"\\\\$([\\\\d.,]+)\"}).",
+      "custom_parser_invalid_json": "Custom parser must be valid JSON — a JSON object, e.g. a regex type with a price pattern.",
       "custom_parser_not_object": "Custom parser must be a JSON object (key/value pairs), not an array or string.",
       "unknown": "Unexpected error. See HA logs for details.",
       "name_required": "Product name is required."
@@ -172,7 +172,7 @@
       },
       "parser": {
         "title": "Parser options",
-        "description": "Cookies and custom parser config. Cookies are stored inside the parser config; leave the parser field alone unless you know what you're doing.\n\n**Cookies** — paste a Cookie header value to send with every request (DevTools → Network tab → reload → click document → Headers → copy `Cookie:` value).\n\n**Custom parser** — raw JSON, e.g. `{\"type\": \"regex\", \"price\": \"\\\\$([\\\\d.,]+)\", \"request_cookies\": \"...\"}`. Leave blank to use the auto-detected preset.",
+        "description": "Cookies and custom parser config. Cookies are stored inside the parser config; leave the parser field alone unless you know what you're doing.\n\n**Cookies** — paste a Cookie header value to send with every request (DevTools → Network tab → reload → click document → Headers → copy `Cookie:` value).\n\n**Custom parser** — raw JSON: a regex type with a price pattern and optional request_cookies. Leave blank to use the auto-detected preset.",
         "data": {
           "cookies": "Cookies (one-line header value)",
           "custom_parser": "Custom parser (JSON, advanced)",
@@ -214,7 +214,7 @@
       "base_url_required": "Base URL is required for OpenAI-compatible providers (e.g. https://api.openai.com/v1).",
       "model_required": "Model name is required for OpenAI-compatible providers.",
       "openai_compat_unreachable": "Could not reach the OpenAI-compatible endpoint. Check the URL, network, and that the server is running. If the server doesn't support tool calls, try the 'Force JSON mode' option.",
-      "extra_headers_invalid_json": "Extra headers must be valid JSON (e.g. {\"HTTP-Referer\": \"https://myapp.com\"}).",
+      "extra_headers_invalid_json": "Extra headers must be valid JSON — a JSON object of key/value pairs, e.g. an HTTP-Referer header set to your app URL.",
       "extra_headers_not_object": "Extra headers must be a JSON object (key/value pairs), not an array or string.",
       "custom_parser_invalid_json": "Custom parser must be valid JSON.",
       "custom_parser_not_object": "Custom parser must be a JSON object (key/value pairs)."
