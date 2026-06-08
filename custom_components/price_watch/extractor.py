@@ -117,6 +117,19 @@ def _host_of(url: str) -> str:
         return ""
 
 
+def _retailer_from_host(url: str | None) -> str | None:
+    """A clean STORE label from a URL host: 'www.bauhaus.is' -> 'Bauhaus'.
+
+    JSON-LD's `brand` is the product's manufacturer (bauhaus.is sells
+    "Frøslev" wood), not the seller — so for the JSON-LD path we label the
+    listing by its store (host) instead.
+    """
+    host = _host_of(url or "")
+    if not host:
+        return None
+    return host.split(".")[0].replace("-", " ").title() or None
+
+
 @asynccontextmanager
 async def _fetch_slot(url: str, politeness: bool = True):
     """Acquire a fetch slot: global concurrency cap + (optional) per-host gap.
@@ -1708,7 +1721,7 @@ async def extract_product(
             stock_count=stock_count,
             image_url=image_url,
             sku=jsonld.get("sku"),
-            retailer=jsonld.get("retailer"),
+            retailer=_retailer_from_host(url) or jsonld.get("retailer"),
             original_price=original_price,
             store_availability=store_avail,
             size_options=size_options,
