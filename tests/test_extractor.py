@@ -839,3 +839,88 @@ async def test_extract_product_byko_variant_drives_title_and_price(monkeypatch):
     assert result.title == "FURA ALHEF 45X95 AB-GAGNV 480"
     assert result.currency == "ISK"
     assert result.retailer == "BYKO"
+
+
+# --- Bot-wall detection + fresh-session retry (Amazon interstitial) ---------
+
+def test_looks_like_botwall_detects_amazon_interstitial():
+    wall = ("Amazon.de Klicke auf die Schaltfläche unten, um mit dem Einkauf "
+            "fortzufahren Weiter shoppen Unsere AGB")
+    assert extractor_mod._looks_like_botwall(wall) is True
+    assert extractor_mod._looks_like_botwall(
+        "<div id='productTitle'>X</div> a-price-whole 772"
+    ) is False
+    assert extractor_mod._looks_like_botwall("") is False
+    assert extractor_mod._looks_like_botwall(None) is False
+
+
+def test_prefers_fresh_session_amazon():
+    assert extractor_mod._prefers_fresh_session("amazon.de") is True
+    assert extractor_mod._prefers_fresh_session("amazon.co.uk") is True
+    assert extractor_mod._prefers_fresh_session("byko.is") is False
+
+
+class _FakeResp:
+    def __init__(self, text, status=200):
+        self.text = text
+        self.status_code = status
+
+
+class _FakeSession:
+    def __init__(self, text):
+        self._text = text
+        self.closed = False
+
+    async def get(self, *a, **k):
+        return _FakeResp(self._text)
+
+    async def post(self, *a, **k):
+        return _FakeResp(self._text)
+
+    async def close(self):
+        self.closed = True
+
+
+def _patch_cffi(monkeypatch, persistent_text, fresh_text):
+    persistent = _FakeSession(persistent_text)
+
+    async def fake_get_persistent():
+        return persistent
+    monkeypatch.setattr(extractor_mod, "_get_persistent_session", fake_get_persistent)
+
+    class _FakeCffi:
+        @staticmethod
+        def AsyncSession(**k):
+            return _FakeSession(fresh_text)
+
+    monkeypatch.setattr(extractor_mod, "_cffi_requests", _FakeCffi)
+    monkeypatch.setattr(extractor_mod, "_CURL_CFFI_AVAILABLE", True)
+    return persistent
+
+
+@pytest.mark.asyncio
+async def test_fetch_retries_on_botwall_with_fresh_session(monkeypatch):
+    host = "example-wall.test"
+    extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+    wall = "Please enter the characters you see below to continue"
+    product = "<html><div id='productTitle'>Hi</div></html>"
+    _patch_cffi(monkeypatch, wall, product)
+    try:
+        text = await extractor_mod._fetch_with_curl_cffi(f"https://{host}/p")
+        assert "productTitle" in text
+        # host is now remembered so the next poll skips straight to fresh
+        assert host in extractor_mod._FRESH_SESSION_HOSTS
+    finally:
+        extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+
+
+@pytest.mark.asyncio
+async def test_fetch_amazon_uses_fresh_session_first(monkeypatch):
+    # Persistent jar would serve the wall; amazon is pre-seeded to fresh, so the
+    # product comes through on the very first fetch.
+    product = "<html><div id='productTitle'>Hi</div></html>"
+    _patch_cffi(monkeypatch, "WALL: enter the characters you see below", product)
+    text = await extractor_mod._fetch_with_curl_cffi(
+        "https://www.amazon.de/-/en/dp/B0DTGNB9Q5"
+    )
+    assert "productTitle" in text

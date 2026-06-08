@@ -200,6 +200,16 @@ class UpdateMixin:
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Unexpected error: {err}") from err
 
+        # Honor listing-level currency/retailer overrides (set via edit_listing)
+        # when extraction didn't supply them. A custom CSS price selector reads
+        # only the number, so without this the user's configured currency would
+        # be lost — breaking price formatting AND FX conversion (price_local
+        # skips when currency is blank) AND the stored history rows.
+        if not result.currency and config.get("currency"):
+            result.currency = str(config["currency"]).strip().upper()
+        if not result.retailer and config.get("retailer"):
+            result.retailer = str(config["retailer"]).strip()
+
         # Update per-listing state
         now = dt_util.utcnow()
         listing["last_hash"] = result.content_hash

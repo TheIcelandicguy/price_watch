@@ -84,6 +84,42 @@ async def _get_persistent_session() -> Any:
     return _persistent_session
 
 
+# Some sites do the OPPOSITE of the cookie-accumulation assumption above:
+# reusing the shared session's jar is what TRIGGERS their bot-wall. Amazon is
+# the canonical case — verified empirically that a reused chrome session gets
+# the "Weiter shoppen / Continue shopping" interstitial on the 2nd+ hit while a
+# FRESH, cookie-free chrome session reliably returns the real product page.
+# These hosts are fetched on a throwaway session so the shared jar never makes
+# them suspicious. Pre-seeded with Amazon; any host that we catch serving a
+# wall is added at runtime so the next poll skips straight to a fresh session.
+_FRESH_SESSION_HOSTS: set[str] = set()
+_BOTWALL_MARKERS = (
+    "klicke auf die schaltfläche unten",            # amazon.de "continue shopping"
+    "click the button below to continue shopping",  # amazon EN variant
+    "/errors/validatecaptcha",                      # amazon captcha endpoint
+    "enter the characters you see below",           # amazon captcha prompt
+)
+
+
+def _looks_like_botwall(html: str | None) -> bool:
+    """True if the response is a known bot-wall / interstitial, not real content.
+
+    Amazon serves a short 'Continue shopping' interstitial (or a CAPTCHA) when
+    it distrusts the session; these pages carry NO product data, so every
+    extractor (CSS, JSON-LD, AI) can only fail on them. Detecting one lets the
+    fetch layer retry on a fresh, cookie-free session, which gets the real page.
+    """
+    if not html:
+        return False
+    low = html.lower()
+    return any(marker in low for marker in _BOTWALL_MARKERS)
+
+
+def _prefers_fresh_session(host: str) -> bool:
+    """Whether this host should be fetched on a throwaway (cookie-free) session."""
+    return host in _FRESH_SESSION_HOSTS or host.startswith("amazon.")
+
+
 # --- Fetch throttle -------------------------------------------------------
 # Protects the tracked retailers (and us) from a request burst when many
 # products refresh at once — the worst case being an HA restart, where every
@@ -1283,25 +1319,55 @@ async def _fetch_with_curl_cffi(
 
     method = (method or "GET").upper()
     headers = dict(extra_headers) if extra_headers else None
+    host = _host_of(url)
+
+    async def _do(sess: Any):
+        if method == "POST":
+            return await sess.post(
+                url, data=body, headers=headers, cookies=cookies,
+                timeout=HTTP_TIMEOUT, allow_redirects=True,
+            )
+        return await sess.get(
+            url, headers=headers, cookies=cookies,
+            timeout=HTTP_TIMEOUT, allow_redirects=True,
+        )
+
+    async def _do_fresh():
+        """Run the request on a brand-new cookie-free session, then drop it."""
+        fresh = _cffi_requests.AsyncSession(impersonate="chrome")
+        try:
+            return await _do(fresh)
+        finally:
+            try:
+                await fresh.close()
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Error closing throwaway curl_cffi session", exc_info=True)
 
     try:
-        if method == "POST":
-            response = await session.post(
-                url,
-                data=body,
-                headers=headers,
-                cookies=cookies,
-                timeout=HTTP_TIMEOUT,
-                allow_redirects=True,
-            )
+        # Wall-prone hosts (Amazon) skip the shared jar entirely — reusing it
+        # there serves the interstitial instead of the product.
+        if method == "GET" and _prefers_fresh_session(host):
+            response = await _do_fresh()
         else:
-            response = await session.get(
-                url,
-                headers=headers,
-                cookies=cookies,
-                timeout=HTTP_TIMEOUT,
-                allow_redirects=True,
-            )
+            response = await _do(session)
+            # Catch a host that walls on session reuse the FIRST time it does
+            # so: remember it (future polls go straight to a fresh session) and
+            # retry this one on a throwaway session right now.
+            if (
+                method == "GET"
+                and response.status_code < 400
+                and _looks_like_botwall(response.text)
+            ):
+                _FRESH_SESSION_HOSTS.add(host)
+                _LOGGER.info(
+                    "Bot-wall/interstitial detected for %s; retrying on a fresh "
+                    "cookie-free session (and using one for this host from now on).",
+                    host,
+                )
+                retry = await _do_fresh()
+                if retry.status_code < 400 and not _looks_like_botwall(retry.text):
+                    response = retry
+
         if response.status_code >= 400:
             snippet = (response.text or "")[:200].replace("\n", " ")
             raise ExtractionError(
