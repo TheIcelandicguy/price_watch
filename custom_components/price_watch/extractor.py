@@ -1357,28 +1357,46 @@ async def _fetch_with_curl_cffi(
         if method == "GET" and _prefers_fresh_session(host):
             response = await _do_fresh()
         else:
-            response = await _do(session)
-            # A host can reject a REUSED session (stale shared-jar cookies) two
-            # ways: an interstitial BODY served with status 200 (Amazon's
-            # "Continue shopping"), or a 403/429 STATUS (Argos "Access Denied",
-            # rate-limit). Both frequently clear on a fresh, cookie-free session.
-            # Detect either, retry once on a throwaway session, and remember the
-            # host so future polls skip the shared jar. (404/5xx are NOT this —
-            # a fresh session won't conjure a missing page or fix a server error.)
-            reused_block = method == "GET" and (
-                response.status_code in (403, 429)
-                or (response.status_code < 400 and _looks_like_botwall(response.text))
-            )
-            if reused_block:
-                retry = await _do_fresh()
-                if retry.status_code < 400 and not _looks_like_botwall(retry.text):
-                    _FRESH_SESSION_HOSTS.add(host)
-                    _LOGGER.info(
-                        "Session-reuse block on %s (status %s); a fresh cookie-free "
-                        "session worked — using one for this host from now on.",
-                        host, response.status_code,
-                    )
-                    response = retry
+            try:
+                response = await _do(session)
+            except Exception as conn_err:  # noqa: BLE001
+                # A connection/protocol-level failure on the SHARED session —
+                # e.g. Best Buy resets a REUSED HTTP/2 stream
+                # ("curl: (92) stream not closed cleanly"). A brand-new session
+                # is a new connection, which clears it. Retry once on a fresh
+                # session and remember the host so later polls skip the shared
+                # connection entirely. Non-GET (and a fresh failure) propagate.
+                if method != "GET":
+                    raise
+                _LOGGER.info(
+                    "Persistent-session fetch error on %s (%s); retrying on a "
+                    "fresh session (and using one for this host from now on).",
+                    host, type(conn_err).__name__,
+                )
+                response = await _do_fresh()
+                _FRESH_SESSION_HOSTS.add(host)
+            else:
+                # A host can reject a REUSED session (stale shared-jar cookies)
+                # two ways: an interstitial BODY at status 200 (Amazon's
+                # "Continue shopping"), or a 403/429 STATUS (Argos "Access
+                # Denied", rate-limit). Both frequently clear on a fresh,
+                # cookie-free session. Detect either, retry once on a throwaway
+                # session, and remember the host. (404/5xx are NOT this — a
+                # fresh session won't conjure a missing page or fix a 5xx.)
+                reused_block = method == "GET" and (
+                    response.status_code in (403, 429)
+                    or (response.status_code < 400 and _looks_like_botwall(response.text))
+                )
+                if reused_block:
+                    retry = await _do_fresh()
+                    if retry.status_code < 400 and not _looks_like_botwall(retry.text):
+                        _FRESH_SESSION_HOSTS.add(host)
+                        _LOGGER.info(
+                            "Session-reuse block on %s (status %s); a fresh "
+                            "cookie-free session worked — using one henceforth.",
+                            host, response.status_code,
+                        )
+                        response = retry
 
         if response.status_code >= 400:
             snippet = (response.text or "")[:200].replace("\n", " ")

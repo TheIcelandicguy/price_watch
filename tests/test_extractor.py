@@ -982,3 +982,38 @@ async def test_fetch_does_not_fresh_retry_on_404(monkeypatch):
         assert host not in extractor_mod._FRESH_SESSION_HOSTS
     finally:
         extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+
+
+@pytest.mark.asyncio
+async def test_fetch_retries_on_connection_error_with_fresh_session(monkeypatch):
+    """A persistent-session protocol error (Best Buy HTTP/2 reset) retries fresh."""
+    host = "bestbuy-like.test"
+    extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+    product = "<html><div id='productTitle'>Hi</div></html>"
+
+    class _ThrowingSession:
+        async def get(self, *a, **k):
+            raise RuntimeError("curl: (92) HTTP/2 stream not closed cleanly")
+
+        async def post(self, *a, **k):
+            raise RuntimeError("boom")
+
+        async def close(self):
+            pass
+
+    async def fake_get_persistent():
+        return _ThrowingSession()
+    monkeypatch.setattr(extractor_mod, "_get_persistent_session", fake_get_persistent)
+
+    class _FakeCffi:
+        @staticmethod
+        def AsyncSession(**k):
+            return _StatusSession(product, 200)
+    monkeypatch.setattr(extractor_mod, "_cffi_requests", _FakeCffi)
+    monkeypatch.setattr(extractor_mod, "_CURL_CFFI_AVAILABLE", True)
+    try:
+        text = await extractor_mod._fetch_with_curl_cffi(f"https://{host}/p")
+        assert "productTitle" in text
+        assert host in extractor_mod._FRESH_SESSION_HOSTS
+    finally:
+        extractor_mod._FRESH_SESSION_HOSTS.discard(host)
