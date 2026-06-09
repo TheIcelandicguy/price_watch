@@ -175,6 +175,31 @@ _NON_SHOP_DOMAINS: frozenset[str] = frozenset(
         "makeuseof.com",
         "howtogeek.com",
         "wled.ge",
+        # Review / editorial / spec sites — surface heavily for product
+        # queries ("best X", "X review") but never sell anything. None of
+        # these host a checkout, so dropping them only removes dead rows.
+        "protoolreviews.com",
+        "popularmechanics.com",
+        "rtings.com",
+        "tomsguide.com",
+        "tomshardware.com",
+        "techradar.com",
+        "cnet.com",
+        "theverge.com",
+        "engadget.com",
+        "pcmag.com",
+        "gsmarena.com",
+        "notebookcheck.net",
+        "trustedreviews.com",
+        "wirecutter.com",
+        "nytimes.com",
+        "consumerreports.org",
+        "which.co.uk",
+        "digitaltrends.com",
+        "androidauthority.com",
+        "thespruce.com",
+        "familyhandyman.com",
+        "bobvila.com",
     }
 )
 
@@ -218,6 +243,63 @@ def _is_non_shop_domain(url: str) -> bool:
     if any(host == nd or host.endswith("." + nd) for nd in _NON_SHOP_DOMAINS):
         return True
     return host.startswith(_NON_SHOP_SUBDOMAIN_PREFIXES)
+
+
+# Path fragments that mark a search-results or category/browse page rather than
+# a single product — these never carry one trackable price (Amazon /s?k=,
+# Home Depot /b/, Lowe's /pl/, eBay /sch/, Shopify /collections/, etc.).
+_LISTING_PATH_MARKERS: tuple[str, ...] = (
+    "/b/",
+    "/pl/",
+    "/sch/",
+    "/search",
+    "/browse/",
+    "/category/",
+    "/categories/",
+    "/collections/",
+    "/c/",
+    "/shop/",
+)
+# Query keys that mark a search (?k=, ?q=, ?query=, ...).
+_LISTING_QUERY_KEYS: tuple[str, ...] = (
+    "k=",
+    "q=",
+    "query=",
+    "searchterm=",
+    "keyword=",
+    "searchkeyword=",
+)
+
+
+def _looks_like_listing_url(url: str) -> bool:
+    """True if the URL is a search/category/browse page, not a single product.
+
+    Conservative: matches well-known listing path fragments and search query
+    keys. A real product URL (Amazon /dp/, /gp/product/, retailer /product/…)
+    has none of these, so this won't drop a trackable page.
+    """
+    if not url:
+        return False
+    try:
+        parts = urlparse(url.lower())
+    except ValueError:
+        return False
+    path, query = parts.path, parts.query
+    if any(marker in path for marker in _LISTING_PATH_MARKERS):
+        return True
+    # Amazon search: path ends with "/s" and carries a search query.
+    if (path == "/s" or path.endswith("/s")) and "k=" in query:
+        return True
+    if any(query == k or query.startswith(k) or ("&" + k) in query for k in _LISTING_QUERY_KEYS):
+        return True
+    return False
+
+
+def is_unusable_search_result(url: str) -> bool:
+    """Drop signal for live search / alternatives: a non-shop domain (review,
+    spec, wiki, video) OR a search/category page — neither is a trackable,
+    priceable product listing."""
+    return _is_non_shop_domain(url) or _looks_like_listing_url(url)
 
 
 if TYPE_CHECKING:

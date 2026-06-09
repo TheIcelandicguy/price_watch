@@ -69,6 +69,7 @@ from .coordinator_alternatives import (
     _is_non_shop_domain,
     _normalize_domain,
     enrich_alternatives_via_jsonld,
+    is_unusable_search_result,
 )
 from .search.ai_synthesizer import AISynthesizerSearchProvider
 from .search.anthropic_native import AnthropicNativeSearchProvider
@@ -272,10 +273,18 @@ async def ws_search(
 
     try:
         if isinstance(provider, (DuckDuckGoSearchProvider, SearxngSearchProvider)):
-            hits = await provider.search(query_text, max_results=max_results)
+            # Bias the raw engine toward product pages: without AI, a bare
+            # query ("dewalt drill") ranks manufacturer/category/review pages;
+            # appending "buy" pushes actual retailer listings up. Fetch extra
+            # so the listing/non-shop filter below still leaves a full page.
+            hits = await provider.search(
+                f"{query_text} buy", max_results=max_results * 2
+            )
             alts: list[tuple[Alternative, str]] = []
             for hit in hits:
-                if not hit.url:
+                # Drop search/category pages and non-shop domains (reviews,
+                # wikis, manufacturer index) — none are a trackable product.
+                if not hit.url or is_unusable_search_result(hit.url):
                     continue
                 alts.append(
                     (
@@ -304,6 +313,12 @@ async def ws_search(
                 results.append(row)
         else:
             alternatives = await provider.find_alternatives(query)
+            # Drop search/category pages and non-shop domains here too — the AI
+            # occasionally cites a manufacturer index or review article.
+            alternatives = [
+                alt for alt in alternatives
+                if alt.url and not is_unusable_search_result(alt.url)
+            ]
             # The AI often returns price=null (works from snippets); backfill
             # from each page's JSON-LD/meta, same as tracked alternatives.
             await enrich_alternatives_via_jsonld(hass, alternatives)
