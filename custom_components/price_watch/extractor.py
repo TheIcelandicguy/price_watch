@@ -57,6 +57,14 @@ except ImportError:
     _CURL_CFFI_AVAILABLE = False
 
 
+# curl_cffi browser-fingerprint to impersonate. NOT the bare "chrome" alias
+# (which tracks curl_cffi's newest profile) — empirically several retailers'
+# bot-detection (Best Buy, B&H) 403/reset the bleeding-edge fingerprints but
+# pass "chrome131", a very common real-world Chrome. Verified it also keeps
+# every previously-working site green. Pin it explicitly so a curl_cffi upgrade
+# can't silently shift the fingerprint into a blocked one.
+_IMPERSONATE = "chrome131"
+
 # A persistent curl_cffi AsyncSession lives at module scope so cookies
 # accumulate across calls. Sites like Amazon track "returning visitor"
 # state via cookies and serve different content (real product page vs
@@ -80,7 +88,7 @@ async def _get_persistent_session() -> Any:
     if _persistent_session is None:
         async with _persistent_session_lock:
             if _persistent_session is None:
-                _persistent_session = _cffi_requests.AsyncSession(impersonate="chrome")
+                _persistent_session = _cffi_requests.AsyncSession(impersonate=_IMPERSONATE)
     return _persistent_session
 
 
@@ -1334,7 +1342,7 @@ async def _fetch_with_curl_cffi(
 
     async def _do_fresh():
         """Run the request on a brand-new cookie-free session, then drop it."""
-        fresh = _cffi_requests.AsyncSession(impersonate="chrome")
+        fresh = _cffi_requests.AsyncSession(impersonate=_IMPERSONATE)
         try:
             return await _do(fresh)
         finally:
