@@ -50,8 +50,15 @@ _LOGGER = logging.getLogger(__name__)
 # (importlib.metadata reads the dist-info), which blocks the event loop if
 # done lazily inside an async function. HA flags that as a bug.
 try:
+    import curl_cffi as _curl_cffi_mod  # noqa: E402
     from curl_cffi import requests as _cffi_requests  # noqa: E402
     _CURL_CFFI_AVAILABLE = True
+    # Log the runtime build once (debug) — bot-wall behaviour (e.g. Best Buy's
+    # HTTP/2 stream resets) can differ across curl_cffi versions/arch builds,
+    # so the installed version is a useful first diagnostic. (Confirmed 0.15.0
+    # on both dev x86_64 and the HA box; Best Buy's reset is an arch-build
+    # HTTP/2 quirk, not a version mismatch.)
+    _LOGGER.debug("price_watch using curl_cffi %s", getattr(_curl_cffi_mod, "__version__", "?"))
 except ImportError:
     _cffi_requests = None  # type: ignore[assignment]
     _CURL_CFFI_AVAILABLE = False
