@@ -6,6 +6,7 @@ import pytest
 
 from custom_components.price_watch import extractor as extractor_mod
 from custom_components.price_watch.extractor import (
+    ExtractionError,
     _normalize_cookies,
     extract_product,
     list_byko_variants,
@@ -924,3 +925,60 @@ async def test_fetch_amazon_uses_fresh_session_first(monkeypatch):
         "https://www.amazon.de/-/en/dp/B0DTGNB9Q5"
     )
     assert "productTitle" in text
+
+
+class _StatusSession:
+    """Fake curl_cffi session returning a fixed (text, status)."""
+    def __init__(self, text, status):
+        self._text, self._status = text, status
+
+    async def get(self, *a, **k):
+        return _FakeResp(self._text, self._status)
+
+    async def post(self, *a, **k):
+        return _FakeResp(self._text, self._status)
+
+    async def close(self):
+        pass
+
+
+def _patch_status(monkeypatch, persistent_status, persistent_text, fresh_text):
+    async def fake_get_persistent():
+        return _StatusSession(persistent_text, persistent_status)
+    monkeypatch.setattr(extractor_mod, "_get_persistent_session", fake_get_persistent)
+
+    class _FakeCffi:
+        @staticmethod
+        def AsyncSession(**k):
+            return _StatusSession(fresh_text, 200)
+    monkeypatch.setattr(extractor_mod, "_cffi_requests", _FakeCffi)
+    monkeypatch.setattr(extractor_mod, "_CURL_CFFI_AVAILABLE", True)
+
+
+@pytest.mark.asyncio
+async def test_fetch_retries_on_403_with_fresh_session(monkeypatch):
+    """A reused-session 403 (Argos 'Access Denied') retries fresh and remembers."""
+    host = "argos-like.test"
+    extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+    product = "<html><div id='productTitle'>Hi</div></html>"
+    _patch_status(monkeypatch, 403, "<h1>Access Denied</h1>", product)
+    try:
+        text = await extractor_mod._fetch_with_curl_cffi(f"https://{host}/p")
+        assert "productTitle" in text
+        assert host in extractor_mod._FRESH_SESSION_HOSTS
+    finally:
+        extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+
+
+@pytest.mark.asyncio
+async def test_fetch_does_not_fresh_retry_on_404(monkeypatch):
+    """A 404 is a real missing page — no fresh retry, and the host is NOT flagged."""
+    host = "missing-page.test"
+    extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+    _patch_status(monkeypatch, 404, "Not Found", "<div id='productTitle'>x</div>")
+    try:
+        with pytest.raises(ExtractionError):
+            await extractor_mod._fetch_with_curl_cffi(f"https://{host}/p")
+        assert host not in extractor_mod._FRESH_SESSION_HOSTS
+    finally:
+        extractor_mod._FRESH_SESSION_HOSTS.discard(host)

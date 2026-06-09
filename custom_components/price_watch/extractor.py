@@ -1350,22 +1350,26 @@ async def _fetch_with_curl_cffi(
             response = await _do_fresh()
         else:
             response = await _do(session)
-            # Catch a host that walls on session reuse the FIRST time it does
-            # so: remember it (future polls go straight to a fresh session) and
-            # retry this one on a throwaway session right now.
-            if (
-                method == "GET"
-                and response.status_code < 400
-                and _looks_like_botwall(response.text)
-            ):
-                _FRESH_SESSION_HOSTS.add(host)
-                _LOGGER.info(
-                    "Bot-wall/interstitial detected for %s; retrying on a fresh "
-                    "cookie-free session (and using one for this host from now on).",
-                    host,
-                )
+            # A host can reject a REUSED session (stale shared-jar cookies) two
+            # ways: an interstitial BODY served with status 200 (Amazon's
+            # "Continue shopping"), or a 403/429 STATUS (Argos "Access Denied",
+            # rate-limit). Both frequently clear on a fresh, cookie-free session.
+            # Detect either, retry once on a throwaway session, and remember the
+            # host so future polls skip the shared jar. (404/5xx are NOT this —
+            # a fresh session won't conjure a missing page or fix a server error.)
+            reused_block = method == "GET" and (
+                response.status_code in (403, 429)
+                or (response.status_code < 400 and _looks_like_botwall(response.text))
+            )
+            if reused_block:
                 retry = await _do_fresh()
                 if retry.status_code < 400 and not _looks_like_botwall(retry.text):
+                    _FRESH_SESSION_HOSTS.add(host)
+                    _LOGGER.info(
+                        "Session-reuse block on %s (status %s); a fresh cookie-free "
+                        "session worked — using one for this host from now on.",
+                        host, response.status_code,
+                    )
                     response = retry
 
         if response.status_code >= 400:
