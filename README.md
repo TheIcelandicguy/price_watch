@@ -10,7 +10,9 @@
 
 > Track product prices across the web from inside Home Assistant. Paste a URL, get sensors and a price history. Works **free** on most major retailers (no API key) — with an optional AI fallback for the tricky ones.
 
-<!-- TODO(maintainer): add a screenshot or GIF of the Price Watch panel here. -->
+<p align="center">
+  <img src="docs/images/panel.png" alt="The Price Watch panel: product cards with price, history, listings and priced alternatives" width="900">
+</p>
 
 > [!NOTE]
 > **This is a beta looking for testers.** It works well on a wide range of retailers, but the web is messy — some shops block automated requests or hide prices behind "add to cart". Bug reports, retailer reports (works / doesn't work), and ideas are very welcome — please [open an issue](https://github.com/TheIcelandicguy/price_watch/issues).
