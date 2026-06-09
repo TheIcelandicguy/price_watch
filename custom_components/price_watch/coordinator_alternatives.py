@@ -230,6 +230,67 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+async def enrich_alternatives_via_jsonld(
+    hass: HomeAssistant, alternatives: list[Alternative]
+) -> None:
+    """Backfill price/currency/image on alternatives via JSON-LD + meta tags.
+
+    For each listing missing a price or image, fetch the page (curl_cffi Chrome
+    impersonation, same as the tracker) and read a price from JSON-LD first,
+    then Open Graph / microdata meta tags. Listings that already have both a
+    price and an image are skipped (no fetch). A page that fails to fetch or has
+    no usable price simply keeps price=None. Never overrides a price the AI
+    already supplied. Fetches run concurrently under a small semaphore.
+
+    Module-level (not just a coordinator method) so the live "Search & add"
+    websocket path can price its candidates too, not only tracked products.
+    """
+    if not alternatives:
+        return
+
+    session = async_get_clientsession(hass)
+    sem = asyncio.Semaphore(_ENRICH_CONCURRENCY)
+
+    async def _enrich_one(alt: Alternative) -> None:
+        if alt.price is not None and alt.image_url:
+            return
+        async with sem:
+            try:
+                html = await fetch_html(alt.url, session=session)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("alt enrich: fetch failed for %s: %s", alt.url, err)
+                return
+            try:
+                jsonld = try_jsonld(html, url=alt.url)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug(
+                    "alt enrich: JSON-LD parse failed for %s", alt.url, exc_info=True
+                )
+                jsonld = None
+
+            if alt.price is None and jsonld and jsonld.get("price"):
+                alt.price = jsonld["price"]
+                if jsonld.get("currency"):
+                    alt.currency = jsonld["currency"]
+                if jsonld.get("title"):
+                    alt.title = jsonld["title"]
+            # Meta/microdata fallback when JSON-LD has no price.
+            if alt.price is None:
+                meta_price, meta_currency = find_meta_price(html)
+                if meta_price is not None:
+                    alt.price = meta_price
+                    if meta_currency and not alt.currency:
+                        alt.currency = meta_currency
+            image = (jsonld or {}).get("image_url") or find_meta_image(html)
+            if image and not alt.image_url:
+                alt.image_url = image
+
+    await asyncio.gather(
+        *(_enrich_one(alt) for alt in alternatives),
+        return_exceptions=True,
+    )
+
+
 class AlternativesMixin:
     """Alternatives-discovery behavior for PriceWatchCoordinator.
 
@@ -426,84 +487,8 @@ class AlternativesMixin:
     async def _enrich_alternatives_via_jsonld(
         self, alternatives: list[Alternative]
     ) -> None:
-        """Backfill price/currency/image on alternatives using JSON-LD.
-
-        Used by every search path, not just the free one: for each
-        listing missing a price or image we fetch the page (curl_cffi
-        Chrome impersonation, same as the tracker) and run try_jsonld —
-        the deterministic Schema.org extractor that prices every tracked
-        product. Listings that already have both a price and an image are
-        skipped (no fetch). A page that fails to fetch, or has no usable
-        JSON-LD, simply keeps price=None (the panel renders "Price
-        unknown"), so one bad page never sinks the whole search. We never
-        override a price the AI already supplied. Fetches run
-        concurrently under a small semaphore to keep latency reasonable.
-        """
-        if not alternatives:
-            return
-
-        session = async_get_clientsession(self.hass)
-        sem = asyncio.Semaphore(_ENRICH_CONCURRENCY)
-
-        async def _enrich_one(alt: Alternative) -> None:
-            # Nothing to gain if the provider already gave us both a price
-            # and an image — skip the fetch entirely. This keeps the
-            # Anthropic/AI path cheap: we only hit the network for the
-            # listings the AI couldn't price (Claude's web_search returns
-            # price=null for most results since it works from snippets).
-            if alt.price is not None and alt.image_url:
-                return
-            async with sem:
-                try:
-                    html = await fetch_html(alt.url, session=session)
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.debug(
-                        "alt enrich: fetch failed for %s: %s", alt.url, err
-                    )
-                    return
-                try:
-                    jsonld = try_jsonld(html, url=alt.url)
-                except Exception:  # noqa: BLE001
-                    _LOGGER.debug(
-                        "alt enrich: JSON-LD parse failed for %s",
-                        alt.url,
-                        exc_info=True,
-                    )
-                    jsonld = None
-
-                # Only fill the price when the provider left it blank —
-                # never override a price the AI already supplied (it may
-                # have come from a more reliable source than this page's
-                # JSON-LD, e.g. a structured snippet).
-                if alt.price is None and jsonld and jsonld.get("price"):
-                    alt.price = jsonld["price"]
-                    if jsonld.get("currency"):
-                        alt.currency = jsonld["currency"]
-                    # JSON-LD title is usually cleaner than a raw DDG
-                    # snippet title (no "| Buy now - Retailer" cruft).
-                    if jsonld.get("title"):
-                        alt.title = jsonld["title"]
-                # Meta/microdata fallback: many shops carry the price only in
-                # Open Graph product tags or itemprop microdata, not a full
-                # JSON-LD Product. Try that before giving up on a price.
-                if alt.price is None:
-                    meta_price, meta_currency = find_meta_price(html)
-                    if meta_price is not None:
-                        alt.price = meta_price
-                        if meta_currency and not alt.currency:
-                            alt.currency = meta_currency
-                # Grab a thumbnail regardless of whether we got a price —
-                # JSON-LD image first, then og:image meta as fallback.
-                image = (jsonld or {}).get("image_url") or find_meta_image(html)
-                if image and not alt.image_url:
-                    alt.image_url = image
-
-        # Best-effort: gather never raises because each task swallows its
-        # own errors above. return_exceptions is belt-and-suspenders.
-        await asyncio.gather(
-            *(_enrich_one(alt) for alt in alternatives),
-            return_exceptions=True,
-        )
+        """Coordinator wrapper around the module-level enrichment helper."""
+        await enrich_alternatives_via_jsonld(self.hass, alternatives)
 
     async def async_find_alternatives(
         self, max_results: int | None = None

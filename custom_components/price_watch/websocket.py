@@ -68,6 +68,7 @@ from .coordinator_alternatives import (
     _host_excluded,
     _is_non_shop_domain,
     _normalize_domain,
+    enrich_alternatives_via_jsonld,
 )
 from .search.ai_synthesizer import AISynthesizerSearchProvider
 from .search.anthropic_native import AnthropicNativeSearchProvider
@@ -272,25 +273,40 @@ async def ws_search(
     try:
         if isinstance(provider, (DuckDuckGoSearchProvider, SearxngSearchProvider)):
             hits = await provider.search(query_text, max_results=max_results)
-            results = []
+            alts: list[tuple[Alternative, str]] = []
             for hit in hits:
                 if not hit.url:
                     continue
-                row = Alternative(
-                    title=hit.title,
-                    url=hit.url,
-                    notes=(hit.snippet or "")[:_DDG_SNIPPET_CHARS],
-                ).to_dict()
-                # Free mode has no AI to name the retailer or read a price,
-                # so surface the bare domain as the retailer and flag the
-                # obvious non-shops (GitHub/YouTube/wiki/docs) — that's the
-                # only "is this a seller?" signal we can give without AI.
-                row["retailer"] = _normalize_domain(hit.url)
-                row["likely_non_shop"] = _is_non_shop_domain(hit.url)
+                alts.append(
+                    (
+                        Alternative(
+                            title=hit.title,
+                            url=hit.url,
+                            notes=(hit.snippet or "")[:_DDG_SNIPPET_CHARS],
+                        ),
+                        hit.url,
+                    )
+                )
+            alts = alts[:max_results]
+            # Read a price/image off each candidate's page (JSON-LD + meta
+            # tags) — without AI that's the only way "Search & add" can show
+            # a price instead of "Price unknown".
+            await enrich_alternatives_via_jsonld(hass, [a for a, _ in alts])
+            results = []
+            for alt, url in alts:
+                row = alt.to_dict()
+                # Free mode has no AI to name the retailer, so surface the bare
+                # domain (unless enrichment already set one) and flag obvious
+                # non-shops (GitHub/YouTube/wiki/docs).
+                if not row.get("retailer"):
+                    row["retailer"] = _normalize_domain(url)
+                row["likely_non_shop"] = _is_non_shop_domain(url)
                 results.append(row)
-            results = results[:max_results]
         else:
             alternatives = await provider.find_alternatives(query)
+            # The AI often returns price=null (works from snippets); backfill
+            # from each page's JSON-LD/meta, same as tracked alternatives.
+            await enrich_alternatives_via_jsonld(hass, alternatives)
             results = [alt.to_dict() for alt in alternatives]
     except SearchProviderAuthError as err:
         connection.send_error(msg["id"], "search_auth_failed", str(err))
