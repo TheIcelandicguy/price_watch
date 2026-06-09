@@ -7,40 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-09
+
+First public beta. Reframes Price Watch from a single Claude-powered URL
+tracker into a **free-by-default, multi-retailer price tracker with a sidebar
+panel** — AI is now optional.
+
 ### Added
-- Cookie capture in the panel: the per-listing price-selector editor now has
-  a **Request cookies** box, so anti-bot cookies (Amazon/Cloudflare) can be
-  pasted without editing JSON or digging into the config flow. Cookies are
-  kept independent of the price selector — saving one never clobbers the
-  other — and "Reset to automatic" clears both. The editor shows a
-  "✓ cookies currently set" hint when a listing already has cookies (the
-  value itself is never surfaced), and "Test on live page" now fetches with
-  the pasted cookies so testing a walled page reflects the real poll.
+- **Free-first extraction.** Reads price/stock from Schema.org `Product` /
+  Open Graph data with no AI and no key — the default mode. AI (Anthropic
+  **or** any OpenAI-compatible endpoint, including local **Ollama**) is an
+  optional fallback, and can be set to fallback-only so discovery stays free.
+- **Sidebar panel.** Add, search, sort, filter, compare and manage everything
+  from one screen — no YAML or dashboard wiring. Includes a custom
+  price-selector editor (with a "Test on live page" button and an
+  element-picker bookmarklet), cookie capture, a variant/size picker, an
+  alert-builder dialog, and an AI-provider settings editor.
+- **Multi-retailer listings.** Track the same product at several shops as
+  separate listings under one product, each with its own price/stock/photo.
+- **Discovery & "Search & add".** Look a product up across the web, price the
+  results that expose a price (JSON-LD or `<meta>`/microdata), filter out
+  review/category/search pages, sort priced results first, and add any with
+  one click. Region-aware: flags and can hide listings that won't ship to you.
+- **Currency conversion** — every price also reported in your home currency
+  (`sensor.<slug>_price_local`).
+- **Per-store stock** (e.g. Húsasmiðjan, JYSK) and **variant pickers**
+  (lumber length, sizes) on supported sites.
+- **On-sale detection** — `price_watch_discount` event when a retailer's own
+  sale/strikethrough appears; plus `price_watch_discontinued`.
+- **Price context** — all-time low / "at low" flags, typical price, and a
+  per-unit price (e.g. kr/m), with a manual unit override.
+- **Custom parsers** — CSS / regex / JSONPath / raw-JSON, with cookies and
+  per-listing currency/retailer/unit overrides, all editable from the panel.
+- **SearXNG** as an alternative search source; a global excluded-domains
+  blocklist.
+- New services: `track_product`, `add_listing`, `remove_listing`,
+  `edit_listing`, `set_variant`, `set_paused`, `find_alternatives`.
+
+### Changed
+- More resilient fetching: realistic browser TLS impersonation with an
+  automatic fresh-session retry for sites that block reused sessions or serve
+  an interstitial (Amazon-style "continue shopping", 403/429), plus a
+  per-host politeness gap and a global concurrency cap so a large fleet of
+  products doesn't burst-hit a store.
+- Daily-downsampled long-term history alongside the fine-grained recent
+  history.
 
 ### Fixed
-- Cookie-walled sites with no custom selector no longer fail extraction: a
-  cookies-only parser now fetches with its cookies and falls through to the
-  JSON-LD / AI pipeline instead of being forced down the (empty) CSS path,
-  which previously hard-failed on the free/no-AI tier.
-- Cookies pasted on the add-product form are no longer silently dropped for
-  sites without a built-in preset; they now build a cookies-only parser so
-  the first fetch already runs as a returning visitor.
-- `request_cookies` set via the `add_listing` / `edit_listing` services now
-  actually reaches the extractor. Previously it was written to a top-level
-  field the poll path never read, so it was a silent no-op. Cookies are now
-  stored inside `custom_parser.request_cookies` (the only place the extractor
-  reads them) and the services accept a header string, a `{name: value}`
-  dict, or a list of cookie dicts.
-- A non-empty but unparseable `request_cookies` value now raises instead of
-  silently clearing a listing's existing cookies; a `custom_parser` that is
-  valid JSON but not an object is rejected instead of crashing every poll.
+- Cookie-walled sites with no custom selector no longer fail extraction; a
+  cookies-only parser fetches with its cookies and falls through to the
+  JSON-LD / AI pipeline.
+- `request_cookies` set via `add_listing` / `edit_listing` now actually
+  reaches the extractor (stored inside `custom_parser.request_cookies`);
+  accepts a header string, a `{name: value}` dict, or a list of cookie dicts.
+- Paused products keep their last-known price instead of going unavailable.
+- Removing a listing cleans up its entities (no "unavailable" ghost rows).
 
 ### Internal
-- Cookie normalization consolidated into a single `cookies` module
-  (`to_header_str` / `to_dict`) shared by the services, config flow,
-  extractor and websocket, replacing four drifting copies. Per-listing
-  parser reads now go through one tolerant boundary
-  (`coordinator.effective_custom_parser`).
+- Coordinator split into focused mixins (events / fx / storage / update /
+  alternatives); cookie normalization consolidated into one `cookies` module.
+- CI: hassfest, HACS validation, pytest (3.12 + 3.13) and ruff on every push.
 
 ## [0.1.0] - 2026-04-29
 

@@ -1582,7 +1582,7 @@ function e(e,t,r,i){var s,o=arguments.length,a=o<3?t:null===i?i=Object.getOwnPro
           type="url"
           .value=${this._pSearxngUrl}
           @input=${e=>this._pSearxngUrl=e.target.value}
-          placeholder="http://192.168.0.92:8080"
+          placeholder="http://localhost:8080"
         />
       </label>
       <div class="trackform__hint">
@@ -1665,7 +1665,7 @@ function e(e,t,r,i){var s,o=arguments.length,a=o<3?t:null===i?i=Object.getOwnPro
           type="url"
           .value=${this._pBaseUrl}
           @input=${e=>this._pBaseUrl=e.target.value}
-          placeholder="http://192.168.0.92:11434/v1"
+          placeholder="http://localhost:11434/v1"
         />
       </label>
       <label class="trackform__field">

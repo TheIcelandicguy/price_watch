@@ -2429,7 +2429,7 @@ export class PriceWatchPanel extends LitElement {
           .value=${this._pSearxngUrl}
           @input=${(e: Event) =>
             (this._pSearxngUrl = (e.target as HTMLInputElement).value)}
-          placeholder="http://192.168.0.92:8080"
+          placeholder="http://localhost:8080"
         />
       </label>
       <div class="trackform__hint">
@@ -2556,7 +2556,7 @@ export class PriceWatchPanel extends LitElement {
           .value=${this._pBaseUrl}
           @input=${(e: Event) =>
             (this._pBaseUrl = (e.target as HTMLInputElement).value)}
-          placeholder="http://192.168.0.92:11434/v1"
+          placeholder="http://localhost:11434/v1"
         />
       </label>
       <label class="trackform__field">
