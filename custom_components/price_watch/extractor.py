@@ -396,6 +396,60 @@ def find_meta_image(html: str) -> str | None:
     return None
 
 
+def find_meta_price(html: str) -> tuple[float | None, str | None]:
+    """Best-effort (price, currency) from <meta>/microdata when JSON-LD has none.
+
+    Many shops expose the price ONLY via Open Graph product tags or schema.org
+    microdata, not a full ld+json Product. Covers, in priority order:
+      - <meta property="product:price:amount"> (+ product:price:currency)
+      - <meta property="og:price:amount">      (+ og:price:currency)
+      - <meta itemprop="price">                (+ itemprop="priceCurrency")
+      - any element with itemprop="price" (content attr or text)
+    Returns (None, None) when nothing usable is found. Used to enrich
+    alternatives — never on the primary tracker path, which prefers JSON-LD.
+    """
+    from .parsers import _apply_transforms  # lazy: avoid import cycle
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    def _clean(raw: str | None) -> float | None:
+        if not raw:
+            return None
+        val = _apply_transforms(raw, "price_clean")
+        try:
+            f = float(val)
+        except (TypeError, ValueError):
+            return None
+        return f if f > 0 else None
+
+    meta_pairs = [
+        ({"property": "product:price:amount"}, {"property": "product:price:currency"}),
+        ({"property": "og:price:amount"}, {"property": "og:price:currency"}),
+        ({"itemprop": "price"}, {"itemprop": "priceCurrency"}),
+    ]
+    for price_attrs, cur_attrs in meta_pairs:
+        el = soup.find("meta", attrs=price_attrs)
+        if el and el.get("content"):
+            price = _clean(el["content"])
+            if price is not None:
+                cur_el = soup.find("meta", attrs=cur_attrs)
+                currency = (cur_el.get("content") if cur_el else None) or None
+                return price, currency
+
+    # Microdata element (e.g. <span itemprop="price" content="12.33">$12.33</span>)
+    el = soup.find(attrs={"itemprop": "price"})
+    if el:
+        price = _clean(el.get("content") or el.get_text(strip=True))
+        if price is not None:
+            cur_el = soup.find(attrs={"itemprop": "priceCurrency"})
+            currency = None
+            if cur_el:
+                currency = cur_el.get("content") or cur_el.get_text(strip=True) or None
+            return price, currency
+
+    return None, None
+
+
 def _parse_store_availability(html: str) -> list[dict[str, Any]] | None:
     """Parse per-physical-store stock from a retailer's availability block.
 

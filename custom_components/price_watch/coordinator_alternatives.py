@@ -42,7 +42,7 @@ from urllib.parse import urlparse
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
-from .extractor import fetch_html, find_meta_image, try_jsonld
+from .extractor import fetch_html, find_meta_image, find_meta_price, try_jsonld
 
 from .const import (
     ALTERNATIVES_REFRESH_HOURS,
@@ -483,6 +483,15 @@ class AlternativesMixin:
                     # snippet title (no "| Buy now - Retailer" cruft).
                     if jsonld.get("title"):
                         alt.title = jsonld["title"]
+                # Meta/microdata fallback: many shops carry the price only in
+                # Open Graph product tags or itemprop microdata, not a full
+                # JSON-LD Product. Try that before giving up on a price.
+                if alt.price is None:
+                    meta_price, meta_currency = find_meta_price(html)
+                    if meta_price is not None:
+                        alt.price = meta_price
+                        if meta_currency and not alt.currency:
+                            alt.currency = meta_currency
                 # Grab a thumbnail regardless of whether we got a price —
                 # JSON-LD image first, then og:image meta as fallback.
                 image = (jsonld or {}).get("image_url") or find_meta_image(html)

@@ -1017,3 +1017,37 @@ async def test_fetch_retries_on_connection_error_with_fresh_session(monkeypatch)
         assert host in extractor_mod._FRESH_SESSION_HOSTS
     finally:
         extractor_mod._FRESH_SESSION_HOSTS.discard(host)
+
+
+# --- find_meta_price (alternatives enrichment fallback) --------------------
+
+def test_find_meta_price_product_og_tag():
+    html = ('<meta property="product:price:amount" content="129.99">'
+            '<meta property="product:price:currency" content="USD">')
+    assert extractor_mod.find_meta_price(html) == (129.99, "USD")
+
+
+def test_find_meta_price_og_comma_decimal():
+    html = ('<meta property="og:price:amount" content="49,90">'
+            '<meta property="og:price:currency" content="EUR">')
+    price, currency = extractor_mod.find_meta_price(html)
+    assert price == 49.9
+    assert currency == "EUR"
+
+
+def test_find_meta_price_itemprop_microdata():
+    html = ('<span itemprop="price" content="12.33">$12.33</span>'
+            '<meta itemprop="priceCurrency" content="USD">')
+    price, currency = extractor_mod.find_meta_price(html)
+    assert price == 12.33
+    assert currency == "USD"
+
+
+def test_find_meta_price_itemprop_text_only():
+    html = '<span itemprop="price">$1,499.00</span>'
+    price, _ = extractor_mod.find_meta_price(html)
+    assert price == 1499.0
+
+
+def test_find_meta_price_absent():
+    assert extractor_mod.find_meta_price("<html><body>no price here</body></html>") == (None, None)
