@@ -340,6 +340,11 @@ async def ws_search(
             r for r in results if not _host_excluded(str(r.get("url") or ""), excluded)
         ]
 
+    # Surface results we could actually price to the top (stable sort, so the
+    # provider's relevance order is preserved within the priced and unpriced
+    # groups). Otherwise the handful of comparable, priced hits get buried
+    # under Amazon / manufacturer / MAP-hidden pages that never expose a price.
+    results.sort(key=lambda r: r.get("price") is None)
     connection.send_result(msg["id"], {"engine": engine, "results": results})
 
 
