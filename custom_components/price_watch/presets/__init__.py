@@ -27,12 +27,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from . import amazon, elko, tolvutek
+from . import amazon, elko, rafland, tolvutek
 
 _LOGGER = logging.getLogger(__name__)
 
 # Order matters only for overlapping domains - more specific first
-PRESETS = [tolvutek, elko, amazon]
+PRESETS = [tolvutek, elko, rafland, amazon]
 
 
 def find_preset(url: str) -> Any | None:
