@@ -141,6 +141,12 @@ Honest expectations for testers:
 - **"See price in cart" / MAP pricing** (some US retailers) can't be read — the price genuinely isn't on the page.
 - **Discovery quality depends on the search source.** AI search finds real product pages; the free DuckDuckGo path is weaker for niche items. The integration filters out review/category pages either way.
 
+## A store isn't working?
+
+1. **Try a custom selector.** Open the product's **✎** editor in the panel, point it at the price (CSS / regex), hit **Test on live page**, and save. Most "Price unknown" cases are fixable this way.
+2. **Check [issue #1 — Retailer compatibility](https://github.com/TheIcelandicguy/price_watch/issues/1).** It lists what's confirmed working / hard, so you might find the answer (or add a one-line report).
+3. **File a report with diagnostics.** Settings → Devices & Services → Price Watch → the product's **⋮ → Download diagnostics** — it's a redacted JSON (your API key and cookies are stripped) showing exactly what the integration extracted. Attach it to a [retailer report](https://github.com/TheIcelandicguy/price_watch/issues/new?template=retailer_report.md) or [bug report](https://github.com/TheIcelandicguy/price_watch/issues/new?template=bug_report.md). That one file usually tells us the whole story.
+
 ## Development
 
 ```bash
