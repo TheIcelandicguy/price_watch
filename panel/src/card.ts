@@ -110,6 +110,15 @@ export class PriceWatchCard extends LitElement {
   // product follows that size's own page.
   @property({ attribute: false })
   onChangeSize?: (product: TrackedProduct, url: string, label: string) => void;
+  // Optional callback fired when the user clicks the 🗑 (delete) button in
+  // the card's action bar. The card shows a window.confirm first (this is
+  // destructive and unlike remove-listing wipes the WHOLE product), then
+  // delegates to the panel owner, which calls price_watch.untrack_product.
+  // That removes the config entry; HA unloads it and drops its storage, the
+  // entity_registry_updated event fires, the panel re-fetches, and the card
+  // disappears from the grid.
+  @property({ attribute: false })
+  onRemoveProduct?: (product: TrackedProduct) => void;
 
   /**
    * The currency we show next to the headline price. Prefer the local
@@ -966,6 +975,27 @@ export class PriceWatchCard extends LitElement {
   };
 
   /**
+   * Delete the whole product. Destructive and irreversible — unlike
+   * removing a single listing, this drops the product's history, every
+   * listing's sensors and any alerts — so the confirm names the product
+   * and spells out what's lost. Mirrors handleRemoveListing's
+   * window.confirm approach for consistency.
+   */
+  private handleRemoveProduct = (event: Event): void => {
+    event.stopPropagation();
+    const name = this.product.title || "this product";
+    if (
+      !window.confirm(
+        `Stop tracking and delete "${name}"?\n\n` +
+          "This removes its price history, all its listings' sensors and " +
+          "any alerts. It can't be undone."
+      )
+    )
+      return;
+    this.onRemoveProduct?.(this.product);
+  };
+
+  /**
    * Commit an inline target-price edit. Parses the input value: empty
    * (or non-numeric) clears the target (null); a valid number sets it.
    * No-ops when the value hasn't changed so we don't fire redundant
@@ -1005,7 +1035,8 @@ export class PriceWatchCard extends LitElement {
       !this.onRefreshNow &&
       !this.onSetTarget &&
       !this.onSetPaused &&
-      !this.onAlert
+      !this.onAlert &&
+      !this.onRemoveProduct
     ) {
       return nothing;
     }
@@ -1065,6 +1096,17 @@ export class PriceWatchCard extends LitElement {
                 icon=${this.refreshingNow ? "mdi:loading" : "mdi:refresh"}
                 class=${this.refreshingNow ? "actions__btn-spin" : ""}
               ></ha-icon>
+            </button>`
+          : nothing}
+        ${this.onRemoveProduct
+          ? html`<button
+              class="actions__btn actions__btn--danger"
+              type="button"
+              @click=${this.handleRemoveProduct}
+              aria-label="Delete this product"
+              title="Stop tracking and delete this product"
+            >
+              <ha-icon icon="mdi:trash-can-outline"></ha-icon>
             </button>`
           : nothing}
       </div>
@@ -1393,6 +1435,10 @@ export class PriceWatchCard extends LitElement {
       color: var(--primary-color, #03a9f4);
       background: var(--secondary-background-color, #f5f5f5);
       border-color: var(--divider-color, #e0e0e0);
+    }
+    .actions__btn--danger:hover:not(:disabled) {
+      color: var(--error-color, #db4437);
+      border-color: var(--error-color, #db4437);
     }
     .actions__btn:disabled {
       cursor: wait;

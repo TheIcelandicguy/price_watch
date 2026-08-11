@@ -784,6 +784,36 @@ export class PriceWatchPanel extends LitElement {
   };
 
   /**
+   * Delete a whole product (stop tracking it).
+   *
+   * Fires price_watch.untrack_product, which removes the product's config
+   * entry. The card has already shown a window.confirm before invoking
+   * this — deletion is destructive (history + every listing's sensors +
+   * alerts) so the user has agreed.
+   *
+   * On success HA unloads the entry, async_remove_entry drops its storage,
+   * and entity_registry_updated fires; our subscription rebuilds the
+   * registry and the card drops out of the grid — no explicit state
+   * management here. On failure (network, service error) we log to the
+   * console; the card stays and the user can retry.
+   */
+  private _handleRemoveProduct = async (
+    product: TrackedProduct
+  ): Promise<void> => {
+    if (!this._conn) return;
+    try {
+      await this._conn.sendMessagePromise({
+        type: "call_service",
+        domain: "price_watch",
+        service: "untrack_product",
+        service_data: { entry_id: product.entryId },
+      });
+    } catch (err) {
+      console.error("[price-watch-panel] untrack_product failed:", err);
+    }
+  };
+
+  /**
    * Add an alternative as a tracked listing on its product.
    *
    * Fires price_watch.add_listing with the alternative's URL plus
@@ -2801,6 +2831,7 @@ export class PriceWatchPanel extends LitElement {
               .onSetPaused=${this._handleSetPaused}
               .hideNonShipping=${this._hideNonShipping}
               .onRemoveListing=${this._handleRemoveListing}
+              .onRemoveProduct=${this._handleRemoveProduct}
               .onAddListing=${this._handleAddListing}
               .onEditListing=${this._handleEditListing}
               .onEditVariant=${this._handleEditVariant}

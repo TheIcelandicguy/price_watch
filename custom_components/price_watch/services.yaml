@@ -312,3 +312,18 @@ track_product:
           mode: box
           min: 0
           step: 0.01
+
+untrack_product:
+  name: Untrack product
+  description: >
+    Stop tracking a product and delete it. Removes the whole config
+    entry — every listing's sensors, the price history and any stored
+    state. This cannot be undone. Backs the panel's per-card delete
+    button.
+  fields:
+    entry_id:
+      name: Config entry ID
+      description: The product entry to remove (required).
+      example: 01KSBSNNAYACAF7FB34KX8BWNP
+      selector:
+        text:

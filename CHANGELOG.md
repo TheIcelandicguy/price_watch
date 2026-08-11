@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-11
+
+### Added
+- **Delete a product from the panel.** Each card now has a delete (🗑) button
+  in its action bar that stops tracking and removes the whole product — its
+  price history, every listing's sensors and any alerts. A confirmation names
+  the product first. Backed by a new `price_watch.untrack_product` service
+  (single-entry, product-only), so it's also usable from automations.
+
 ## [0.2.0] - 2026-06-09
 
 First public beta. Reframes Price Watch from a single Claude-powered URL

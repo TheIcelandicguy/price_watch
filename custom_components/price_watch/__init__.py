@@ -992,6 +992,21 @@ async def _register_services(hass: HomeAssistant) -> None:
 
         _LOGGER.info("track_product: created entry for %s", url)
 
+    async def untrack_product(call: ServiceCall) -> None:
+        """Stop tracking a product and delete its config entry.
+
+        Removes the whole product — every listing's sensors, the price
+        history and the stored per-entry state — by removing the config
+        entry. HA runs async_unload_entry then async_remove_entry, which
+        drops the .storage/price_watch.{entry_id} file. Backs the panel's
+        per-card delete button. Single-entry only: _resolve_entry requires
+        an explicit entry_id and rejects the settings entry, so a stray
+        broadcast can't wipe every product.
+        """
+        entry = _resolve_entry(call)
+        _LOGGER.info("untrack_product: removing entry %s", entry.entry_id)
+        await hass.config_entries.async_remove(entry.entry_id)
+
     target_schema = vol.Schema(
         {
             vol.Optional("entry_id"): str,
@@ -1093,4 +1108,10 @@ async def _register_services(hass: HomeAssistant) -> None:
                 vol.Optional("target_price"): vol.Any(None, vol.Coerce(float)),
             }
         ),
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "untrack_product",
+        untrack_product,
+        schema=vol.Schema({vol.Required("entry_id"): str}),
     )
