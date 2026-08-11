@@ -111,12 +111,12 @@ export class PriceWatchCard extends LitElement {
   @property({ attribute: false })
   onChangeSize?: (product: TrackedProduct, url: string, label: string) => void;
   // Optional callback fired when the user clicks the 🗑 (delete) button in
-  // the card's action bar. The card shows a window.confirm first (this is
-  // destructive and unlike remove-listing wipes the WHOLE product), then
-  // delegates to the panel owner, which calls price_watch.untrack_product.
-  // That removes the config entry; HA unloads it and drops its storage, the
-  // entity_registry_updated event fires, the panel re-fetches, and the card
-  // disappears from the grid.
+  // the card's action bar. Deletion is destructive (unlike remove-listing it
+  // wipes the WHOLE product), so the panel owner shows a native HA
+  // confirmation dialog before calling price_watch.untrack_product — the card
+  // does NOT confirm itself. On confirm that removes the config entry; HA
+  // unloads it and drops its storage, entity_registry_updated fires, the
+  // panel re-fetches, and the card disappears from the grid.
   @property({ attribute: false })
   onRemoveProduct?: (product: TrackedProduct) => void;
 
@@ -975,23 +975,13 @@ export class PriceWatchCard extends LitElement {
   };
 
   /**
-   * Delete the whole product. Destructive and irreversible — unlike
-   * removing a single listing, this drops the product's history, every
-   * listing's sensors and any alerts — so the confirm names the product
-   * and spells out what's lost. Mirrors handleRemoveListing's
-   * window.confirm approach for consistency.
+   * Request deletion of the whole product. The panel owner shows a native
+   * HA confirmation dialog (deletion is destructive and irreversible —
+   * drops history, every listing's sensors and any alerts) and only then
+   * calls the untrack service, so the card doesn't confirm here.
    */
   private handleRemoveProduct = (event: Event): void => {
     event.stopPropagation();
-    const name = this.product.title || "this product";
-    if (
-      !window.confirm(
-        `Stop tracking and delete "${name}"?\n\n` +
-          "This removes its price history, all its listings' sensors and " +
-          "any alerts. It can't be undone."
-      )
-    )
-      return;
     this.onRemoveProduct?.(this.product);
   };
 

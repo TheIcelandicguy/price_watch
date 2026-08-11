@@ -493,6 +493,19 @@ export class PriceWatchPanel extends LitElement {
   // Holds the created automation's friendly id briefly on success.
   @state() private _alertSaved: string | null = null;
 
+  // --- Native confirmation dialog state ---
+  // When set, a Home Assistant <ha-dialog> confirmation is shown (instead of
+  // the browser's window.confirm). `onConfirm` runs on the primary action;
+  // cancel / scrim-click / escape / the close-X all dismiss without running
+  // it. Generic so other destructive actions can adopt it later.
+  @state() private _confirm: {
+    title: string;
+    text: string;
+    confirmText: string;
+    destructive: boolean;
+    onConfirm: () => void;
+  } | null = null;
+
   // Stashed connection used for the post-bootstrap call_service
   // sends. Populated by _bootstrap() once the wrapper resolves.
   private _conn: HassConnection | null = null;
@@ -786,18 +799,34 @@ export class PriceWatchPanel extends LitElement {
   /**
    * Delete a whole product (stop tracking it).
    *
-   * Fires price_watch.untrack_product, which removes the product's config
-   * entry. The card has already shown a window.confirm before invoking
-   * this — deletion is destructive (history + every listing's sensors +
-   * alerts) so the user has agreed.
-   *
-   * On success HA unloads the entry, async_remove_entry drops its storage,
-   * and entity_registry_updated fires; our subscription rebuilds the
-   * registry and the card drops out of the grid — no explicit state
+   * Opens the native HA confirmation dialog (deletion is destructive —
+   * history + every listing's sensors + alerts). The actual removal runs
+   * from _untrackProduct only if the user confirms; the card no longer does
+   * its own window.confirm.
+   */
+  private _handleRemoveProduct = (product: TrackedProduct): void => {
+    const name = product.title || "this product";
+    this._askConfirm({
+      title: "Delete product?",
+      text:
+        `Stop tracking and delete “${name}”? This removes its price ` +
+        `history, all its listings' sensors and any alerts. It can't be ` +
+        `undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => void this._untrackProduct(product),
+    });
+  };
+
+  /**
+   * Fire price_watch.untrack_product, which removes the product's config
+   * entry. On success HA unloads the entry, async_remove_entry drops its
+   * storage, and entity_registry_updated fires; our subscription rebuilds
+   * the registry and the card drops out of the grid — no explicit state
    * management here. On failure (network, service error) we log to the
    * console; the card stays and the user can retry.
    */
-  private _handleRemoveProduct = async (
+  private _untrackProduct = async (
     product: TrackedProduct
   ): Promise<void> => {
     if (!this._conn) return;
@@ -811,6 +840,45 @@ export class PriceWatchPanel extends LitElement {
     } catch (err) {
       console.error("[price-watch-panel] untrack_product failed:", err);
     }
+  };
+
+  // --- Native confirmation dialog ---
+
+  /** Open the HA <ha-dialog> confirmation. */
+  private _askConfirm(opts: {
+    title: string;
+    text: string;
+    confirmText: string;
+    destructive?: boolean;
+    onConfirm: () => void;
+  }): void {
+    this._confirm = {
+      title: opts.title,
+      text: opts.text,
+      confirmText: opts.confirmText,
+      destructive: opts.destructive ?? false,
+      onConfirm: opts.onConfirm,
+    };
+  }
+
+  /** Dismiss the confirmation without running the action. */
+  private _closeConfirm = (): void => {
+    this._confirm = null;
+  };
+
+  /** Primary action: run the stashed callback, then close. */
+  private _confirmProceed = (): void => {
+    const cb = this._confirm?.onConfirm;
+    this._confirm = null;
+    cb?.();
+  };
+
+  /**
+   * ha-dialog fires `closed` on scrim-click, escape, or the header close-X.
+   * Treat any of those as a cancel — clearing state removes the dialog.
+   */
+  private _onConfirmDialogClosed = (): void => {
+    this._confirm = null;
   };
 
   /**
@@ -2868,6 +2936,43 @@ export class PriceWatchPanel extends LitElement {
       ${this._renderSelectorModal()}
       ${this._renderVariantModal()}
       ${this._renderAlertModal()}
+      ${this._renderConfirmDialog()}
+    `;
+  }
+
+  /**
+   * Native Home Assistant confirmation dialog. Uses HA's own <ha-dialog>
+   * element (present in the frontend runtime) so it looks and behaves like
+   * every other HA confirmation — themed, scrim-dismissable, escape-to-close
+   * — instead of the browser's window.confirm. The action buttons are plain
+   * styled buttons (HA-text-button look) so we depend only on <ha-dialog>
+   * itself. Rendered at the panel root; nothing when no confirm is pending.
+   */
+  private _renderConfirmDialog() {
+    const c = this._confirm;
+    if (!c) return null;
+    return html`
+      <ha-dialog
+        open
+        .heading=${c.title}
+        @closed=${this._onConfirmDialogClosed}
+      >
+        <p class="confirm__text">${c.text}</p>
+        <button
+          slot="secondaryAction"
+          class="confirm__btn"
+          @click=${this._closeConfirm}
+        >
+          Cancel
+        </button>
+        <button
+          slot="primaryAction"
+          class="confirm__btn ${c.destructive ? "confirm__btn--danger" : ""}"
+          @click=${this._confirmProceed}
+        >
+          ${c.confirmText}
+        </button>
+      </ha-dialog>
     `;
   }
 
@@ -4264,6 +4369,36 @@ export class PriceWatchPanel extends LitElement {
     .error p,
     .loading p {
       margin: 0;
+    }
+
+    /* Native HA confirmation dialog (<ha-dialog>) body + action buttons.
+       ha-dialog supplies the themed frame; these style our slotted content
+       to match HA's text-button look. */
+    .confirm__text {
+      margin: 0;
+      max-width: 360px;
+      color: var(--primary-text-color, #212121);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .confirm__btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 14px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      color: var(--primary-color, #03a9f4);
+    }
+    .confirm__btn:hover {
+      background: rgba(127, 127, 127, 0.12);
+    }
+    .confirm__btn--danger {
+      color: var(--error-color, #db4437);
     }
   `;
 }
