@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the product first. Backed by a new `price_watch.untrack_product` service
   (single-entry, product-only), so it's also usable from automations.
 
+### Changed
+- **Themed confirmation dialogs.** Every confirm and error popup in the panel
+  (delete product, remove listing, add listing, exclude site, switch size,
+  reset custom selector, clear pinned variant) now uses an in-panel dialog
+  that follows your Home Assistant theme, instead of the browser's grey
+  `confirm()` / `alert()` boxes.
+
 ## [0.2.0] - 2026-06-09
 
 First public beta. Reframes Price Watch from a single Claude-powered URL

@@ -38,9 +38,9 @@ export class PriceWatchCard extends LitElement {
   @property({ type: Boolean, attribute: false })
   hideNonShipping = false;
   // Optional callback fired when the user clicks "Remove" on a
-  // secondary listing's row. The panel owner is responsible for the
-  // confirmation dialog (handled in the card via window.confirm) and
-  // for calling the price_watch.remove_listing service. After the
+  // secondary listing's row. The panel owner shows the in-panel
+  // confirmation dialog and then calls
+  // the price_watch.remove_listing service. After the
   // service returns, the sensor entities for that listing are
   // unregistered server-side, the registry-updated event fires, the
   // panel re-fetches the registry, and the card re-renders without
@@ -519,36 +519,24 @@ export class PriceWatchCard extends LitElement {
   }
 
   /**
-   * Click handler for an alternative row's "⊘" button. Stops propagation,
-   * confirms, and delegates to onExcludeAlternative, which adds the site's
-   * host to the global excluded-domains blocklist.
+   * Click handler for an alternative row's "⊘" button. Stops propagation
+   * and delegates to onExcludeAlternative, which confirms in-panel before
+   * adding the site's host to the global excluded-domains blocklist.
    */
   private handleExcludeAlternative(event: Event, alt: Alternative): void {
     event.stopPropagation();
     event.preventDefault();
-    const host = this.altHost(alt.url);
-    if (
-      !window.confirm(
-        `Exclude ${host || "this site"} from all future searches and alternatives?`
-      )
-    )
-      return;
     this.onExcludeAlternative?.(this.product, alt);
   }
 
   /**
-   * Click handler for an alternative row's "+" button. Stops
-   * propagation (so the card's open-source handler doesn't fire),
-   * confirms intent, and delegates to onAddListing. Mirrors
-   * handleRemoveListing's window.confirm approach for consistency.
+   * Click handler for an alternative row's "+" button. Stops propagation
+   * (so the card's open-source handler doesn't fire) and delegates to
+   * onAddListing; the panel owner confirms in-panel first.
    */
   private handleAddListing(event: Event, alt: Alternative): void {
     event.stopPropagation();
     event.preventDefault();
-    const label = alt.retailer
-      ? `Track the ${alt.retailer} listing for ${this.product.title}?`
-      : `Track this alternative as a listing on ${this.product.title}?`;
-    if (!window.confirm(label)) return;
     this.onAddListing?.(this.product, alt);
   }
 
@@ -731,7 +719,7 @@ export class PriceWatchCard extends LitElement {
    * and a last-check timestamp. The primary listing gets a small
    * "primary" badge and no remove button (you can't remove a
    * product's last listing). Secondaries get a × button that
-   * fires onRemoveListing after a window.confirm.
+   * fires onRemoveListing (the panel confirms in-panel).
    *
    * Always rendered when the product has at least one listing
    * (which is always, since a product without listings would have
@@ -938,23 +926,14 @@ export class PriceWatchCard extends LitElement {
   }
 
   /**
-   * Click handler for a row's × button. Stops propagation (so the
-   * card's open-source handler doesn't fire), shows a native
-   * confirmation, and delegates to onRemoveListing on confirm.
-   *
-   * window.confirm is intentionally minimal — feels heavy compared
-   * to a slick custom modal but it's reliable across themes and
-   * doesn't pull in modal-state plumbing. Easy to upgrade later if
-   * we want a nicer UX.
+   * Click handler for a row's × button. Stops propagation (so the card's
+   * open-source handler doesn't fire) and delegates to onRemoveListing;
+   * the panel owner shows the in-panel confirmation before removing.
    */
   private handleRemoveListing(event: Event, listing: Listing): void {
     event.stopPropagation();
     event.preventDefault();
     if (listing.isPrimary) return;  // Defensive — button shouldn't render
-    const label = listing.retailer
-      ? `Remove the ${listing.retailer} listing from ${this.product.title}?`
-      : `Remove this listing from ${this.product.title}?`;
-    if (!window.confirm(label)) return;
     this.onRemoveListing?.(this.product, listing);
   }
 

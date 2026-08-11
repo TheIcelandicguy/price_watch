@@ -493,16 +493,18 @@ export class PriceWatchPanel extends LitElement {
   // Holds the created automation's friendly id briefly on success.
   @state() private _alertSaved: string | null = null;
 
-  // --- Native confirmation dialog state ---
-  // When set, a Home Assistant <ha-dialog> confirmation is shown (instead of
-  // the browser's window.confirm). `onConfirm` runs on the primary action;
-  // cancel / scrim-click / escape / the close-X all dismiss without running
-  // it. Generic so other destructive actions can adopt it later.
+  // --- In-panel confirmation dialog state ---
+  // When set, an in-panel confirmation is shown (instead of the browser's
+  // window.confirm). `onConfirm` runs on the primary action; Cancel, the ✕
+  // and a backdrop click all dismiss without running it. With `hideCancel`
+  // it degrades to a notice (single OK button) — our window.alert stand-in.
+  // Shared by every destructive/confirming action in the panel.
   @state() private _confirm: {
     title: string;
     text: string;
     confirmText: string;
     destructive: boolean;
+    hideCancel: boolean;
     onConfirm: () => void;
   } | null = null;
 
@@ -746,11 +748,31 @@ export class PriceWatchPanel extends LitElement {
   };
 
   /**
-   * Remove a single listing from a product.
+   * Remove a single listing from a product — asks first, in-panel.
    *
-   * Fires price_watch.remove_listing via the websocket. The card
-   * has already shown a window.confirm before invoking this — by
-   * the time we get here the user has agreed.
+   * Only this retailer's row goes away; the product itself (and every other
+   * listing) stays. Deleting the whole product is the card's 🗑 button.
+   */
+  private _handleRemoveListing = (
+    product: TrackedProduct,
+    listing: Listing
+  ): void => {
+    const what = listing.retailer
+      ? `the ${listing.retailer} listing`
+      : "this listing";
+    this._askConfirm({
+      title: "Remove listing?",
+      text:
+        `Remove ${what} from “${product.title}”? Its price history and ` +
+        `sensors are deleted. The product and its other listings stay.`,
+      confirmText: "Remove",
+      destructive: true,
+      onConfirm: () => void this._removeListing(product, listing),
+    });
+  };
+
+  /**
+   * Fire price_watch.remove_listing via the websocket.
    *
    * On success, the integration unregisters the listing's sensor
    * entities and persists the change. HA emits
@@ -759,10 +781,9 @@ export class PriceWatchPanel extends LitElement {
    * no explicit state management needed here.
    *
    * On failure (network, service error, listing not found), we
-   * surface the error to the console. A future enhancement could
-   * show a toast / banner. The user can re-try from the row.
+   * surface the error to the console. The user can re-try from the row.
    */
-  private _handleRemoveListing = async (
+  private _removeListing = async (
     product: TrackedProduct,
     listing: Listing
   ): Promise<void> => {
@@ -799,10 +820,10 @@ export class PriceWatchPanel extends LitElement {
   /**
    * Delete a whole product (stop tracking it).
    *
-   * Opens the native HA confirmation dialog (deletion is destructive —
+   * Opens the in-panel confirmation dialog (deletion is destructive —
    * history + every listing's sensors + alerts). The actual removal runs
-   * from _untrackProduct only if the user confirms; the card no longer does
-   * its own window.confirm.
+   * from _untrackProduct only if the user confirms; the card doesn't
+   * confirm itself.
    */
   private _handleRemoveProduct = (product: TrackedProduct): void => {
     const name = product.title || "this product";
@@ -842,9 +863,9 @@ export class PriceWatchPanel extends LitElement {
     }
   };
 
-  // --- Native confirmation dialog ---
+  // --- In-panel confirmation dialog ---
 
-  /** Open the HA <ha-dialog> confirmation. */
+  /** Open the in-panel confirmation dialog. */
   private _askConfirm(opts: {
     title: string;
     text: string;
@@ -857,7 +878,23 @@ export class PriceWatchPanel extends LitElement {
       text: opts.text,
       confirmText: opts.confirmText,
       destructive: opts.destructive ?? false,
+      hideCancel: false,
       onConfirm: opts.onConfirm,
+    };
+  }
+
+  /**
+   * Show a single-OK notice — the window.alert stand-in, using the same
+   * themed dialog so failures don't drop the user back to an OS popup.
+   */
+  private _showNotice(title: string, text: string): void {
+    this._confirm = {
+      title,
+      text,
+      confirmText: "OK",
+      destructive: false,
+      hideCancel: true,
+      onConfirm: () => {},
     };
   }
 
@@ -879,12 +916,30 @@ export class PriceWatchPanel extends LitElement {
   };
 
   /**
-   * Add an alternative as a tracked listing on its product.
-   *
-   * Fires price_watch.add_listing with the alternative's URL plus
+   * Add an alternative as a tracked listing on its product — asks first,
+   * in-panel. Adding starts polling that retailer's page, so it's worth a
+   * confirmation even though it isn't destructive.
+   */
+  private _handleAddListing = (
+    product: TrackedProduct,
+    alt: Alternative
+  ): void => {
+    if (!(alt.url ?? "").trim()) return;
+    const where = alt.retailer ? `the ${alt.retailer} listing` : "this listing";
+    this._askConfirm({
+      title: "Track this listing?",
+      text:
+        `Add ${where} to “${product.title}”? Its price will be tracked ` +
+        `alongside the product's other listings.`,
+      confirmText: "Add listing",
+      onConfirm: () => void this._addListing(product, alt),
+    });
+  };
+
+  /**
+   * Fire price_watch.add_listing with the alternative's URL plus
    * retailer/currency hints so the backend doesn't have to re-derive
-   * them. The card has already shown a window.confirm before invoking
-   * this. add_listing mutates entry.options.listings and reloads the
+   * them. add_listing mutates entry.options.listings and reloads the
    * entry; the coordinator re-instantiates with the new listing, sensor
    * entities are created, entity_registry_updated fires, our
    * subscription rebuilds the registry, and the new row appears in the
@@ -895,7 +950,7 @@ export class PriceWatchPanel extends LitElement {
    * likely error and is already guarded against in the card (the add
    * button is replaced by a ✓ once a matching listing exists).
    */
-  private _handleAddListing = async (
+  private _addListing = async (
     product: TrackedProduct,
     alt: Alternative
   ): Promise<void> => {
@@ -1081,15 +1136,29 @@ export class PriceWatchPanel extends LitElement {
    * (they're orthogonal), so a full reset clears them explicitly too —
    * this is also the panel's only way to drop stored cookies.
    */
-  private _clearSelector = async (): Promise<void> => {
+  private _clearSelector = (): void => {
     if (!this._conn || !this._selProduct || !this._selListing) return;
-    if (
-      !window.confirm(
-        "Remove the custom price selector and any stored cookies, and go " +
-          "back to automatic extraction?"
-      )
-    )
-      return;
+    // Capture the targets now — the confirm is async and the modal's
+    // selection could otherwise change underneath the action.
+    const product = this._selProduct;
+    const listing = this._selListing;
+    this._askConfirm({
+      title: "Reset to automatic extraction?",
+      text:
+        "Remove the custom price selector and any stored cookies for this " +
+        "listing, and go back to reading the price automatically?",
+      confirmText: "Reset",
+      destructive: true,
+      onConfirm: () => void this._doClearSelector(product, listing),
+    });
+  };
+
+  /** Perform the parser/cookie clear via edit_listing. */
+  private _doClearSelector = async (
+    product: TrackedProduct,
+    listing: Listing
+  ): Promise<void> => {
+    if (!this._conn) return;
     this._selSaving = true;
     this._selSaveError = null;
     try {
@@ -1098,8 +1167,8 @@ export class PriceWatchPanel extends LitElement {
         domain: "price_watch",
         service: "edit_listing",
         service_data: {
-          entry_id: this._selProduct.entryId,
-          listing_id: this._selListing.listingId,
+          entry_id: product.entryId,
+          listing_id: listing.listingId,
           custom_parser: "",
           request_cookies: "",
         },
@@ -1154,24 +1223,38 @@ export class PriceWatchPanel extends LitElement {
    * URL, so we point the PRIMARY listing at the chosen size's URL via
    * edit_listing; the coordinator then tracks that size on the next refresh.
    */
-  private _handleChangeSize = async (
+  private _handleChangeSize = (
     product: TrackedProduct,
     url: string,
     label: string
-  ): Promise<void> => {
+  ): void => {
     if (!this._conn) return;
     const primary = product.listings.find((l) => l.isPrimary);
     const listingId = primary?.listingId;
     if (!listingId) {
-      window.alert("Could not resolve the primary listing to switch size.");
+      this._showNotice(
+        "Can't switch size",
+        "Could not resolve the primary listing to switch size."
+      );
       return;
     }
-    if (
-      !window.confirm(
-        `Track the ${label} size instead?\n\nThis product will follow that size's own page — its price, stock and discount.`
-      )
-    )
-      return;
+    this._askConfirm({
+      title: "Switch size?",
+      text:
+        `Track the ${label} size instead? This product will follow that ` +
+        `size's own page — its price, stock and discount.`,
+      confirmText: "Switch",
+      onConfirm: () => void this._changeSize(product, listingId, url),
+    });
+  };
+
+  /** Point the primary listing at the chosen size's URL. */
+  private _changeSize = async (
+    product: TrackedProduct,
+    listingId: string,
+    url: string
+  ): Promise<void> => {
+    if (!this._conn) return;
     try {
       await this._conn.sendMessagePromise({
         type: "call_service",
@@ -1180,10 +1263,9 @@ export class PriceWatchPanel extends LitElement {
         service_data: { entry_id: product.entryId, listing_id: listingId, url },
       } as never);
     } catch (err) {
-      window.alert(
-        `Could not switch size: ${
-          (err as { message?: string })?.message ?? "unknown error"
-        }`
+      this._showNotice(
+        "Could not switch size",
+        (err as { message?: string })?.message ?? "Unknown error."
       );
     }
   };
@@ -1314,24 +1396,39 @@ export class PriceWatchPanel extends LitElement {
    * Clear the pinned variant, reverting to the page's default offer. Same
    * service split as save; an empty variant_options clears it.
    */
-  private _clearVariant = async (): Promise<void> => {
+  private _clearVariant = (): void => {
     if (!this._conn || !this._varProduct || !this._varListing) return;
-    if (
-      !window.confirm(
-        "Stop following a specific variant and go back to the default price?"
-      )
-    )
-      return;
+    // Capture now — the confirm is async and the picker's selection could
+    // otherwise change underneath the action.
+    const product = this._varProduct;
+    const listing = this._varListing;
+    this._askConfirm({
+      title: "Clear pinned variant?",
+      text:
+        "Stop following a specific variant and go back to the page's " +
+        "default price?",
+      confirmText: "Clear",
+      destructive: true,
+      onConfirm: () => void this._doClearVariant(product, listing),
+    });
+  };
+
+  /** Perform the variant clear (set_variant / edit_listing). */
+  private _doClearVariant = async (
+    product: TrackedProduct,
+    listing: Listing
+  ): Promise<void> => {
+    if (!this._conn) return;
     this._varSaving = true;
     this._varSaveError = null;
     try {
-      const data: Record<string, unknown> = this._varListing.isPrimary
+      const data: Record<string, unknown> = listing.isPrimary
         ? {
             type: "call_service",
             domain: "price_watch",
             service: "set_variant",
             service_data: {
-              entry_id: this._varProduct.entryId,
+              entry_id: product.entryId,
               variant_options: [],
             },
           }
@@ -1340,8 +1437,8 @@ export class PriceWatchPanel extends LitElement {
             domain: "price_watch",
             service: "edit_listing",
             service_data: {
-              entry_id: this._varProduct.entryId,
-              listing_id: this._varListing.listingId,
+              entry_id: product.entryId,
+              listing_id: listing.listingId,
               variant_options: [],
             },
           };
@@ -2305,18 +2402,35 @@ export class PriceWatchPanel extends LitElement {
   };
 
   /**
-   * Add an alternative's site to the global excluded-domains blocklist via
+   * Exclude an alternative's site — asks first, in-panel. This is a GLOBAL
+   * setting (every product, every future search), so the confirm says so.
+   */
+  private _handleExcludeAlternative = (
+    _product: TrackedProduct,
+    alt: Alternative
+  ): void => {
+    if (!this._conn) return;
+    const host = this._hostOf(alt.url ?? "");
+    if (!host) return;
+    this._askConfirm({
+      title: "Exclude this site?",
+      text:
+        `Hide ${host} from all future searches and alternatives, for every ` +
+        `product? You can undo this in the AI settings' excluded-sites list.`,
+      confirmText: "Exclude",
+      destructive: true,
+      onConfirm: () => void this._excludeAlternative(host),
+    });
+  };
+
+  /**
+   * Add a host to the global excluded-domains blocklist via
    * price_watch/exclude_domain, then hide that host's alternatives on every
    * card immediately. The blocklist is honored server-side on the next
    * find_alternatives / search, so the site won't return.
    */
-  private _handleExcludeAlternative = async (
-    _product: TrackedProduct,
-    alt: Alternative
-  ): Promise<void> => {
+  private _excludeAlternative = async (host: string): Promise<void> => {
     if (!this._conn) return;
-    const host = this._hostOf(alt.url ?? "");
-    if (!host) return;
     try {
       await this._conn.sendMessagePromise({
         type: "price_watch/exclude_domain",
@@ -2324,10 +2438,9 @@ export class PriceWatchPanel extends LitElement {
       });
       this._hiddenAltHosts = new Set(this._hiddenAltHosts).add(host);
     } catch (err) {
-      window.alert(
-        `Could not exclude ${host}: ${
-          (err as { message?: string })?.message ?? "unknown error"
-        }`
+      this._showNotice(
+        `Could not exclude ${host}`,
+        (err as { message?: string })?.message ?? "Unknown error."
       );
     }
   };
@@ -2943,7 +3056,7 @@ export class PriceWatchPanel extends LitElement {
    * HA's <ha-dialog> — mwc-dialog mis-positions and drops its action bar
    * when driven from inside this panel's shadow DOM. Themed via HA CSS vars
    * so it still reads as part of Home Assistant, and it's definitely not the
-   * browser's window.confirm. Backdrop-click, the ✕, and Cancel all dismiss
+   * browser's popup. Backdrop-click, the ✕, and Cancel all dismiss
    * without running the action. Rendered at the panel root; nothing when no
    * confirm is pending.
    */
@@ -2971,9 +3084,11 @@ export class PriceWatchPanel extends LitElement {
           </div>
           <p class="confirm__text">${c.text}</p>
           <div class="confirm__actions">
-            <button class="confirm__btn" @click=${this._closeConfirm}>
-              Cancel
-            </button>
+            ${c.hideCancel
+              ? null
+              : html`<button class="confirm__btn" @click=${this._closeConfirm}>
+                  Cancel
+                </button>`}
             <button
               class="confirm__btn ${c.destructive ? "confirm__btn--danger" : ""}"
               @click=${this._confirmProceed}
