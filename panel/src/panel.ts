@@ -873,12 +873,9 @@ export class PriceWatchPanel extends LitElement {
     cb?.();
   };
 
-  /**
-   * ha-dialog fires `closed` on scrim-click, escape, or the header close-X.
-   * Treat any of those as a cancel — clearing state removes the dialog.
-   */
-  private _onConfirmDialogClosed = (): void => {
-    this._confirm = null;
+  /** Backdrop click dismisses (cancel); clicks inside the card are ignored. */
+  private _onConfirmBackdrop = (e: Event): void => {
+    if (e.target === e.currentTarget) this._confirm = null;
   };
 
   /**
@@ -2941,38 +2938,51 @@ export class PriceWatchPanel extends LitElement {
   }
 
   /**
-   * Native Home Assistant confirmation dialog. Uses HA's own <ha-dialog>
-   * element (present in the frontend runtime) so it looks and behaves like
-   * every other HA confirmation — themed, scrim-dismissable, escape-to-close
-   * — instead of the browser's window.confirm. The action buttons are plain
-   * styled buttons (HA-text-button look) so we depend only on <ha-dialog>
-   * itself. Rendered at the panel root; nothing when no confirm is pending.
+   * Confirmation dialog. Built on the panel's own modal chrome (the same
+   * backdrop + card the search/provider/variant dialogs use) rather than
+   * HA's <ha-dialog> — mwc-dialog mis-positions and drops its action bar
+   * when driven from inside this panel's shadow DOM. Themed via HA CSS vars
+   * so it still reads as part of Home Assistant, and it's definitely not the
+   * browser's window.confirm. Backdrop-click, the ✕, and Cancel all dismiss
+   * without running the action. Rendered at the panel root; nothing when no
+   * confirm is pending.
    */
   private _renderConfirmDialog() {
     const c = this._confirm;
     if (!c) return null;
     return html`
-      <ha-dialog
-        open
-        .heading=${c.title}
-        @closed=${this._onConfirmDialogClosed}
+      <div
+        class="modal-backdrop modal-backdrop--center"
+        @click=${this._onConfirmBackdrop}
+        role="alertdialog"
+        aria-modal="true"
+        aria-label=${c.title}
       >
-        <p class="confirm__text">${c.text}</p>
-        <button
-          slot="secondaryAction"
-          class="confirm__btn"
-          @click=${this._closeConfirm}
-        >
-          Cancel
-        </button>
-        <button
-          slot="primaryAction"
-          class="confirm__btn ${c.destructive ? "confirm__btn--danger" : ""}"
-          @click=${this._confirmProceed}
-        >
-          ${c.confirmText}
-        </button>
-      </ha-dialog>
+        <div class="confirm-card">
+          <div class="modal__head">
+            <h2>${c.title}</h2>
+            <button
+              class="modal__close"
+              @click=${this._closeConfirm}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <p class="confirm__text">${c.text}</p>
+          <div class="confirm__actions">
+            <button class="confirm__btn" @click=${this._closeConfirm}>
+              Cancel
+            </button>
+            <button
+              class="confirm__btn ${c.destructive ? "confirm__btn--danger" : ""}"
+              @click=${this._confirmProceed}
+            >
+              ${c.confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -4371,15 +4381,30 @@ export class PriceWatchPanel extends LitElement {
       margin: 0;
     }
 
-    /* Native HA confirmation dialog (<ha-dialog>) body + action buttons.
-       ha-dialog supplies the themed frame; these style our slotted content
-       to match HA's text-button look. */
+    /* Confirmation dialog — reuses the panel's modal chrome, centered. */
+    .modal-backdrop--center {
+      align-items: center;
+    }
+    .confirm-card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card-background-color, #fff);
+      border-radius: 16px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
     .confirm__text {
       margin: 0;
-      max-width: 360px;
+      padding: 16px 20px 4px;
       color: var(--primary-text-color, #212121);
       font-size: 14px;
       line-height: 1.5;
+    }
+    .confirm__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+      padding: 12px 16px 16px;
     }
     .confirm__btn {
       background: none;
@@ -4390,8 +4415,8 @@ export class PriceWatchPanel extends LitElement {
       text-transform: uppercase;
       letter-spacing: 0.04em;
       font-size: 14px;
-      padding: 8px 10px;
-      border-radius: 4px;
+      padding: 9px 14px;
+      border-radius: 6px;
       color: var(--primary-color, #03a9f4);
     }
     .confirm__btn:hover {
