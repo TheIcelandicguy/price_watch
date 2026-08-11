@@ -1,0 +1,16 @@
+# Ruff configuration.
+#
+# We pin an explicit rule set so `ruff check` stays deterministic across
+# Ruff releases. Ruff's out-of-the-box selection has drifted between
+# versions — 0.16 turned on import-sorting (I) by default — which silently
+# turned CI red on code that never opted into it. Listing `select`
+# explicitly means Ruff runs ONLY these rules and ignores its shifting
+# defaults.
+#
+# This is the classic default set: pyflakes (F) plus the pycodestyle
+# error subset (E4/E7/E9). To enforce import sorting later, add "I" here
+# and run `ruff check --fix`.
+target-version = "py312"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
