@@ -33,6 +33,7 @@ from .const import (
 )
 from .coordinator import PriceWatchCoordinator
 from .extractor import shutdown_persistent_session
+from .store import derive_listing_id
 from .panel import async_register_panel
 from .websocket import async_register_websocket_api
 
@@ -56,6 +57,47 @@ _COOKIE_PARSE_ERR = (
 _LIVE_OPTION_KEYS = frozenset(
     {CONF_PAUSED, CONF_FORCE_DISCONTINUED, CONF_TARGET_PRICE}
 )
+
+
+def _materialize_primary_listing(entry: ConfigEntry, listings: list) -> dict | None:
+    """Write the IMPLICIT primary listing into a listings array.
+
+    Products created by the "Add by URL" config flow or by
+    track_product from the panel (source panel_track) have a primary
+    listing that exists only as entry.data.url — the coordinator
+    synthesizes it under the deterministic id derive_listing_id(entry)
+    and never writes it to options["listings"].
+
+    That implicit form is fine on its own, but it breaks as soon as
+    options["listings"] holds anything else: the array then reads as
+    the complete set of listings for the entry. So every service that
+    appends to it must declare the primary first.
+
+    Appends to `listings` in place and returns the new config dict, or
+    None if there is nothing to materialize (no entry URL, or the
+    primary is already declared).
+    """
+    primary_id = derive_listing_id(entry)
+    for listing in listings:
+        if isinstance(listing, dict) and listing.get("id") == primary_id:
+            return None
+    primary_url = entry.data.get(CONF_URL) or ""
+    if not primary_url:
+        # Shell entry — no implicit primary to declare.
+        return None
+    from urllib.parse import urlparse
+    host = urlparse(primary_url).netloc.lower().removeprefix("www.")
+    target = {
+        "id": primary_id,
+        "url": primary_url,
+        "retailer": host.split(".")[0].title() if host else "",
+    }
+    listings.append(target)
+    _LOGGER.info(
+        "materialized implicit primary listing %s for entry %s (url=%s)",
+        primary_id, entry.entry_id, primary_url,
+    )
+    return target
 
 
 def _reload_signature(entry: ConfigEntry) -> dict[str, Any]:
@@ -637,6 +679,16 @@ async def _register_services(hass: HomeAssistant) -> None:
         # Mutate entry.options.listings — async_update_entry handles
         # the immutable-options copy-and-replace correctly.
         existing = list(entry.options.get("listings") or [])
+        # Declare the implicit primary FIRST. Without this the array goes
+        # from empty (primary implicit, synthesized from entry.data.url) to
+        # holding only the new listing, and the coordinator has no way to
+        # tell the primary was ever meant to be there.
+        # _ensure_primary_listing re-declares it defensively too; doing it
+        # here keeps options["listings"] honest as the record of what the
+        # entry tracks. It also has to happen BEFORE the duplicate check
+        # below, or re-adding the primary's own URL would pass the check
+        # and land as a second copy of the same listing.
+        _materialize_primary_listing(entry, existing)
         # Defensive: refuse to add a duplicate URL (avoids silent
         # double-polling of the same retailer)
         for existing_listing in existing:
@@ -789,33 +841,15 @@ async def _register_services(hass: HomeAssistant) -> None:
                 target = listing
                 break
         if target is None:
-            # Panel-track / from-scratch products have an IMPLICIT primary
-            # listing: the coordinator synthesizes it (deterministic id =
-            # l_<last-12-of-entry-id>) from entry.data.url, but it was never
-            # materialized into options["listings"]. The panel's ✎ editor
-            # targets that synthesized id, so the first edit on such a
-            # product lands here with no matching listing. Rather than fail
-            # (leaving the user unable to attach a selector/cookies to the
-            # very product that needs them), materialize the primary listing
-            # now from the entry's URL — then this and every future edit
-            # find it normally.
-            primary_id = f"l_{entry.entry_id[-12:].lower()}"
-            if listing_id == primary_id:
-                primary_url = entry.data.get(CONF_URL) or ""
-                from urllib.parse import urlparse
-                host = urlparse(primary_url).netloc.lower().removeprefix("www.")
-                target = {
-                    "id": listing_id,
-                    "url": primary_url,
-                    "retailer": host.split(".")[0].title() if host else "",
-                }
-                existing.append(target)
-                _LOGGER.info(
-                    "edit_listing: materialized implicit primary listing %s "
-                    "for entry %s (url=%s)",
-                    listing_id, entry.entry_id, primary_url,
-                )
-            else:
+            # The panel's ✎ editor targets the synthesized primary id, so
+            # the first edit on a URL-added / panel-tracked product lands
+            # here with no matching listing. Rather than fail (leaving the
+            # user unable to attach a selector/cookies to the very product
+            # that needs them), declare the implicit primary now — this and
+            # every future edit then find it normally.
+            if listing_id == derive_listing_id(entry):
+                target = _materialize_primary_listing(entry, existing)
+            if target is None:
                 raise HomeAssistantError(
                     f"Listing {listing_id!r} not found on entry {entry.entry_id}"
                 )

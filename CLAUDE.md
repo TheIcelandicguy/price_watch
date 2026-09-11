@@ -29,7 +29,7 @@ custom_components/price_watch/
   listings.py store.py fx.py cookies.py migration.py websocket.py panel.py
   frontend/price-watch-panel.js    BUILT artifact — never hand-edit
 panel/src/          panel.ts, card.ts, utils.ts, types.ts (Lit 3 + TypeScript)
-tests/  9 modules       scripts/  live-site probes, not shipped
+tests/  10 modules      scripts/  live-site probes, not shipped
 ```
 
 ## Coordinator / mixin map
@@ -60,6 +60,14 @@ A product holds N listings. `_listings[listing_id]` is per-listing state;
 `_state` **aliases** the primary listing's dict, so `self._state[k] = v` also
 mutates `_listings[primary][k]`. `_product_state` holds product-wide
 alternatives. `_listing_results` is an in-memory-only ExtractionResult cache.
+
+The primary listing is often **implicit**: products from the URL config flow
+or the panel's `track_product` (source `panel_track`) have it only as
+`entry.data.url`, never written to `options["listings"]`. Its id is
+`derive_listing_id(entry)` = `l_<last-12-of-entry-id>`. `_ensure_primary_listing`
+auto-declares it whenever `entry.data.url` is set, so it is not pruned as an
+orphan once other listings are declared; any service that appends to
+`options["listings"]` must first call `_materialize_primary_listing`.
 
 ## Extraction: how a page becomes a price
 

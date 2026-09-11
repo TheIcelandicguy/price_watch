@@ -157,10 +157,13 @@ class StorageMixin:
             - Listings in self._listings but NOT declared in options are
               pruned as orphans (from partial remove_listing, external
               storage edits, etc.)
-            - Back-compat: if options has no declared listings but
-              storage has the deterministic primary listing's ID,
-              treat primary as declared (covers v1-migrated entries
-              where options.listings might be empty/absent)
+            - Back-compat: the deterministic primary is treated as
+              declared whenever entry.data.url is set, even when other
+              listings ARE declared — it is implicit for URL-added and
+              panel-tracked products and would otherwise be pruned.
+              Also treated as declared when nothing is declared and
+              storage holds its state (v1-migrated entries whose
+              options.listings is empty/absent)
 
         Primary listing determination for self._state alias:
             1. Prefer the deterministic primary_listing_id when it's
@@ -191,22 +194,32 @@ class StorageMixin:
                 if isinstance(lid, str) and lid:
                     declared_ids.add(lid)
 
-        # Back-compat: no declared listings, but the entry already has
-        # a primary listing identity. Auto-declare it in two cases:
-        #   (a) v1-migrated entry whose storage has the deterministic
-        #       primary state — load preserves it, we declare it now.
-        #   (b) URL-based entry created via the "Add by URL" config
-        #       flow — entry.data.url is set but options.listings was
-        #       never populated (only add_listing populates it). The
-        #       deterministic primary IS the implicit listing for this
-        #       entry and must be declared so sensors materialize on
-        #       first setup.
+        # Back-compat: the deterministic primary listing can exist
+        # IMPLICITLY, never written into options["listings"]. Auto-
+        # declare it in two cases:
+        #   (a) entry.data.url is set — an entry created by the "Add by
+        #       URL" config flow or by track_product from the panel
+        #       (source panel_track). That URL *is* the primary
+        #       listing; nothing materializes it into options until an
+        #       edit_listing call happens to touch it. This holds
+        #       regardless of how many OTHER listings are declared: it
+        #       used to be gated on `not declared_ids`, so the first
+        #       add_listing call made the implicit primary undeclared
+        #       and the prune below deleted it — taking its history
+        #       with it and silently re-pointing its sensors at the
+        #       newly added listing.
+        #   (b) nothing declared at all, but storage already holds the
+        #       deterministic primary's state — a v1-migrated entry
+        #       whose options.listings is empty or absent. Kept narrow
+        #       (only when nothing is declared) because without a URL
+        #       there is nothing to poll such a listing with.
         # Shell entries (entry.data.url == "" AND no listings declared)
-        # bypass both branches and fall through to the sentinel path.
-        if not declared_ids:
-            entry_url = self.entry.data.get(CONF_URL) or ""
-            if self._primary_listing_id in self._listings or entry_url:
-                declared_ids.add(self._primary_listing_id)
+        # match neither and fall through to the sentinel path.
+        entry_url = self.entry.data.get(CONF_URL) or ""
+        if entry_url:
+            declared_ids.add(self._primary_listing_id)
+        elif not declared_ids and self._primary_listing_id in self._listings:
+            declared_ids.add(self._primary_listing_id)
 
         # Ensure runtime state for every declared listing
         for lid in declared_ids:
