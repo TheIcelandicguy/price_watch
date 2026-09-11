@@ -135,6 +135,34 @@ def _prefers_fresh_session(host: str) -> bool:
     return host in _FRESH_SESSION_HOSTS or host.startswith("amazon.")
 
 
+# Statuses that mean "you are blocked right now", not "this page is gone".
+# 404/410 are a missing product and 5xx is the retailer's own outage; those
+# stay ordinary ExtractionErrors. 403 is the bot-block status (Argos "Access
+# Denied", Cloudflare challenges); 429 is rate limiting.
+_BLOCK_STATUSES = frozenset({403, 429})
+
+
+def _raise_if_blocked(status: int, text: str | None, url: str) -> None:
+    """Raise TransientBlockError if the final response is a block, not a page.
+
+    Called by both fetch paths after their own fresh-session retry has had
+    its chance, so a raise here means the retailer is refusing us *this
+    poll*. Two shapes: a block status (403/429), or a 2xx whose body is a
+    known interstitial / CAPTCHA (Amazon's "Continue shopping") — those carry
+    no product data, so every extractor could only fail on them anyway.
+    """
+    if status in _BLOCK_STATUSES:
+        snippet = (text or "")[:120].replace("\n", " ")
+        raise TransientBlockError(
+            f"HTTP {status} from {url} — the retailer is blocking or rate-limiting "
+            f"this request. Response preview: {snippet}"
+        )
+    if status < 400 and _looks_like_botwall(text):
+        raise TransientBlockError(
+            f"Bot wall / CAPTCHA interstitial from {url} instead of the product page"
+        )
+
+
 # --- Fetch throttle -------------------------------------------------------
 # Protects the tracked retailers (and us) from a request burst when many
 # products refresh at once — the worst case being an HA restart, where every
@@ -296,6 +324,20 @@ class ExtractionResult:
 
 class ExtractionError(Exception):
     """Raised when extraction fails."""
+
+
+class TransientBlockError(ExtractionError):
+    """The retailer refused or challenged this request; the page is not gone.
+
+    Raised for a bot wall / CAPTCHA interstitial body, or an HTTP 403 / 429,
+    after the fetch layer has already retried on a fresh cookie-free session.
+    A plain ExtractionError means "we could not read a price from what came
+    back"; this one means "we were not shown the page at all, and asking
+    again later usually works". The coordinator uses the distinction to keep
+    a listing's last known result instead of flipping it unavailable for one
+    poll — the "CAPTCHA flap" where sensors alternate between a price and
+    unavailable on a retailer that challenges every other request.
+    """
 
 
 def preprocess_html(html: str) -> tuple[str, str]:
@@ -1459,6 +1501,7 @@ async def _fetch_with_curl_cffi(
                         )
                         response = retry
 
+        _raise_if_blocked(response.status_code, response.text, url)
         if response.status_code >= 400:
             snippet = (response.text or "")[:200].replace("\n", " ")
             raise ExtractionError(
@@ -1508,6 +1551,7 @@ async def _fetch_with_aiohttp(
             )
         async with ctx as response:
             text = await response.text()
+            _raise_if_blocked(response.status, text, url)
             if response.status >= 400:
                 snippet = text[:200].replace("\n", " ")
                 raise ExtractionError(

@@ -31,7 +31,7 @@ custom_components/price_watch/
   listings.py store.py fx.py cookies.py migration.py websocket.py panel.py
   frontend/price-watch-panel.js    BUILT artifact — never hand-edit
 panel/src/          panel.ts, card.ts, utils.ts, types.ts (Lit 3 + TypeScript)
-tests/  10 modules      scripts/  live-site probes, not shipped
+tests/  11 modules      scripts/  live-site probes, not shipped
 ```
 
 ## Coordinator / mixin map
@@ -99,7 +99,14 @@ selects it.
 
 `previous_hash` equal to the new content hash raises `ExtractionError`
 ("UNCHANGED") before any parsing — that is the no-op short-circuit, not a
-failure. The AI's `NO_PRODUCT_FOUND` / `<UNKNOWN>` / price<=0 sentinels are
+failure. A bot wall / CAPTCHA body at 2xx, or an HTTP 403/429, raises
+`TransientBlockError` (an `ExtractionError` subclass) from
+`_raise_if_blocked()` in both fetch paths, after the fresh-session retry.
+`coordinator_update.py` treats it like UNCHANGED when a previous result
+exists — keeps the last known result, logs a warning, writes nothing — so a
+retailer that challenges every other poll no longer flaps the sensors
+between a price and unavailable. With no previous result it is an ordinary
+`UpdateFailed`. The AI's `NO_PRODUCT_FOUND` / `<UNKNOWN>` / price<=0 sentinels are
 rejected as "no product", while `is_discontinued` is a *successful* terminal
 result that stops polling.
 

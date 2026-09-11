@@ -44,6 +44,7 @@ from .const import (
 from .extractor import (
     ExtractionError,
     ExtractionResult,
+    TransientBlockError,
     extract_product,
     fetch_image_bytes,
     is_on_sale,
@@ -195,6 +196,24 @@ class UpdateMixin:
                     previous_hash=None,
                     variant_options=variant_options,
                 )
+            elif isinstance(err, TransientBlockError) and previous is not None:
+                # The retailer challenged or refused THIS request (CAPTCHA,
+                # bot wall, 403/429) after the fetch layer's own fresh-session
+                # retry. The product isn't gone and the price hasn't changed
+                # as far as we know, so keep the last result rather than
+                # flipping the listing unavailable for one poll — that flap
+                # is worse than a slightly stale price. Nothing is written
+                # to the listing state; next tick tries again normally.
+                # Without a previous result there is nothing to keep, so it
+                # falls through to UpdateFailed like any other error.
+                _LOGGER.warning(
+                    "%s [%s]: %s; keeping the last known result until the "
+                    "next poll",
+                    url, listing_id, err,
+                )
+                if is_primary:
+                    await self._update_price_local(previous)
+                return previous
             else:
                 raise UpdateFailed(f"Extraction failed: {err}") from err
         except Exception as err:  # noqa: BLE001
