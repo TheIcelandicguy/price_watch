@@ -25,11 +25,22 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-# Nordic country group — these retailers ship within the Nordics
-# generally (and from each other's countries). Not all do, but most
-# Nordic electronics retailers (Komplett, Elkjøp, NetOnNet, Power,
-# Elgiganten, Proshop, Inet) have intra-Nordic shipping arrangements.
-_NORDIC_COUNTRIES = frozenset({"IS", "NO", "SE", "DK", "FI"})
+# Mainland Nordic country group — these retailers generally ship
+# within the mainland Nordics, and from each other's countries. Most
+# of the big Nordic electronics retailers (Komplett, Elkjøp, NetOnNet,
+# Power, Elgiganten, Proshop, Inet) have such arrangements.
+#
+# Iceland is deliberately NOT in this set. It is an island outside the
+# EU customs union, and "intra-Nordic shipping" in practice means the
+# mainland only — a .no or .se retailer is not evidence that a parcel
+# reaches Reykjavík. Leaving IS out means rule 7 no longer fires for
+# an Icelandic user, so the AI's guess stands instead of being
+# upgraded to a confident "yes". It also stops the reverse case: a .is
+# retailer is not a positive signal for a Norwegian user either.
+#
+# Retailers verified not to serve a region go in
+# _REGION_BLOCKED_RETAILERS below, which returns a confident False.
+_NORDIC_MAINLAND = frozenset({"NO", "SE", "DK", "FI"})
 
 # EU country group — for retailers like Amazon DE / .fr / .es / .it
 # that mostly ship throughout the EU. Iceland is in EFTA, not EU, so
@@ -73,6 +84,25 @@ _US_ONLY_RETAILERS = frozenset({
     "tigerdirect.com",
     "walmart.com",  # ships internationally only for select items
 })
+
+# Retailers verified NOT to ship to a particular region, keyed by the
+# user's country code. Hostname suffixes, lowercase, no leading dot.
+#
+# This is the region-aware counterpart to _US_ONLY_RETAILERS: the
+# retailer is perfectly usable for everyone else, it just doesn't
+# serve this one country. A match returns a confident False, which the
+# panel renders as a "Doesn't ship" badge and drops from the
+# alternatives list.
+#
+# Only add a host here once it is actually confirmed — a wrong False
+# silently hides a retailer the user could have bought from.
+_REGION_BLOCKED_RETAILERS: dict[str, frozenset[str]] = {
+    # Komplett does not ship to Iceland. All three storefronts are the
+    # same company and the same logistics, so all three are blocked.
+    # Without this they read as ordinary Nordic retailers and get
+    # recommended to Icelandic users.
+    "IS": frozenset({"komplett.no", "komplett.se", "komplett.dk"}),
+}
 
 # Retailers known to ship globally including to Iceland and other
 # small markets. These get overridden to True for almost any user.
@@ -148,10 +178,12 @@ def evaluate_shipping(
     2. Aggregator hostname → return None (suppress, not relevant)
     3. Global shipper hostname → return True
     4. US-only retailer + user is non-US → return False
-    5. Matching country TLD → return True
-    6. Nordic TLD + user is Nordic → return True
-    7. EU TLD + user is in EU → return True (Amazon DE etc. for EU users)
-    8. Otherwise → return None (let AI's guess stand)
+    5. Retailer blocked for the user's region → return False
+    6. Matching country TLD → return True
+    7. Mainland-Nordic TLD + user is in the mainland Nordics → True.
+       Iceland is excluded on both sides — see _NORDIC_MAINLAND.
+    8. EU TLD + user is in EU → return True (Amazon DE etc. for EU users)
+    9. Otherwise → return None (let AI's guess stand)
     """
     if not user_region:
         return None
@@ -177,21 +209,27 @@ def evaluate_shipping(
             if host == suffix or host.endswith("." + suffix):
                 return False
 
+    # Rule 5: retailer verified not to serve the user's region
+    for suffix in _REGION_BLOCKED_RETAILERS.get(user_region, frozenset()):
+        if host == suffix or host.endswith("." + suffix):
+            return False
+
     tld = _tld_of(host)
 
-    # Rule 5: matching country TLD
+    # Rule 6: matching country TLD
     country_tlds = _COUNTRY_TLDS.get(user_region, frozenset())
     if tld in country_tlds and tld != "com":  # .com is too weak alone
         return True
 
-    # Rule 6: Nordic TLDs are interchangeable within Nordic group
-    if user_region in _NORDIC_COUNTRIES:
-        for nordic in _NORDIC_COUNTRIES:
+    # Rule 7: mainland-Nordic TLDs are interchangeable within that
+    # group. Iceland is in neither half of this check, by design.
+    if user_region in _NORDIC_MAINLAND:
+        for nordic in _NORDIC_MAINLAND:
             nordic_tlds = _COUNTRY_TLDS.get(nordic, frozenset())
             if tld in nordic_tlds and tld != "com":
                 return True
 
-    # Rule 7: EU TLDs for EU users (excluding the country match
+    # Rule 8: EU TLDs for EU users (excluding the country match
     # already handled above)
     if user_region in _EU_COUNTRIES:
         for eu in _EU_COUNTRIES:

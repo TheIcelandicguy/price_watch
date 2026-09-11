@@ -29,7 +29,7 @@ custom_components/price_watch/
   listings.py store.py fx.py cookies.py migration.py websocket.py panel.py
   frontend/price-watch-panel.js    BUILT artifact — never hand-edit
 panel/src/          panel.ts, card.ts, utils.ts, types.ts (Lit 3 + TypeScript)
-tests/  8 modules       scripts/  live-site probes, not shipped
+tests/  9 modules       scripts/  live-site probes, not shipped
 ```
 
 ## Coordinator / mixin map
@@ -185,13 +185,18 @@ and 3.13, ruff — on push to main, PRs, manual, weekly Sunday.
 
 ## Gotchas
 
-- **Komplett.no does not ship to Iceland.** Never recommend it as a retailer
-  or alternative for an Icelandic user. The source currently gets this
-  **wrong**: `search/region_heuristic.py` puts `IS` in `_NORDIC_COUNTRIES` and
-  its comment names Komplett as having "intra-Nordic shipping", so rule 6
-  returns `True` for a `.no` host with an `IS` user. Until that is fixed the
-  only real block is adding `komplett.no` to `excluded_domains` on the settings
-  entry (`CONF_EXCLUDED_DOMAINS`, host-suffix match, empty by default).
+- **Komplett does not ship to Iceland.** Never recommend it as a retailer or
+  alternative for an Icelandic user. `search/region_heuristic.py` enforces
+  this in two places: `_REGION_BLOCKED_RETAILERS["IS"]` holds all three
+  Komplett storefronts (`.no` / `.se` / `.dk`) and returns a confident
+  `False`, and `_NORDIC_MAINLAND` (`NO SE DK FI`) deliberately excludes `IS`,
+  so a mainland-Nordic TLD no longer upgrades an Icelandic user's result to
+  `True` — it returns `None` and the AI's guess stands. `False` both shows
+  the panel's "Doesn't ship" badge and drops the alternative from the card.
+  Add further verified retailer→region blocks to `_REGION_BLOCKED_RETAILERS`,
+  not to the country groups. `excluded_domains` on the settings entry
+  (`CONF_EXCLUDED_DOMAINS`, host-suffix match, empty by default) still exists
+  as a per-user override but is no longer the only block.
 - **EPERM / file lock on deploy.** robocopy fails on files a running Home
   Assistant holds open (usually `__pycache__` and loaded `.py`). Retry the
   copy; deleting the target `__pycache__` first avoids most of it; otherwise
