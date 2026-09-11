@@ -118,6 +118,7 @@ The panel also has a 🔔 dialog that writes these automations for you.
 |---|---|
 | `price_watch.track_product` | Create a tracked product from a URL |
 | `price_watch.add_listing` / `remove_listing` | Add/remove a retailer listing under a product |
+| `price_watch.untrack_product` | Stop tracking a product and remove it entirely (the card's delete button) |
 | `price_watch.edit_listing` | Set a custom parser, cookies, currency, unit price, or swap a listing's URL |
 | `price_watch.set_target` | Update the target price |
 | `price_watch.set_variant` | Pick a variant (size/length) on supported pages |

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Adding a second listing no longer deletes the first.** Products created
+  from a URL or from the panel's "Track" had an implicit primary listing that
+  the first `add_listing` call caused to be pruned on reload — its history
+  went with it and its sensors silently showed the new retailer's price. The
+  coordinator now always keeps the primary when the entry has a URL, and
+  `add_listing` declares it explicitly before appending. Already-lost history
+  is not recoverable; the listing and its sensors come back on the next reload.
+- **Komplett is never suggested to Icelandic users.** Komplett does not ship
+  to Iceland, but the shipping heuristic counted any Nordic host as
+  "ships within the Nordics". Iceland is now outside that group, and all
+  three Komplett storefronts are blocked for Icelandic users outright.
+- **No more CAPTCHA flap.** A bot wall, CAPTCHA page, 403 or 429 on one poll
+  keeps the listing's last known price (with a warning in the log) instead of
+  flipping every sensor unavailable until the next poll gets through.
+
+### Changed
+- Internal: the search-result filters and JSON-LD price backfill moved out of
+  the coordinator into `search/filters.py` and `search/enrich.py`.
+
 ## [0.2.1] - 2026-08-11
 
 ### Added

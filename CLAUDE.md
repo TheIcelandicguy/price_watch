@@ -181,6 +181,15 @@ ruff check custom_components/price_watch
 `ruff.toml` pins `select = ["E4","E7","E9","F"]` on purpose — Ruff's defaults
 drifted (0.16 turned on `I`) and reddened CI. Don't "modernise" it casually.
 
+**pytest does not collect on this Windows machine.** `tests/conftest.py`
+loads `pytest_homeassistant_custom_component` → `homeassistant.runner` →
+`fcntl` (POSIX only). Linux CI is the real run. Test modules that need no HA
+fixture (`test_region_heuristic`, `test_implicit_primary_listing`,
+`test_transient_block`, `test_alternatives_filter`) can be driven locally by
+importing the module and calling each `test_*` (repo root on the Python path;
+`asyncio.run` the coroutines). Local deps needed to import the package:
+`beautifulsoup4 httpx anthropic openai`.
+
 Panel build:
 
 ```bash
@@ -190,11 +199,11 @@ npm run build   # → ../custom_components/price_watch/frontend/price-watch-pane
 npm run watch   # dev, skips terser
 ```
 
-Deploy — no committed script, this is the whole procedure, then restart HA:
+Deploy with the committed wrapper, then restart HA:
 
 ```powershell
-robocopy E:\price_watch\custom_components\price_watch `
-         Z:\custom_components\price_watch /E
+.\deploy.ps1            # robocopy /E /R:2 /W:2 via E:\tools\deploy-to-ha.ps1
+.\deploy.ps1 -DryRun    # show what would change
 ```
 
 CI (`.github/workflows/validate.yml`): hassfest, HACS validate, pytest on 3.12
@@ -231,5 +240,5 @@ and 3.13, ruff — on push to main, PRs, manual, weekly Sunday.
   newer fingerprints get 403'd by Best Buy / B&H. Don't bump it blind.
 - Doc drift: `services.yaml` omits `edit_listing`'s `url`, `unit_quantity` and
   `unit_label` (the schema accepts them); `panel/README.md` wrongly claims the
-  bundle URL is unversioned. `OVERVIEW.md` is accurate but untracked, as are
-  `scripts/` and `.claude/`.
+  bundle URL is unversioned. `OVERVIEW.md` is tracked and was refreshed
+  2026-09-11; `scripts/` and `.claude/` are untracked on purpose.
