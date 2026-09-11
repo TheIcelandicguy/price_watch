@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from custom_components.price_watch.coordinator_alternatives import (
+from custom_components.price_watch.search.filters import (
     _is_non_shop_domain,
     _looks_like_listing_url,
     is_unusable_search_result,

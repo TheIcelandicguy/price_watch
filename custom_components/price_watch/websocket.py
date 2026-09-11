@@ -64,11 +64,12 @@ from .const import (
     DOMAIN,
     ENTRY_TYPE_SETTINGS,
 )
-from .coordinator_alternatives import (
+from .search.enrich import enrich_alternatives_via_jsonld
+from .search.filters import (
+    _DDG_SNIPPET_CHARS,
     _host_excluded,
     _is_non_shop_domain,
     _normalize_domain,
-    enrich_alternatives_via_jsonld,
     is_unusable_search_result,
 )
 from .search.ai_synthesizer import AISynthesizerSearchProvider
@@ -88,10 +89,6 @@ _LOGGER = logging.getLogger(__name__)
 # Hard cap so a panel bug or hostile client can't request a huge search.
 _MAX_RESULTS_CAP = 20
 _DEFAULT_MAX_RESULTS = 8
-
-# Per-hit snippet length we forward in the DDG-only fallback (no AI to
-# summarize, so we hand the raw snippet to the panel as `notes`).
-_DDG_SNIPPET_CHARS = 220
 
 
 @callback

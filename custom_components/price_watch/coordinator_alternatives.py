@@ -24,6 +24,11 @@ option for "search provider"), with the contract: "use whatever
 is configured for AI extraction, in the most capable mode that
 provider supports; fall back to raw DDG when there is no AI."
 
+The URL/domain filters (non-shop domains, search/category pages,
+excluded hosts) live in search/filters.py and the JSON-LD price backfill
+in search/enrich.py — both are shared with the panel's live search in
+websocket.py, so they are not coordinator concerns.
+
 The mixin reads/writes coordinator state it does not itself define
 (self._state, self._ai_provider, self._search_provider, self.data,
 self.entry, self.hass, self.user_region, self._async_save,
@@ -34,15 +39,11 @@ contract without creating an import cycle.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
-
-from .extractor import fetch_html, find_meta_image, find_meta_price, try_jsonld
 
 from .const import (
     ALTERNATIVES_REFRESH_HOURS,
@@ -53,6 +54,14 @@ from .const import (
     DEFAULT_MAX_ALTERNATIVES,
     DEFAULT_MODEL,
     DOMAIN,
+)
+from .search.enrich import enrich_alternatives_via_jsonld
+from .search.filters import (
+    _DDG_SNIPPET_CHARS,
+    _host_excluded,
+    _host_label,
+    _is_non_shop_domain,
+    _normalize_domain,
 )
 from .search import (
     AISynthesizerSearchProvider,
@@ -65,243 +74,6 @@ from .search import (
     SearchQuery,
 )
 
-# Per-hit snippet length forwarded in the DDG-only (no-AI) path. Without
-# an AI to summarize, the raw snippet is handed to the panel as `notes`.
-# Mirrors websocket._DDG_SNIPPET_CHARS so both search paths look alike.
-_DDG_SNIPPET_CHARS = 220
-
-# Max concurrent listing fetches when enriching DDG hits with prices via
-# JSON-LD. Bounded so a search doesn't open a dozen sockets at once.
-_ENRICH_CONCURRENCY = 4
-
-
-def _host_label(url: str) -> str:
-    """Human-ish retailer label derived from a URL host.
-
-    DDG raw hits carry no retailer field, so we default to the bare
-    hostname ("www." stripped) — e.g. "newegg.com", "amazon.de". Good
-    enough for the card until JSON-LD (if any) gives something better.
-    """
-    try:
-        host = urlparse(url).netloc.lower()
-    except (ValueError, TypeError):
-        return ""
-    if host.startswith("www."):
-        host = host[4:]
-    return host
-
-
-def _normalize_domain(value: str) -> str:
-    """Normalize a user-entered domain to a bare lowercase host.
-
-    Accepts full URLs ("https://www.amazon.de/foo"), host-with-www, or
-    bare hosts. Strips scheme, path, port, leading "www.", surrounding
-    whitespace, and a trailing dot. Returns "" for junk so callers can
-    drop empties.
-    """
-    if not value:
-        return ""
-    s = str(value).strip().lower()
-    if not s:
-        return ""
-    if "://" in s:
-        try:
-            s = urlparse(s).netloc or s
-        except (ValueError, TypeError):
-            pass
-    # Drop any path/port/userinfo that survived a bare "amazon.de/foo".
-    s = s.split("/")[0].split("@")[-1].split(":")[0]
-    s = s.strip().strip(".")
-    if s.startswith("www."):
-        s = s[4:]
-    return s
-
-
-def _host_excluded(url: str, excluded: set[str]) -> bool:
-    """True if the URL's host equals or is a subdomain of an excluded host."""
-    if not excluded:
-        return False
-    host = _normalize_domain(url)
-    if not host:
-        return False
-    return any(host == ex or host.endswith("." + ex) for ex in excluded)
-
-
-# Domains that are clearly NOT shops — code hosts, video, social, forums,
-# Q&A, encyclopedias, docs/tutorial blogs. Used by Free-mode "Search & add"
-# to flag raw web hits that can't be a seller. Conservative on purpose: we
-# only mark the obvious non-commerce sites, so a real store never gets a
-# false "not a store" badge (the inverse — an unflagged non-shop — is the
-# safe failure: the user just judges it themselves, same as before).
-_NON_SHOP_DOMAINS: frozenset[str] = frozenset(
-    {
-        "github.com",
-        "gitlab.com",
-        "bitbucket.org",
-        "githubusercontent.com",
-        "youtube.com",
-        "youtu.be",
-        "vimeo.com",
-        "reddit.com",
-        "quora.com",
-        "stackoverflow.com",
-        "stackexchange.com",
-        "superuser.com",
-        "serverfault.com",
-        "wikipedia.org",
-        "wikimedia.org",
-        "fandom.com",
-        "medium.com",
-        "facebook.com",
-        "twitter.com",
-        "x.com",
-        "instagram.com",
-        "pinterest.com",
-        "tiktok.com",
-        "linkedin.com",
-        "readthedocs.io",
-        "readthedocs.org",
-        "instructables.com",
-        "hackster.io",
-        "hackaday.com",
-        "hackaday.io",
-        "dronebotworkshop.com",
-        "randomnerdtutorials.com",
-        "home-assistant.io",
-        "lastminuteengineers.com",
-        "circuitdigest.com",
-        "electronicshub.org",
-        "allaboutcircuits.com",
-        "makeuseof.com",
-        "howtogeek.com",
-        "wled.ge",
-        # Review / editorial / spec sites — surface heavily for product
-        # queries ("best X", "X review") but never sell anything. None of
-        # these host a checkout, so dropping them only removes dead rows.
-        "protoolreviews.com",
-        "popularmechanics.com",
-        "rtings.com",
-        "tomsguide.com",
-        "tomshardware.com",
-        "techradar.com",
-        "cnet.com",
-        "theverge.com",
-        "engadget.com",
-        "pcmag.com",
-        "gsmarena.com",
-        "notebookcheck.net",
-        "trustedreviews.com",
-        "wirecutter.com",
-        "nytimes.com",
-        "consumerreports.org",
-        "which.co.uk",
-        "digitaltrends.com",
-        "androidauthority.com",
-        "thespruce.com",
-        "familyhandyman.com",
-        "bobvila.com",
-    }
-)
-
-# Subdomain prefixes that signal documentation, community, or editorial
-# content rather than a product listing — none of these ever host a
-# checkout. Catches doc/wiki/forum hosts (kno.wled.ge, docs.espressif.com,
-# community.home-assistant.io) that aren't worth denylisting individually.
-# Conservative: a store never lives at docs./forum./help., so this can't
-# false-flag a real seller's product page.
-_NON_SHOP_SUBDOMAIN_PREFIXES: tuple[str, ...] = (
-    "docs.",
-    "doc.",
-    "kno.",
-    "wiki.",
-    "blog.",
-    "forum.",
-    "forums.",
-    "community.",
-    "help.",
-    "support.",
-    "learn.",
-    "kb.",
-)
-
-
-def _is_non_shop_domain(url: str) -> bool:
-    """True if the URL's host is a known non-commerce site (heuristic).
-
-    Two signals, both conservative:
-      1. Suffix match against the curated denylist, so subdomains
-         (gist.github.com, m.youtube.com, en.wikipedia.org) are caught.
-      2. A documentation/community subdomain prefix (docs., kno., forum.,
-         help., ...) — those hosts never sell a product.
-
-    An unrecognized host returns False (treated as a possible shop),
-    which is the safe default.
-    """
-    host = _normalize_domain(url)
-    if not host:
-        return False
-    if any(host == nd or host.endswith("." + nd) for nd in _NON_SHOP_DOMAINS):
-        return True
-    return host.startswith(_NON_SHOP_SUBDOMAIN_PREFIXES)
-
-
-# Path fragments that mark a search-results or category/browse page rather than
-# a single product — these never carry one trackable price (Amazon /s?k=,
-# Home Depot /b/, Lowe's /pl/, eBay /sch/, Shopify /collections/, etc.).
-_LISTING_PATH_MARKERS: tuple[str, ...] = (
-    "/b/",
-    "/pl/",
-    "/sch/",
-    "/search",
-    "/browse/",
-    "/category/",
-    "/categories/",
-    "/collections/",
-    "/c/",
-    "/shop/",
-)
-# Query keys that mark a search (?k=, ?q=, ?query=, ...).
-_LISTING_QUERY_KEYS: tuple[str, ...] = (
-    "k=",
-    "q=",
-    "query=",
-    "searchterm=",
-    "keyword=",
-    "searchkeyword=",
-)
-
-
-def _looks_like_listing_url(url: str) -> bool:
-    """True if the URL is a search/category/browse page, not a single product.
-
-    Conservative: matches well-known listing path fragments and search query
-    keys. A real product URL (Amazon /dp/, /gp/product/, retailer /product/…)
-    has none of these, so this won't drop a trackable page.
-    """
-    if not url:
-        return False
-    try:
-        parts = urlparse(url.lower())
-    except ValueError:
-        return False
-    path, query = parts.path, parts.query
-    if any(marker in path for marker in _LISTING_PATH_MARKERS):
-        return True
-    # Amazon search: path ends with "/s" and carries a search query.
-    if (path == "/s" or path.endswith("/s")) and "k=" in query:
-        return True
-    if any(query == k or query.startswith(k) or ("&" + k) in query for k in _LISTING_QUERY_KEYS):
-        return True
-    return False
-
-
-def is_unusable_search_result(url: str) -> bool:
-    """Drop signal for live search / alternatives: a non-shop domain (review,
-    spec, wiki, video) OR a search/category page — neither is a trackable,
-    priceable product listing."""
-    return _is_non_shop_domain(url) or _looks_like_listing_url(url)
-
-
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
@@ -310,67 +82,6 @@ if TYPE_CHECKING:
     from .extractor import ExtractionResult
 
 _LOGGER = logging.getLogger(__name__)
-
-
-async def enrich_alternatives_via_jsonld(
-    hass: HomeAssistant, alternatives: list[Alternative]
-) -> None:
-    """Backfill price/currency/image on alternatives via JSON-LD + meta tags.
-
-    For each listing missing a price or image, fetch the page (curl_cffi Chrome
-    impersonation, same as the tracker) and read a price from JSON-LD first,
-    then Open Graph / microdata meta tags. Listings that already have both a
-    price and an image are skipped (no fetch). A page that fails to fetch or has
-    no usable price simply keeps price=None. Never overrides a price the AI
-    already supplied. Fetches run concurrently under a small semaphore.
-
-    Module-level (not just a coordinator method) so the live "Search & add"
-    websocket path can price its candidates too, not only tracked products.
-    """
-    if not alternatives:
-        return
-
-    session = async_get_clientsession(hass)
-    sem = asyncio.Semaphore(_ENRICH_CONCURRENCY)
-
-    async def _enrich_one(alt: Alternative) -> None:
-        if alt.price is not None and alt.image_url:
-            return
-        async with sem:
-            try:
-                html = await fetch_html(alt.url, session=session)
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.debug("alt enrich: fetch failed for %s: %s", alt.url, err)
-                return
-            try:
-                jsonld = try_jsonld(html, url=alt.url)
-            except Exception:  # noqa: BLE001
-                _LOGGER.debug(
-                    "alt enrich: JSON-LD parse failed for %s", alt.url, exc_info=True
-                )
-                jsonld = None
-
-            if alt.price is None and jsonld and jsonld.get("price"):
-                alt.price = jsonld["price"]
-                if jsonld.get("currency"):
-                    alt.currency = jsonld["currency"]
-                if jsonld.get("title"):
-                    alt.title = jsonld["title"]
-            # Meta/microdata fallback when JSON-LD has no price.
-            if alt.price is None:
-                meta_price, meta_currency = find_meta_price(html)
-                if meta_price is not None:
-                    alt.price = meta_price
-                    if meta_currency and not alt.currency:
-                        alt.currency = meta_currency
-            image = (jsonld or {}).get("image_url") or find_meta_image(html)
-            if image and not alt.image_url:
-                alt.image_url = image
-
-    await asyncio.gather(
-        *(_enrich_one(alt) for alt in alternatives),
-        return_exceptions=True,
-    )
 
 
 class AlternativesMixin:

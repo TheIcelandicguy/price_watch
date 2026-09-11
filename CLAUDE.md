@@ -25,7 +25,9 @@ custom_components/price_watch/
   presets/          per-retailer auto-config: tolvutek, elko, rafland, amazon
   ai/               AIProvider ABC + anthropic_provider, openai_compat_provider
   search/           duckduckgo, searxng, anthropic_native, ai_synthesizer,
-                    region_heuristic
+                    region_heuristic, filters (URL/domain junk filters),
+                    enrich (JSON-LD price backfill) — the last two are
+                    shared by the coordinator and websocket.py
   listings.py store.py fx.py cookies.py migration.py websocket.py panel.py
   frontend/price-watch-panel.js    BUILT artifact — never hand-edit
 panel/src/          panel.ts, card.ts, utils.ts, types.ts (Lit 3 + TypeScript)
@@ -46,7 +48,7 @@ class PriceWatchCoordinator(
 | File | Owns |
 |---|---|
 | `coordinator.py` | init, pause / force-discontinued, target, per-listing accessors, `device_info`, `user_region` |
-| `coordinator_alternatives.py` | discovery, search-provider choice, `async_find_alternatives`, 24h TTL refresh (685 ln, biggest) |
+| `coordinator_alternatives.py` | discovery, search-provider choice, `async_find_alternatives`, 24h TTL refresh. URL filters and JSON-LD enrichment moved to `search/filters.py` / `search/enrich.py` |
 | `coordinator_events.py` | every `hass.bus.async_fire` payload (one shape) |
 | `coordinator_fx.py` | `price_local` / home-currency conversion |
 | `coordinator_storage.py` | v2 Store load/save, `effective_custom_parser`, discontinued restore |
