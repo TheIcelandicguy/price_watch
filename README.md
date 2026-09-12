@@ -6,6 +6,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/TheIcelandicguy/price_watch.svg)](https://github.com/TheIcelandicguy/price_watch/releases)
+[![Downloads](https://img.shields.io/github/downloads/TheIcelandicguy/price_watch/total?color=brightgreen)](https://github.com/TheIcelandicguy/price_watch/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > Track product prices across the web from inside Home Assistant. Paste a URL, get sensors and a price history. Works **free** on most major retailers (no API key) — with an optional AI fallback for the tricky ones.
