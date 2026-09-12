@@ -5,7 +5,7 @@
 secrets.yaml
 
 # Claude Code local settings (machine-specific)
-.claude/settings.local.json
+.claude/
 
 # Prior chat transcript export (bulky, may contain pasted keys)
 This is a copy of a chat between Claude and Davíð.txt
