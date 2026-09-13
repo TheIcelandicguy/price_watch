@@ -8,7 +8,7 @@
 - **Domain:** `price_watch`
 - **Type:** HACS custom integration (`integration_type: service`, `iot_class: cloud_polling`) + a Lit/TypeScript sidebar panel
 - **Repo:** [TheIcelandicguy/price_watch](https://github.com/TheIcelandicguy/price_watch)
-- **Version:** 0.2.1 (public beta) · **Minimum HA:** 2024.10.0
+- **Version:** 0.2.2 (public beta) · **Minimum HA:** 2024.10.0
 - **License:** MIT
 
 ---

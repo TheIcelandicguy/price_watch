@@ -1,6 +1,6 @@
 # CLAUDE.md — Price Watch
 
-Home Assistant custom integration. Domain `price_watch`, version **0.2.1**,
+Home Assistant custom integration. Domain `price_watch`, version **0.2.2**,
 repo `TheIcelandicguy/price_watch`, branch `main`, HA minimum 2024.10.0.
 
 Source `E:\price_watch` → deployed to `Z:\custom_components\price_watch`.
