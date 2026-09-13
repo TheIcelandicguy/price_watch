@@ -242,6 +242,17 @@ edit_listing:
       example: l_newegg_test
       selector:
         text:
+    url:
+      name: Product URL
+      description: >
+        Switch the page this listing tracks — e.g. from a size-picker page
+        to a sibling size's own product URL. On the primary listing this
+        overrides the product's own URL from the next refresh onward. The
+        listing keeps its price history, so point it at the same product,
+        not a different one. An empty value is rejected.
+      example: https://www.jysk.is/svefnherbergi/dynur-90x200
+      selector:
+        text:
     custom_parser:
       name: Custom parser (JSON)
       description: >
@@ -283,6 +294,28 @@ edit_listing:
         cookies) and kept independent of any price selectors.
       selector:
         object:
+    unit_quantity:
+      name: Unit quantity
+      description: >
+        Manual price-per-unit: how much of the unit the listing's price
+        covers, e.g. 4.8 for a 4.8 m board. The card then shows a
+        price-per-unit figure alongside the price. Use it where the page
+        gives the tracker nothing to derive it from (e.g. Bauhaus lumber
+        priced across a 3–4.2 m range). An empty value or 0 clears it.
+      example: 4.8
+      selector:
+        number:
+          min: 0
+          step: 0.01
+          mode: box
+    unit_label:
+      name: Unit label
+      description: >
+        The unit that goes with the quantity — m, kg, l, stk. Shown on the
+        card as price per that unit. An empty value clears it.
+      example: m
+      selector:
+        text:
 
 track_product:
   name: Track product

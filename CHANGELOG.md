@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`edit_listing` now offers all of its fields in the UI.** `url`,
+  `unit_quantity` and `unit_label` were accepted by the service but missing
+  from `services.yaml`, so Settings > Actions never offered them and they
+  could only be reached from hand-written YAML. Use `url` to point a listing
+  at a different page (e.g. a sibling size's own product URL) while keeping
+  its history, and `unit_quantity` + `unit_label` to set a price-per-unit
+  figure by hand where the page gives the tracker nothing to derive it from.
+  No behaviour change — the service already accepted all three.
+- A contract test now fails when a service accepts a field `services.yaml`
+  does not document, so the UI and the schema cannot drift apart unnoticed
+  in either direction.
+
 ## [0.2.2] - 2026-09-13
 
 ### Fixed

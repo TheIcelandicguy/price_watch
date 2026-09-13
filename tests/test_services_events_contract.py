@@ -47,6 +47,13 @@ EXPECTED_EVENTS = {
     "price_watch_discontinued",
 }
 
+# Fields a registered schema accepts that services.yaml deliberately does
+# NOT document. Empty on purpose: as of 2026-09-13 every accepted field is
+# in the YAML. Leaving a field out hides it from the UI's service picker,
+# which is a product decision — so add an entry here with its reason rather
+# than weakening test_every_accepted_field_is_documented below.
+UNDOCUMENTED_ON_PURPOSE: set[tuple[str, str]] = set()
+
 
 def _documented_services() -> dict[str, dict[str, Any]]:
     """services.yaml, as the service picker in the UI reads it."""
@@ -144,6 +151,39 @@ async def test_documented_fields_are_accepted_by_the_schema(hass):
     )
     # Without this the test would pass silently if schema introspection
     # ever stopped returning keys — a green test that compares nothing.
+    assert checked > 20, f"only {checked} fields compared; introspection broke"
+
+
+async def test_every_accepted_field_is_documented(hass):
+    """The other direction, and the one that drifts quietly.
+
+    services.yaml is what fills the UI's service picker, so a field the
+    schema accepts but the YAML never names cannot be discovered or filled
+    in from Settings > Actions — it works only from hand-written YAML. That
+    is a fine thing to choose, and a bad thing to arrive at by forgetting:
+    edit_listing's url, unit_quantity and unit_label sat undocumented that
+    way until 2026-09-13. Keeping a field internal is allowed, but it has to
+    be written down in UNDOCUMENTED_ON_PURPOSE.
+    """
+    registered = await _register_all(hass)
+    documented = _documented_services()
+
+    problems: list[str] = []
+    checked = 0
+    for name, service in registered.items():
+        accepted = _schema_field_names(service)
+        if not accepted:
+            continue  # no schema: takes anything
+        fields = set((documented.get(name) or {}).get("fields", {}) or {})
+        for field in sorted(accepted):
+            checked += 1
+            if field in fields or (name, field) in UNDOCUMENTED_ON_PURPOSE:
+                continue
+            problems.append(f"{name}.{field}")
+    assert not problems, (
+        "the schema accepts fields services.yaml never documents, so the UI "
+        f"cannot offer them: {sorted(problems)}"
+    )
     assert checked > 20, f"only {checked} fields compared; introspection broke"
 
 
