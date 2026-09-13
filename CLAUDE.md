@@ -171,24 +171,54 @@ The panel also drives a WebSocket API in `websocket.py`: `price_watch/search`,
 
 Tests and lint, from `E:\price_watch`:
 
-```bash
-pip install -r requirements_test.txt
-pytest tests/          # pytest.ini: asyncio_mode=auto, pythonpath=.
-pytest tests/ -v --cov=custom_components.price_watch --cov-report=term-missing
-ruff check custom_components/price_watch
+```powershell
+.\test.ps1                                          # whole suite, quiet
+.\test.ps1 tests\test_fx.py                         # one file
+.\test.ps1 -k region -v                             # args pass through to pytest
+.\test.ps1 --cov=custom_components.price_watch      # as CI runs it
+.\test.ps1 -Reinstall                               # rebuild the test venv
+ruff check custom_components/price_watch            # what CI lints (not tests/)
 ```
 
 `ruff.toml` pins `select = ["E4","E7","E9","F"]` on purpose — Ruff's defaults
 drifted (0.16 turned on `I`) and reddened CI. Don't "modernise" it casually.
 
-**pytest does not collect on this Windows machine.** `tests/conftest.py`
-loads `pytest_homeassistant_custom_component` → `homeassistant.runner` →
-`fcntl` (POSIX only). Linux CI is the real run. Test modules that need no HA
-fixture (`test_region_heuristic`, `test_implicit_primary_listing`,
-`test_transient_block`, `test_alternatives_filter`) can be driven locally by
-importing the module and calling each `test_*` (repo root on the Python path;
-`asyncio.run` the coroutines). Local deps needed to import the package:
-`beautifulsoup4 httpx anthropic openai`.
+**Run the suite through `test.ps1`, not `pytest`.** `pytest` in PowerShell
+never collects: `tests/conftest.py` loads
+`pytest_homeassistant_custom_component` → `homeassistant.runner` → `fcntl`
+(POSIX only). `test.ps1` runs it under WSL against this same working tree via
+`/mnt/<drive>`, in a venv at `~/.venvs/price_watch` inside the WSL filesystem
+(not in the repo — slow on `/mnt`, and one more thing for deploy and git to
+skip). First run installs `requirements_test.txt` and stamps
+`.requirements-installed`; that stamp, not `bin/python`, is the readiness
+check, so an interrupted install retries instead of leaving a venv with no
+pytest. `pytest.ini` supplies `asyncio_mode=auto` and `pythonpath=.`.
+
+Most of the suite is unit-level, driving one mixin on a stand-in object
+(`tests/test_transient_block.py`, `tests/test_implicit_primary_listing.py`) —
+fast, but nothing there loads the integration. Three files work at the HA
+level instead:
+
+- `tests/test_setup_entry.py` — loads real config entries (settings and
+  product), asserts entities appear on all four platforms and unload cleanly,
+  and imports every module in the package. Until these existed, a name a
+  module only resolves at runtime could pass the whole suite and then take
+  every sensor to `unknown` after a restart.
+- `tests/test_coordinator_refresh.py` — whole polls through the real
+  coordinator, one page result at a time: history, extremes, the bus events
+  and their payload, and the `UNCHANGED` short-circuit. Its `_Page` fake
+  reproduces `extract_product`'s protocol, including raising
+  `ExtractionError("UNCHANGED")` when the caller's `previous_hash` matches.
+- `tests/test_services_events_contract.py` — pins `services.yaml` against the
+  registered services (both directions) and the `EVENT_*` values against
+  literals. Add a service or rename an event and this is what fails, on
+  purpose: those are identifiers other people's automations are built on.
+
+**Never run `git` from WSL in this repo without `core.autocrlf=true`.** The
+Windows checkout is CRLF and WSL git defaults to `false`, so `git status`
+there reports ~17 unmodified files as wholly changed, and a commit from WSL
+would rewrite every line ending. `test.ps1` sets the flag on each run; commit
+from PowerShell regardless.
 
 Panel build:
 
