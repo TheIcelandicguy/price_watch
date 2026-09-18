@@ -271,4 +271,6 @@ and 3.13, ruff — on push to main, PRs, manual, weekly Sunday.
 - Doc drift: `services.yaml` omits `edit_listing`'s `url`, `unit_quantity` and
   `unit_label` (the schema accepts them); `panel/README.md` wrongly claims the
   bundle URL is unversioned. `OVERVIEW.md` is tracked and was refreshed
-  2026-09-11; `scripts/` and `.claude/` are untracked on purpose.
+  2026-09-11; `scripts/` tracks only `retailer_probe.py` and
+  `convert_brand.py`; the one-off per-shop probes there are gitignored and
+  local-only, and `.claude/` is untracked on purpose.

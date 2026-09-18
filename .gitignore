@@ -30,3 +30,11 @@ panel/*.tsbuildinfo
 .DS_Store
 Thumbs.db
 *.swp
+
+# --- One-off retailer probes: local-only ---
+# scripts/ keeps the general tools; the per-shop probes written while
+# working out a preset stay on the dev machine.
+scripts/*
+!scripts/README.md
+!scripts/retailer_probe.py
+!scripts/convert_brand.py

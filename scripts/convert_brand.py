@@ -3,7 +3,7 @@
 resvg is a Rust-based SVG renderer with no system library dependencies,
 faster and more reliable than headless Chrome for static SVG-to-PNG.
 
-Usage: python convert_brand.py
+Usage (from the repo root): python scripts/convert_brand.py
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import resvg_py
 
-BRAND_DIR = Path(__file__).parent / "custom_components" / "price_watch" / "brand"
+BRAND_DIR = Path(__file__).resolve().parent.parent / "custom_components" / "price_watch" / "brand"
 
 
 def render(svg_path: Path, out_path: Path, width: int, height: int) -> None:

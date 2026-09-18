@@ -170,7 +170,7 @@ price_watch/
 │   └── frontend/price-watch-panel.js  # built Lit bundle (served to the sidebar)
 ├── panel/                             # Lit + TypeScript source (src/panel.ts, card.ts, utils.ts, types.ts)
 ├── docs/custom_parsers.md             # custom-parser guide
-├── scripts/                           # ad-hoc retailer probe/diagnostic scripts (NOT deploy, untracked)
+├── scripts/                           # retailer_probe.py + convert_brand.py (dev aids, not shipped)
 ├── tests/                             # pytest suite (11 modules)
 ├── CLAUDE.md / check_docs.py          # working notes for the repo + a drift check that fails when they go stale
 └── deploy.ps1                         # thin wrapper over the shared E:\tools\deploy-to-ha.ps1
@@ -410,9 +410,10 @@ must never be recommended as an Icelandic retailer / alternative — enforced in
 confident "doesn't ship" for all three Komplett storefronts, and Iceland is
 deliberately outside the `_NORDIC_MAINLAND` group so a `.no`/`.se`/`.dk`/`.fi`
 host is never taken as evidence of shipping to Iceland. The
-`scripts/` directory holds ad-hoc probe scripts (`retailer_probe.py`,
-`jysk_probe*.py`, `amazon_*`, etc.) used to test the fetch/extract path against
-live sites — they are diagnostics, not part of the shipped integration.
+`scripts/` directory holds `retailer_probe.py`, which runs the fetch/extract
+path against live sites and says whether a shop needs a preset, and
+`convert_brand.py` for the brand PNGs — diagnostics, not part of the shipped
+integration.
 
 ## 9. Known limitations & roadmap
 

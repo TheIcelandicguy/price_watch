@@ -1,30 +1,34 @@
 # scripts/
 
-Ad-hoc probes written while working out whether a retailer can be read for
-free, and what a preset for it needs to do. They are development aids, not part
-of the integration: nothing in `custom_components/price_watch/` imports them and
-they are not covered by the test suite.
+Development aids, not part of the integration: nothing in
+`custom_components/price_watch/` imports them, the test suite does not cover
+them, and neither ships in a release. Run them from the repo root.
 
-Most of them follow the same shape — fetch a product page through the real
-extractor path (`curl_cffi` with Chrome impersonation, fresh session), then
-report which of three outcomes you get:
+## retailer_probe.py
 
-- a bot wall, so the site needs cookies or is not worth supporting;
-- a usable Schema.org `Product` / Open Graph price, so the free path works and
-  no preset is needed;
-- neither, so the site needs a selector or an API preset.
+Fetches a list of product pages through the real extractor path (`curl_cffi`
+with Chrome impersonation, a fresh session each) and reports one of three
+outcomes per shop:
 
-That last case is what produced the presets in
-`custom_components/price_watch/presets/`. `rafland_gql*.py` and `magento_gql.py`
-are the ones that found Rafland's headless Magento GraphQL endpoint;
-`elko_biltema.py`, `jysk_*.py`, `bauhaus_probe.py` and `is_*_probe.py` cover the
-Icelandic shops; `amazon_*.py`, `bestbuy_*.py` and `target_mm_*.py` were the
-US/EU comparison set.
+- **bot wall** - the site needs cookies, or is not worth supporting;
+- **JSON-LD price** - the free Schema.org / Open Graph path works, no preset
+  needed;
+- **needs a selector** - the page loaded but carries no usable price, so the
+  site needs a selector or an API preset (see `docs/custom_parsers.md` and
+  `custom_components/price_watch/presets/`).
 
-Two things to know before running one:
+Edit `URLS` for the shops you want to test. It hits live retailer sites: keep
+the rate low, and expect results to change when a shop changes its markup.
 
-- Several hardcode an absolute path in `sys.path.insert(...)` so they can import
-  the extractor. Fix the path for your checkout.
-- They hit live retailer sites. Keep the request rate low, and expect a script
-  to rot the moment a shop changes its markup — that is the nature of the job,
-  not a bug to fix here.
+```
+python scripts/retailer_probe.py
+```
+
+## convert_brand.py
+
+Re-renders the PNGs in `custom_components/price_watch/brand/` from their SVGs
+with `resvg_py` (`pip install resvg_py`). Run it after editing a brand SVG.
+
+```
+python scripts/convert_brand.py
+```

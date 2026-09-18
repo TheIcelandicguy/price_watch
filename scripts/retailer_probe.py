@@ -4,7 +4,10 @@ For each URL: fetch via curl_cffi (chrome impersonation, fresh session),
 then report bot-wall / JSON-LD price / needs-selector.
 """
 import sys
-sys.path.insert(0, "/mnt/e/price_watch")
+from pathlib import Path
+
+# Import the real extractor from this checkout, wherever it lives.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from curl_cffi import requests as cr
 from custom_components.price_watch.extractor import try_jsonld, _looks_like_botwall
 
