@@ -38,3 +38,4 @@ scripts/*
 !scripts/README.md
 !scripts/retailer_probe.py
 !scripts/convert_brand.py
+AGENTS.md
