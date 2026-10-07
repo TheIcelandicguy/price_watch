@@ -7,6 +7,17 @@ Source `E:\price_watch` → deployed to `Z:\custom_components\price_watch`.
 
 Before ending a session, run `python check_docs.py` and update this file.
 
+**The Claude skill for this repo is kept here, not only on claude.ai.** It is
+`.claude/skills/price-watch-dev/SKILL.md`, which Claude Code loads from the clone. Update
+it in the same PR as the change it describes, and when you cut a release (its
+description quotes the version; `check_docs.py` fails when that is stale).
+claude.ai and Cowork read their own library and nothing pushes to it. After you
+change the skill, run `python build_skill.py --out "E:\skills for update claude_ai"`
+(Davíð's hand-off folder) and **tell him the file is ready to upload** under
+Customize > Skills, then to ask a new chat for the version. Say it in the final
+message of the session, not just in a commit. `check_docs.py` warns while the copy
+claude.ai syncs back under `~/.claude/skills/synced/` differs from the repo.
+
 Free-by-default multi-retailer price tracker with a Lit sidebar panel.
 Icelandic retailers are first-class and prices are ISK; AI is optional and, on
 the extraction path, strictly a last resort.
@@ -32,6 +43,7 @@ custom_components/price_watch/
   frontend/price-watch-panel.js    BUILT artifact — never hand-edit
 panel/src/          panel.ts, card.ts, utils.ts, types.ts (Lit 3 + TypeScript)
 tests/  11 modules      scripts/  live-site probes, not shipped
+build_skill.py      packages .claude/skills/ into dist-skill/*.skill for claude.ai
 ```
 
 ## Coordinator / mixin map
@@ -273,4 +285,4 @@ and 3.13, ruff — on push to main, PRs, manual, weekly Sunday.
   bundle URL is unversioned. `OVERVIEW.md` is tracked and was refreshed
   2026-09-11; `scripts/` tracks only `retailer_probe.py` and
   `convert_brand.py`; the one-off per-shop probes there are gitignored and
-  local-only, and `.claude/` is untracked on purpose.
+  local-only, and `.claude/` is untracked on purpose, except `.claude/skills/`.
