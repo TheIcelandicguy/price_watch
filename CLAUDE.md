@@ -42,7 +42,7 @@ custom_components/price_watch/
   listings.py store.py fx.py cookies.py migration.py websocket.py panel.py
   frontend/price-watch-panel.js    BUILT artifact — never hand-edit
 panel/src/          panel.ts, card.ts, utils.ts, types.ts (Lit 3 + TypeScript)
-tests/  11 modules      scripts/  live-site probes, not shipped
+tests/  14 modules      scripts/  live-site probes, not shipped
 build_skill.py      packages .claude/skills/ into dist-skill/*.skill for claude.ai
 ```
 
@@ -280,9 +280,7 @@ and 3.13, ruff — on push to main, PRs, manual, weekly Sunday.
   aiohttp degrade path only.
 - `_IMPERSONATE = "chrome131"` in `extractor.py` is pinned deliberately —
   newer fingerprints get 403'd by Best Buy / B&H. Don't bump it blind.
-- Doc drift: `services.yaml` omits `edit_listing`'s `url`, `unit_quantity` and
-  `unit_label` (the schema accepts them); `panel/README.md` wrongly claims the
-  bundle URL is unversioned. `OVERVIEW.md` is tracked and was refreshed
-  2026-09-11; `scripts/` tracks only `retailer_probe.py` and
-  `convert_brand.py`; the one-off per-shop probes there are gitignored and
-  local-only, and `.claude/` is untracked on purpose, except `.claude/skills/`.
+- Docs: `OVERVIEW.md` is tracked and was refreshed 2026-09-11; `scripts/`
+  tracks only `retailer_probe.py` and `convert_brand.py`; the one-off per-shop
+  probes there are gitignored and local-only, and `.claude/` is untracked on
+  purpose, except `.claude/skills/`.
