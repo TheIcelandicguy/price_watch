@@ -22,8 +22,9 @@ npm run watch
 ```
 
 Rebuilds on every save. You'll still need to hard-refresh the panel in
-the browser (the bundle URL is unversioned right now — we can add a
-cache buster later).
+the browser: the bundle URL carries the file's modified time (`?v=<mtime>`,
+read by `panel.py` when Home Assistant starts), so a rebuild only reaches a
+browser after an HA restart or a hard refresh.
 
 ## Layout
 

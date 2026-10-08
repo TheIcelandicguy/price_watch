@@ -171,7 +171,7 @@ price_watch/
 ├── panel/                             # Lit + TypeScript source (src/panel.ts, card.ts, utils.ts, types.ts)
 ├── docs/custom_parsers.md             # custom-parser guide
 ├── scripts/                           # retailer_probe.py + convert_brand.py (dev aids, not shipped)
-├── tests/                             # pytest suite (11 modules)
+├── tests/                             # pytest suite (14 modules)
 ├── CLAUDE.md / check_docs.py          # working notes for the repo + a drift check that fails when they go stale
 └── deploy.ps1                         # thin wrapper over the shared E:\tools\deploy-to-ha.ps1
 ```
