@@ -44,3 +44,6 @@ scripts/*
 !scripts/retailer_probe.py
 !scripts/convert_brand.py
 AGENTS.md
+
+# Another coding assistant mirrors skills here; it is a generated copy
+.agents/
